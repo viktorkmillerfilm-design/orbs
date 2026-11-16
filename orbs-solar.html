@@ -792,6 +792,704 @@
 
 </script>
 <script>
+/* ===== orbs fx batch 2 (inlined from fx/batch2.js) ===== */
+/* orbs fx batch 2: eq ring, saturator, delay echoes
+   plain umd, no deps. exposes OrbsFX2 (and module.exports).
+   if OrbsFX is already on the root, also attaches as OrbsFX.batch2 without
+   overwriting batch 1 names.
+   time units exposed to the host are in BEATS (solar convention).
+   compose with batch 1: eq before filter, sat after filter before util,
+   delay send off panner (or output) returning to master.
+   smoothing: setTargetAtTime(v, now, 0.02)
+*/
+(function (root, factory) {
+  const api = factory();
+  if (typeof module === 'object' && module.exports) module.exports = api;
+  if (root && typeof root === 'object') {
+    root.OrbsFX2 = api;
+    if (root.OrbsFX && !root.OrbsFX.batch2) {
+      root.OrbsFX.batch2 = api;
+      const keys = ['createEq', 'createSaturator', 'createDelay', 'install', 'attach'];
+      for (let i = 0; i < keys.length; i++) {
+        if (root.OrbsFX[keys[i]] == null) root.OrbsFX[keys[i]] = api[keys[i]];
+      }
+    }
+  }
+}(typeof self !== 'undefined' ? self : this, function () {
+  'use strict';
+
+  const SMOOTH = 0.02;
+  const EQ_MIN = -15, EQ_MAX = 15;
+  const EQ_LO_HZ = 200, EQ_MID_HZ = 1000, EQ_HI_HZ = 5000, EQ_MID_Q = 0.9;
+  const DRIVE_MIN = 0, DRIVE_MAX = 24;
+  const OUT_MIN = -12, OUT_MAX = 6;
+  const FB_MIN = 0, FB_MAX = 0.9;
+  const SEND_MIN = 0, SEND_MAX = 1;
+  const DELAY_MAX_S = 2;
+  const BEAT_MIN = 0.125; // 1/8 beat = 1/32 note
+  const BEAT_MAX = 2;     // 1/2 note
+  // note values in beats (4/4): 1/32, 1/16, 1/8, 1/8d, 1/4, 1/2
+  const NOTE_BEATS = [0.125, 0.25, 0.5, 0.75, 1, 2];
+  const NOTE_NAMES = { 0.125: '1/32', 0.25: '1/16', 0.5: '1/8', 0.75: '1/8d', 1: '1/4', 2: '1/2' };
+  const SNAP_NOTES = [0.25, 0.5, 0.75, 1]; // 1/16, 1/8, 1/8d, 1/4 (plus range ends in NOTE_BEATS)
+
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const dbToGain = db => {
+    if (!isFinite(db) || db <= -60) return 0;
+    return Math.pow(10, db / 20);
+  };
+  const gainToDb = g => {
+    if (!isFinite(g) || g <= 0) return -Infinity;
+    return 20 * Math.log10(g);
+  };
+  const nowOf = ctx => (ctx && typeof ctx.currentTime === 'number') ? ctx.currentTime : 0;
+  function smooth(param, value, ctx) {
+    if (!param) return;
+    const t = nowOf(ctx);
+    // hold the computed value, drop queued ramps, then approach the new target
+    if (typeof param.cancelAndHoldAtTime === 'function') {
+      try { param.cancelAndHoldAtTime(t); } catch (e) {}
+    } else {
+      try { param.cancelScheduledValues(t); param.setValueAtTime(param.value, t); } catch (e) {}
+    }
+    param.setTargetAtTime(value, t, SMOOTH);
+  }
+  const clampEq = v => clamp(isFinite(+v) ? +v : 0, EQ_MIN, EQ_MAX);
+  const clampDrive = v => clamp(isFinite(+v) ? +v : 0, DRIVE_MIN, DRIVE_MAX);
+  const clampOut = v => clamp(isFinite(+v) ? +v : 0, OUT_MIN, OUT_MAX);
+  const clampFb = v => clamp(isFinite(+v) ? +v : 0, FB_MIN, FB_MAX);
+  const clampSend = v => clamp(isFinite(+v) ? +v : 0, SEND_MIN, SEND_MAX);
+
+  function snapDelayBeats(v, sync) {
+    const x = clamp(isFinite(+v) ? +v : 0.5, BEAT_MIN, BEAT_MAX);
+    if (sync === false) return x;
+    let best = NOTE_BEATS[0], bd = Infinity;
+    for (let i = 0; i < NOTE_BEATS.length; i++) {
+      const d = Math.abs(NOTE_BEATS[i] - x);
+      if (d < bd) { bd = d; best = NOTE_BEATS[i]; }
+    }
+    return best;
+  }
+  function delaySeconds(beats, bpm) {
+    const b = clamp(isFinite(+beats) ? +beats : 0, 0, BEAT_MAX);
+    const p = isFinite(+bpm) && +bpm > 0 ? +bpm : 120;
+    return clamp(b * (60 / p), 0, DELAY_MAX_S);
+  }
+  function beatsToBars(beats) { return (isFinite(+beats) ? +beats : 0) / 4; }
+  function barsToBeats(bars) { return (isFinite(+bars) ? +bars : 0) * 4; }
+  function formatDelayBeats(beats) {
+    const s = snapDelayBeats(beats, true);
+    if (Math.abs(s - (isFinite(+beats) ? +beats : 0)) < 1e-6 && NOTE_NAMES[s]) return NOTE_NAMES[s];
+    const x = isFinite(+beats) ? +beats : 0;
+    if (NOTE_NAMES[x]) return NOTE_NAMES[x];
+    return x.toFixed(2) + ' bt';
+  }
+  function formatDb(db) {
+    if (!isFinite(db)) return '-inf';
+    const s = db.toFixed(1);
+    return (db > 0 ? '+' : '') + s;
+  }
+
+  /* ---------- saturator curve ---------- */
+  // k from drive dB: 0 → 0 (linear), 24 dB → ~14.85
+  function driveToK(driveDb) {
+    const d = clampDrive(driveDb);
+    if (d <= 0) return 0;
+    return Math.pow(10, d / 20) - 1;
+  }
+  function makeCurve(k, kind, n) {
+    const N = n || 8192;
+    const curve = new Float32Array(N);
+    const hard = kind === 'hard' || kind === 'clip';
+    if (k < 1e-8) {
+      for (let i = 0; i < N; i++) curve[i] = (i / (N - 1)) * 2 - 1;
+      return curve;
+    }
+    if (hard) {
+      const g = 1 + k;
+      for (let i = 0; i < N; i++) {
+        const x = (i / (N - 1)) * 2 - 1;
+        const y = x * g;
+        curve[i] = y > 1 ? 1 : y < -1 ? -1 : y;
+      }
+      return curve;
+    }
+    for (let i = 0; i < N; i++) {
+      const x = (i / (N - 1)) * 2 - 1;
+      curve[i] = Math.tanh(k * x);
+    }
+    return curve;
+  }
+  function compGain(k, kind) {
+    if (kind === 'hard' || kind === 'clip') return 1;
+    if (k < 1e-8) return 1;
+    return 1 / Math.tanh(k);
+  }
+
+  /* ---------- node factories ---------- */
+  function createEq(ctx) {
+    const lo = ctx.createBiquadFilter();
+    lo.type = 'lowshelf';
+    lo.frequency.value = EQ_LO_HZ;
+    lo.gain.value = 0;
+    const mid = ctx.createBiquadFilter();
+    mid.type = 'peaking';
+    mid.frequency.value = EQ_MID_HZ;
+    mid.Q.value = EQ_MID_Q;
+    mid.gain.value = 0;
+    const hi = ctx.createBiquadFilter();
+    hi.type = 'highshelf';
+    hi.frequency.value = EQ_HI_HZ;
+    hi.gain.value = 0;
+    lo.connect(mid);
+    mid.connect(hi);
+    return { input: lo, output: hi, lo, mid, hi };
+  }
+
+  function createSaturator(ctx) {
+    const input = ctx.createGain();
+    input.gain.value = 1;
+    const shaper = ctx.createWaveShaper();
+    shaper.oversample = '2x';
+    shaper.curve = makeCurve(0, 'soft');
+    const comp = ctx.createGain();
+    comp.gain.value = 1;
+    const outGain = ctx.createGain();
+    outGain.gain.value = 1;
+    input.connect(shaper);
+    shaper.connect(comp);
+    comp.connect(outGain);
+    return { input, shaper, comp, outGain, output: outGain };
+  }
+
+  function createDelay(ctx) {
+    const send = ctx.createGain();
+    send.gain.value = 0;
+    const delay = ctx.createDelay(DELAY_MAX_S);
+    delay.delayTime.value = 0.5;
+    const lpf = ctx.createBiquadFilter();
+    lpf.type = 'lowpass';
+    lpf.frequency.value = 4000;
+    lpf.Q.value = 0.7;
+    const feedback = ctx.createGain();
+    feedback.gain.value = 0;
+    const output = ctx.createGain();
+    output.gain.value = 1;
+    send.connect(delay);
+    delay.connect(lpf);
+    lpf.connect(output);
+    lpf.connect(feedback);
+    feedback.connect(delay);
+    return { send, delay, lpf, feedback, output, input: send };
+  }
+
+  function defaults(opts) {
+    const o = opts || {};
+    const sync = o.sync !== false;
+    return {
+      lo: clampEq(o.lo == null ? 0 : o.lo),
+      mid: clampEq(o.mid == null ? 0 : o.mid),
+      hi: clampEq(o.hi == null ? 0 : o.hi),
+      drive: clampDrive(o.drive == null ? 0 : o.drive),
+      out: clampOut(o.out == null ? 0 : o.out),
+      curve: o.curve === 'hard' || o.curve === 'clip' ? 'hard' : 'soft',
+      delayBeats: snapDelayBeats(o.delayBeats == null ? (o.beats == null ? 0.5 : o.beats) : o.delayBeats, sync),
+      feedback: clampFb(o.feedback == null ? 0 : o.feedback),
+      send: clampSend(o.send == null ? 0 : o.send),
+      sync: sync
+    };
+  }
+
+  function applyEq(nodes, state, ctx) {
+    smooth(nodes.lo.gain, state.lo, ctx);
+    smooth(nodes.mid.gain, state.mid, ctx);
+    smooth(nodes.hi.gain, state.hi, ctx);
+    if (nodes.mid.Q) smooth(nodes.mid.Q, EQ_MID_Q, ctx);
+  }
+
+  function applySat(nodes, state, ctx) {
+    const k = driveToK(state.drive);
+    const kind = state.curve === 'hard' ? 'hard' : 'soft';
+    nodes.shaper.oversample = '2x';
+    nodes.shaper.curve = makeCurve(k, kind);
+    smooth(nodes.comp.gain, compGain(k, kind), ctx);
+    smooth(nodes.outGain.gain, dbToGain(state.out), ctx);
+  }
+
+  // applySat but snap AudioParams now (offline renders / tests)
+  function applySatImmediate(nodes, state, ctx) {
+    const k = driveToK(state.drive);
+    const kind = state.curve === 'hard' ? 'hard' : 'soft';
+    nodes.shaper.oversample = '2x';
+    nodes.shaper.curve = makeCurve(k, kind);
+    const c = compGain(k, kind);
+    const o = dbToGain(state.out);
+    nodes.comp.gain.value = c;
+    nodes.outGain.gain.value = o;
+    if (ctx) {
+      const t = nowOf(ctx);
+      nodes.comp.gain.setTargetAtTime(c, t, SMOOTH);
+      nodes.outGain.gain.setTargetAtTime(o, t, SMOOTH);
+    }
+  }
+
+  function applyDelay(nodes, state, ctx, bpm) {
+    smooth(nodes.send.gain, state.send, ctx);
+    smooth(nodes.feedback.gain, state.feedback, ctx);
+    smooth(nodes.delay.delayTime, delaySeconds(state.delayBeats, bpm), ctx);
+  }
+
+  function applyDelayImmediate(nodes, state, ctx, bpm) {
+    nodes.send.gain.value = state.send;
+    nodes.feedback.gain.value = state.feedback;
+    const sec = delaySeconds(state.delayBeats, bpm);
+    nodes.delay.delayTime.value = sec;
+    if (ctx) applyDelay(nodes, state, ctx, bpm);
+  }
+
+  /* ---------- insert into a batch-1-shaped chain ----------
+     chain: input → [eq] → filter → [sat] → utilGain → panner → output
+     delay send taps panner (default) or output, return goes to delayReturn (master)
+  */
+  function install(chain, pieces) {
+    if (!chain) throw new Error('OrbsFX2.install requires a batch-1-shaped chain');
+    const p = pieces || {};
+    if (p.eq) {
+      try { chain.input.disconnect(chain.filter); } catch (e) {
+        try { chain.input.disconnect(); } catch (e2) {}
+      }
+      chain.input.connect(p.eq.input);
+      p.eq.output.connect(chain.filter);
+      chain.eq = p.eq;
+    }
+    if (p.sat) {
+      try { chain.filter.disconnect(chain.utilGain); } catch (e) {
+        try { chain.filter.disconnect(); } catch (e2) {}
+      }
+      chain.filter.connect(p.sat.input);
+      p.sat.output.connect(chain.utilGain);
+      chain.sat = p.sat;
+    }
+    if (p.delay) {
+      const src = p.delayFrom === 'output' ? chain.output : (chain.panner || chain.output);
+      src.connect(p.delay.send);
+      if (p.delayReturn) p.delay.output.connect(p.delayReturn);
+      chain.delay = p.delay;
+    }
+    return chain;
+  }
+
+  function snapshot(state) {
+    return {
+      lo: state.lo, mid: state.mid, hi: state.hi,
+      drive: state.drive, out: state.out, curve: state.curve,
+      delayBeats: state.delayBeats, beats: state.delayBeats,
+      feedback: state.feedback, send: state.send, sync: state.sync
+    };
+  }
+
+  /* ---------- engine ---------- */
+  function create(ctx, opts) {
+    if (!ctx || typeof ctx.createGain !== 'function') throw new Error('OrbsFX2.create requires an AudioContext');
+    const options = opts || {};
+    let bpm = isFinite(+options.bpm) ? +options.bpm : 120;
+    const bpmOf = typeof options.bpm === 'function' ? options.bpm : () => bpm;
+    const delayReturn = options.destination || options.delayReturn || null;
+    const delayFrom = options.delayFrom || 'panner';
+    const orbits = Object.create(null);
+
+    function need(id) {
+      const o = orbits[id];
+      if (!o) throw new Error('OrbsFX2: unknown orbit "' + id + '"');
+      return o;
+    }
+    function currentBpm() {
+      const v = +bpmOf();
+      return isFinite(v) && v > 0 ? v : bpm;
+    }
+
+    function addOrbit(id, chain, init) {
+      if (orbits[id]) removeOrbit(id);
+      const state = defaults(init);
+      const eq = createEq(ctx);
+      const sat = createSaturator(ctx);
+      const delay = createDelay(ctx);
+      let own = false;
+      let ch = chain;
+      if (!ch) {
+        own = true;
+        const input = ctx.createGain();
+        const output = ctx.createGain();
+        input.connect(eq.input);
+        eq.output.connect(sat.input);
+        sat.output.connect(output);
+        if (delayReturn || options.autoConnect !== false) {
+          output.connect(delayReturn || ctx.destination);
+        }
+        output.connect(delay.send);
+        if (delayReturn) delay.output.connect(delayReturn);
+        else if (options.autoConnect !== false) delay.output.connect(ctx.destination);
+        ch = { input, output, eq, sat, delay, panner: output, filter: null, utilGain: null, _standalone: true };
+      } else {
+        install(ch, { eq, sat, delay, delayFrom, delayReturn: delayReturn || (ch.output && options.autoConnect !== false ? null : null) });
+        if (delayReturn) {
+          // already connected in install
+        } else if (options.autoConnect !== false && !delayReturn) {
+          // if host didn't pass a return, leave delay.output unconnected so they can wire it
+        }
+      }
+      applyEq(eq, state, ctx);
+      applySat(sat, state, ctx);
+      applyDelay(delay, state, ctx, currentBpm());
+      orbits[id] = { id, state, eq, sat, delay, chain: ch, own };
+      return snapshot(state);
+    }
+
+    function removeOrbit(id) {
+      const o = orbits[id];
+      if (!o) return false;
+      try { o.eq.input.disconnect(); } catch (e) {}
+      try { o.sat.input.disconnect(); } catch (e) {}
+      try { o.delay.send.disconnect(); } catch (e) {}
+      try { o.delay.output.disconnect(); } catch (e) {}
+      delete orbits[id];
+      return true;
+    }
+
+    function getOrbit(id) { return snapshot(need(id).state); }
+    function nodes(id) {
+      const o = need(id);
+      return { eq: o.eq, sat: o.sat, delay: o.delay, chain: o.chain };
+    }
+    function ids() { return Object.keys(orbits); }
+
+    function setEq(id, params) {
+      const o = need(id);
+      const p = params || {};
+      if (p.lo != null) o.state.lo = clampEq(p.lo);
+      if (p.mid != null) o.state.mid = clampEq(p.mid);
+      if (p.hi != null) o.state.hi = clampEq(p.hi);
+      if (p.low != null) o.state.lo = clampEq(p.low);
+      if (p.high != null) o.state.hi = clampEq(p.high);
+      applyEq(o.eq, o.state, ctx);
+      return snapshot(o.state);
+    }
+    function setSat(id, params) {
+      const o = need(id);
+      const p = params || {};
+      if (p.drive != null) o.state.drive = clampDrive(p.drive);
+      if (p.out != null) o.state.out = clampOut(p.out);
+      if (p.output != null) o.state.out = clampOut(p.output);
+      if (p.curve != null) o.state.curve = (p.curve === 'hard' || p.curve === 'clip') ? 'hard' : 'soft';
+      applySat(o.sat, o.state, ctx);
+      return snapshot(o.state);
+    }
+    function setDelay(id, params) {
+      const o = need(id);
+      const p = params || {};
+      if (p.sync != null) o.state.sync = !!p.sync;
+      if (p.beats != null || p.delayBeats != null || p.time != null) {
+        o.state.delayBeats = snapDelayBeats(p.beats != null ? p.beats : (p.delayBeats != null ? p.delayBeats : p.time), o.state.sync);
+      }
+      if (p.ms != null && p.beats == null && p.delayBeats == null && p.time == null) {
+        const beats = (+p.ms / 1000) * (currentBpm() / 60);
+        o.state.delayBeats = snapDelayBeats(beats, o.state.sync);
+      }
+      if (p.feedback != null || p.fb != null) o.state.feedback = clampFb(p.feedback != null ? p.feedback : p.fb);
+      if (p.send != null) o.state.send = clampSend(p.send);
+      applyDelay(o.delay, o.state, ctx, currentBpm());
+      return snapshot(o.state);
+    }
+    function setBpm(v) {
+      if (typeof options.bpm !== 'function') bpm = +v || bpm;
+      const p = currentBpm();
+      for (const id in orbits) applyDelay(orbits[id].delay, orbits[id].state, ctx, p);
+      return p;
+    }
+    function attach(fx1, dest) {
+      const ret = dest || delayReturn || (fx1 && fx1.master);
+      if (fx1 && typeof fx1.ids === 'function') {
+        const list = fx1.ids();
+        for (let i = 0; i < list.length; i++) {
+          const id = list[i];
+          if (!orbits[id] && typeof fx1.chain === 'function') {
+            const prevRet = arguments.length > 1 ? dest : ret;
+            // temporarily wire this orbit's delay to ret via addOrbit install
+            addOrbit(id, fx1.chain(id), {});
+            if (prevRet && orbits[id]) {
+              try { orbits[id].delay.output.connect(prevRet); } catch (e) {}
+            }
+          }
+        }
+      }
+      return ids();
+    }
+    function dispose() {
+      for (const id of Object.keys(orbits)) removeOrbit(id);
+    }
+
+    return {
+      context: ctx,
+      addOrbit, removeOrbit, getOrbit, nodes, ids,
+      setEq, setSat, setDelay, setBpm, getBpm: currentBpm,
+      attach, dispose
+    };
+  }
+
+  /* ---------- visuals ---------- */
+  function gainAlpha(gainDb, highlight) {
+    if (highlight) return 0.9;
+    const db = isFinite(gainDb) ? gainDb : -24;
+    if (db <= 0) return 0.15 + 0.13 * clamp((db + 24) / 24, 0, 1);
+    return 0.28 + 0.42 * clamp(db / 6, 0, 1);
+  }
+  function angDiff(a, b) {
+    let d = Math.abs(a - b) % (Math.PI * 2);
+    if (d > Math.PI) d = Math.PI * 2 - d;
+    return d;
+  }
+  function eqOffset(theta, lo, mid, hi, px) {
+    const w = 0.55;
+    const bump = c => Math.exp(-0.5 * Math.pow(angDiff(theta, c) / w, 2));
+    const s = (px == null ? 8 : px) / 15;
+    return s * (hi * bump(0) + mid * (bump(Math.PI / 2) + bump(-Math.PI / 2)) + lo * bump(Math.PI));
+  }
+  function bandFromAngle(ang) {
+    const dHigh = angDiff(ang, 0);
+    const dMid = Math.min(angDiff(ang, Math.PI / 2), angDiff(ang, -Math.PI / 2));
+    const dLow = angDiff(ang, Math.PI);
+    if (dHigh <= dMid && dHigh <= dLow) return 'hi';
+    if (dLow <= dMid) return 'lo';
+    return 'mid';
+  }
+  function hash01(i, seed) {
+    const x = Math.sin(i * 127.1 + (seed || 1) * 311.7) * 43758.5453;
+    return x - Math.floor(x);
+  }
+
+  function drawOrbit(ctx2d, opts) {
+    const o = opts || {};
+    const x = o.x, y = o.y, r = o.r;
+    const lo = o.lo || 0, mid = o.mid || 0, hi = o.hi || 0;
+    const drive = o.drive || 0;
+    const muted = !!o.muted;
+    const highlight = !!o.highlight;
+    const alpha = gainAlpha(o.gainDb, highlight);
+    const jitterAmp = (drive / DRIVE_MAX) * 3;
+    const seed = o.seed == null ? 1 : o.seed;
+    const type = o.filterType || 'bypass';
+    const q = o.q == null ? 0.7 : o.q;
+    const amount = o.filterAmount || 0;
+    const active = type !== 'bypass' && Math.abs(amount) > 0.04;
+    const wobble = active ? ((q - 0.5) / 11.5) * 2.6 : 0;
+    const steps = 192;
+
+    ctx2d.save();
+    ctx2d.lineWidth = 1;
+    ctx2d.strokeStyle = 'rgba(255,255,255,' + alpha + ')';
+    if (muted) ctx2d.setLineDash([3, 4]);
+    ctx2d.beginPath();
+    for (let i = 0; i <= steps; i++) {
+      const t = (i / steps) * Math.PI * 2;
+      const nEq = eqOffset(t, lo, mid, hi, 8);
+      const nSat = jitterAmp ? jitterAmp * (
+        Math.sin(t * 29 + seed * 1.7) * 0.5 +
+        Math.sin(t * 47 + seed * 2.3) * 0.3 +
+        Math.sin(t * 73 + seed * 0.9) * 0.15 +
+        (hash01(i, seed) * 2 - 1) * 0.2
+      ) : 0;
+      const nW = wobble ? (Math.sin(t * 11) * wobble + Math.sin(t * 17) * wobble * 0.35) : 0;
+      const rr = r + nEq + nSat + nW;
+      const px = x + Math.sin(t) * rr;
+      const py = y - Math.cos(t) * rr;
+      if (i === 0) ctx2d.moveTo(px, py); else ctx2d.lineTo(px, py);
+    }
+    ctx2d.stroke();
+    ctx2d.setLineDash([]);
+
+    const lap = o.lapBeats != null ? o.lapBeats : (o.lap == null ? 4 : o.lap * 4);
+    const beats = Math.max(1, Math.round(lap));
+    const tickA = highlight ? 0.55 : Math.max(0.14, alpha * 0.7);
+    ctx2d.strokeStyle = 'rgba(255,255,255,' + tickA + ')';
+    for (let i = 0; i < beats; i++) {
+      const t = (i / beats) * Math.PI * 2;
+      const c = Math.cos(t), s = Math.sin(t);
+      const inner = r - (i === 0 ? 5 : 3);
+      const outer = r + (i === 0 ? 5 : 3);
+      ctx2d.beginPath();
+      ctx2d.moveTo(x + s * inner, y - c * inner);
+      ctx2d.lineTo(x + s * outer, y - c * outer);
+      ctx2d.stroke();
+    }
+
+    if (active) {
+      const inward = type === 'lowpass';
+      const strength = clamp(Math.abs(amount), 0, 1);
+      const nTicks = 24;
+      const len = 2 + strength * 7;
+      ctx2d.strokeStyle = 'rgba(255,255,255,' + (0.16 + strength * 0.45) + ')';
+      for (let i = 0; i < nTicks; i++) {
+        const t = ((i + 0.5) / nTicks) * Math.PI * 2;
+        const c = Math.cos(t), s = Math.sin(t);
+        const a = inward ? r - 1 : r + 1;
+        const b = inward ? r - 1 - len : r + 1 + len;
+        ctx2d.beginPath();
+        ctx2d.moveTo(x + s * a, y - c * a);
+        ctx2d.lineTo(x + s * b, y - c * b);
+        ctx2d.stroke();
+      }
+    }
+
+    if (o.phase === 180) {
+      ctx2d.fillStyle = 'rgba(255,255,255,' + Math.max(0.45, alpha) + ')';
+      ctx2d.font = '9px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
+      ctx2d.textAlign = 'center';
+      ctx2d.textBaseline = 'bottom';
+      ctx2d.fillText('ø', x, y - r - 7);
+    }
+    if (o.label) {
+      ctx2d.fillStyle = 'rgba(255,255,255,' + (highlight ? 0.7 : 0.35) + ')';
+      ctx2d.font = '10px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
+      ctx2d.textAlign = 'left';
+      ctx2d.textBaseline = 'middle';
+      ctx2d.fillText(o.label, x + 8, y - r);
+    }
+    ctx2d.restore();
+  }
+
+  function ghostPhases(phase, delayBeats, lapBeats, n) {
+    const N = n == null ? 6 : n;
+    const out = [];
+    if (!(lapBeats > 0) || !(delayBeats > 0)) return out;
+    const d = delayBeats / lapBeats;
+    for (let i = 1; i <= N; i++) out.push((((phase - d * i) % 1) + 1) % 1);
+    return out;
+  }
+
+  function drawGhosts(ctx2d, opts) {
+    const o = opts || {};
+    if (!(o.send > 0) || !(o.delayBeats > 0) || !(o.r > 0)) return 0;
+    const phases = ghostPhases(o.phase || 0, o.delayBeats, o.lapBeats || 4, 6);
+    const fb = clamp(o.feedback == null ? 0 : o.feedback, 0, 1);
+    const pan = clamp(o.pan || 0, -1, 1) * 4;
+    let drawn = 0;
+    ctx2d.save();
+    ctx2d.lineWidth = 1;
+    for (let i = 0; i < phases.length; i++) {
+      const a = o.send * Math.pow(Math.max(fb, 0.0001), i);
+      if (a < 0.03) break;
+      const t = phases[i] * Math.PI * 2;
+      const px = o.x + Math.sin(t) * o.r + pan;
+      const py = o.y - Math.cos(t) * o.r;
+      ctx2d.strokeStyle = 'rgba(255,255,255,' + (0.12 + a * 0.65) + ')';
+      ctx2d.beginPath();
+      ctx2d.arc(px, py, o.dotR || 2.6, 0, Math.PI * 2);
+      ctx2d.stroke();
+      drawn++;
+    }
+    ctx2d.restore();
+    return drawn;
+  }
+
+  /* ---------- gestures ---------- */
+  const gestures = {
+    eqDrag(tone, id, info) {
+      const band = info.band || bandFromAngle(info.ang || 0);
+      const s = tone.getOrbit(id);
+      let g;
+      if (info.gain != null) g = info.gain;
+      else if (info.rho != null && info.radius) g = clampEq(((info.rho - info.radius) / Math.max(12, info.radius * 0.25)) * 15);
+      else g = s[band] + (info.dGain || 0);
+      const p = {}; p[band] = g;
+      return tone.setEq(id, p);
+    },
+    eqReset(tone, id, info) {
+      const band = (info && (info.band || bandFromAngle(info.ang || 0))) || 'mid';
+      const p = {}; p[band] = 0;
+      return tone.setEq(id, p);
+    },
+    satDrag(tone, id, info) {
+      const start = info.startDrive != null ? info.startDrive : tone.getOrbit(id).drive;
+      const next = clampDrive(start + ((info.startY != null ? info.startY - info.y : 0) / 8));
+      return tone.setSat(id, { drive: next });
+    },
+    delayPlace(tone, id, info) {
+      // angular distance from 12 o'clock, a full turn = 2 beats, then snap
+      const ang = ((info.ang % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+      const turns = ang / (Math.PI * 2);
+      const beats = snapDelayBeats(clamp(turns * 2, BEAT_MIN, BEAT_MAX), true);
+      return tone.setDelay(id, { beats, sync: true });
+    },
+    delayFeedback(tone, id, info) {
+      const start = info.startFb != null ? info.startFb : tone.getOrbit(id).feedback;
+      const next = clampFb(start + ((info.startY != null ? info.startY - info.y : 0) / 120));
+      return tone.setDelay(id, { feedback: next });
+    }
+  };
+
+  /* ---------- offline RMS helper (for tests / sanity) ---------- */
+  async function measureSatRms(opts) {
+    const o = opts || {};
+    const sr = o.sampleRate || 44100;
+    const dur = o.dur || 0.8;
+    const freq = o.freq || 220;
+    const amp = o.amp == null ? 0.5 : o.amp;
+    const Ctor = o.OfflineAudioContext || (typeof OfflineAudioContext !== 'undefined' ? OfflineAudioContext : null);
+    if (!Ctor) throw new Error('OfflineAudioContext not available');
+    const off = new Ctor(1, Math.ceil(sr * dur), sr);
+    const sat = createSaturator(off);
+    applySatImmediate(sat, {
+      drive: o.drive == null ? 0 : o.drive,
+      out: o.out == null ? 0 : o.out,
+      curve: o.curve || 'soft'
+    }, off);
+    const osc = off.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.value = freq;
+    const g = off.createGain();
+    g.gain.value = amp;
+    osc.connect(g);
+    g.connect(sat.input);
+    sat.output.connect(off.destination);
+    osc.start(0);
+    const buf = await off.startRendering();
+    const d = buf.getChannelData(0);
+    const start = Math.floor(d.length * 0.4);
+    let s = 0, n = 0;
+    for (let i = start; i < d.length; i++) { s += d[i] * d[i]; n++; }
+    const rms = Math.sqrt(s / Math.max(1, n));
+    const k = driveToK(o.drive == null ? 0 : o.drive);
+    return { rms, k, comp: compGain(k, o.curve || 'soft'), oversample: sat.shaper.oversample };
+  }
+
+  return {
+    create, createEq, createSaturator, createDelay, install, attach: (fx, dest, ctx) => {
+      // standalone helper: attach batch2 inserts to every orbit on a batch-1 engine
+      const tone = create(ctx || fx.context, { destination: dest || fx.master, bpm: () => fx.getBpm() });
+      tone.attach(fx, dest || fx.master);
+      return tone;
+    },
+    applyEq, applySat, applySatImmediate, applyDelay, applyDelayImmediate,
+    defaults, snapshot,
+    clamp, dbToGain, gainToDb, clampEq, clampDrive, clampOut, clampFb, clampSend,
+    snapDelayBeats, delaySeconds, beatsToBars, barsToBeats, formatDelayBeats, formatDb,
+    driveToK, makeCurve, compGain, measureSatRms,
+    bandFromAngle, eqOffset, ghostPhases,
+    drawOrbit, drawGhosts,
+    gestures,
+    SMOOTH, EQ_MIN, EQ_MAX, EQ_LO_HZ, EQ_MID_HZ, EQ_HI_HZ, EQ_MID_Q,
+    DRIVE_MIN, DRIVE_MAX, OUT_MIN, OUT_MAX, FB_MAX, DELAY_MAX_S,
+    BEAT_MIN, BEAT_MAX, NOTE_BEATS, NOTE_NAMES, SNAP_NOTES,
+    INSERT: {
+      eq: 'before filter (after chain.input / orbitBus)',
+      sat: 'after filter, before utilGain',
+      delay: 'send off panner (or output); return to master'
+    }
+  };
+}));
+
+</script>
+<script>
 (() => {
 'use strict';
 /* ---------------- setup ---------------- */
@@ -809,7 +1507,10 @@ const LAPS = OrbsFX.LAP_STEPS.map(b => b * 4); // fx batch 1 lap steps (bars) �
 const ST_KEYS = ['lap', 'offset', 'quantize', 'gainDb', 'pan', 'muted', 'phase', 'mono', 'filterType', 'cutoff', 'q'];
 const stState = s => { const o = {}; ST_KEYS.forEach(k => o[k] = s[k]); return o; };
 let orbN = 0;
-function mkOrb(L, st) { const s = OrbsFX.defaults(Object.assign({}, st || {}, { lap: L / 4 })); return { id: 'o' + (++orbN), lap: s.lap * 4, st: stState(s) }; }
+const T2_KEYS = ['lo', 'mid', 'hi', 'drive', 'out', 'curve', 'delayBeats', 'feedback', 'send', 'sync'];
+const t2State = s => { const o = {}; T2_KEYS.forEach(k => o[k] = s[k]); return o; };
+const T2_DEF = { delayBeats: 0.75, feedback: 0.35, send: 0 }; // orbit delay starts as solar's old echo: dotted 1/8
+function mkOrb(L, st, t2) { const s = OrbsFX.defaults(Object.assign({}, st || {}, { lap: L / 4 })); return { id: 'o' + (++orbN), lap: s.lap * 4, st: stState(s), t2: t2State(OrbsFX2.defaults(Object.assign({}, T2_DEF, t2 || {}))) }; }
 const DEF = [ // a = angle on the orbit at song position 0 (0 = trigger line at 12 o'clock, clockwise)
   { id: 'kick',   ch: 1, orbit: 0, a: 0,     vol: 0.9,  lvl: 0.95, verb: 0.05, echo: 0,    cut: 1 },
   { id: 'hats',   ch: 3, orbit: 0, a: 0.5,   vol: 0.55, lvl: 0.55, verb: 0.12, echo: 0,    cut: 1 },
@@ -838,7 +1539,7 @@ const PKEYS = ['orbit', 'a', 'vol', 'pn', 'echo', 'verb', 'cut', 'muted', 'seed'
 const KEEP = ['trimS', 'trimE', 'rev', 'loop', 'bars', 'recBpm', 'phase', 'recorded', 'label', 'side', 'base'];
 function save() { if (!ready) return; try {
   const els = {}; IDS.forEach(id => { const e = E[id], o = els[id] = { v: e.variant }; PKEYS.concat(KEEP).forEach(k => { if (e[k] !== undefined) o[k] = e[k]; }); o.a = +(+e.a).toFixed(5); });
-  localStorage.setItem(LS, JSON.stringify({ els, order: IDS.slice(), orbs: ORB.map(o => ({ lap: o.lap, st: Object.assign({}, o.st, { gainDb: isFinite(o.st.gainDb) ? o.st.gainDb : '-inf' }) })), swing, still, bpm, snapOn, recCount, cloneCount })); } catch (e) {} }
+  localStorage.setItem(LS, JSON.stringify({ els, order: IDS.slice(), orbs: ORB.map(o => ({ lap: o.lap, st: Object.assign({}, o.st, { gainDb: isFinite(o.st.gainDb) ? o.st.gainDb : '-inf' }), t2: o.t2 })), swing, still, bpm, snapOn, recCount, cloneCount })); } catch (e) {} }
 function applySaved(e, o) {
   ['orbit', 'a', 'vol', 'pn', 'echo', 'verb', 'cut', 'seed'].forEach(k => { if (typeof o[k] === 'number' && isFinite(o[k])) e[k] = o[k]; });
   e.muted = !!o.muted;
@@ -847,7 +1548,7 @@ function applySaved(e, o) {
   if (e.side === 'rec' && o.label) e.label = String(o.label).slice(0, 14);
 }
 function load() { try { const s = JSON.parse(localStorage.getItem(LS) || 'null'); if (!s) return;
-  if (Array.isArray(s.orbs) && s.orbs.length) ORB = s.orbs.slice(0, MAX_ORB).map(o => mkOrb(LAPS.includes(o.lap) ? o.lap : 4, o.st));
+  if (Array.isArray(s.orbs) && s.orbs.length) ORB = s.orbs.slice(0, MAX_ORB).map(o => mkOrb(LAPS.includes(o.lap) ? o.lap : 4, o.st, o.t2));
   if (typeof s.swing === 'number') swing = clamp(s.swing, 0, 60);
   for (const id of (s.order || Object.keys(s.els || {}))) { const o = (s.els || {})[id]; if (!o) continue;
     if (E[id]) applySaved(E[id], o);
@@ -890,10 +1591,10 @@ function ensureNodes(e) { // planet strip: in → duck → filter → vol → pa
   if (e.in) return;
   e.in = ac.createGain(); e.duck = ac.createGain(); e.flt = ac.createBiquadFilter(); e.flt.type = 'lowpass'; e.flt.Q.value = 0.7; e.flt.frequency.value = cutHz(e.cut);
   e.vg = ac.createGain(); e.vg.gain.value = 0; e.pan = ac.createStereoPanner(); e.sg = ac.createGain(); e.sg.gain.value = 0;
-  e.dg = ac.createGain(); e.dg.gain.value = 0; e.dly = ac.createDelay(4); e.dly.delayTime.value = ECHO_BEATS * 60 / bpm; e.fb = ac.createGain(); e.fb.gain.value = 0.35; e.dlp = ac.createBiquadFilter(); e.dlp.type = 'lowpass'; e.dlp.frequency.value = 3800;
+  e.dg = ac.createGain(); e.dg.gain.value = 0; // echo send → the orbit's batch-2 delay
   e.in.connect(e.duck); e.duck.connect(e.flt); e.flt.connect(e.vg); e.vg.connect(e.pan); e.pan.connect(e.sg); e.sg.connect(rev);
-  e.pan.connect(e.dg); e.dg.connect(e.dly); e.dly.connect(e.dlp); e.dlp.connect(e.fb); e.fb.connect(e.dly);
-  e._mix = {}; e._route = null; routePlanet(e); // dry + echo → the orbit's fx chain (utility, filter)
+  e.pan.connect(e.dg);
+  e._mix = {}; e._route = null; routePlanet(e); // dry → the orbit's fx chain, echo send → the orbit's delay
 }
 function initAudio() {
   if (ac) return;
@@ -1107,7 +1808,6 @@ function midiNote(e, ev, t, dur) {
 }
 
 /* ---------------- solar: tempo-locked orbits ---------------- */
-const ECHO_BEATS = 0.75; // echo = dotted eighth, synced to bpm
 const cutHz = c => 120 * Math.pow(2, clamp(c, 0, 1) * 7.3); // 120 Hz … ~19 kHz
 const COARSE = matchMedia('(pointer: coarse)').matches;
 let touchMode = COARSE;
@@ -1170,13 +1870,21 @@ let fx = null;
 function initFx() { // called from initAudio, before planet strips are built
   if (fx) return;
   fx = OrbsFX.create(ac, { destination: master, bpm, swing });
-  ORB.forEach(o => { fx.addOrbit(o.id, o.st); o.st = stState(fx.getOrbit(o.id)); });
+  fx2 = OrbsFX2.create(ac, { destination: master, bpm: () => bpm }); // batch 2: eq before filter, sat before util, delay send off the panner → master
+  ORB.forEach(addOrbitFx);
+}
+function addOrbitFx(o) { fx.addOrbit(o.id, o.st); o.st = stState(fx.getOrbit(o.id)); fx2.addOrbit(o.id, fx.chain(o.id), o.t2); o.t2 = t2State(fx2.getOrbit(o.id)); }
+let fx2 = null;
+function orb2Set(i, kind, p) { // eq / sat / delay through the batch 2 setters
+  const o = ORB[i]; if (!o) return; initAudio();
+  ({ eq: () => fx2.setEq(o.id, p), sat: () => fx2.setSat(o.id, p), delay: () => fx2.setDelay(o.id, p) })[kind]();
+  o.t2 = t2State(fx2.getOrbit(o.id)); save();
 }
 function routePlanet(e) { // planet dry + echo into its orbit's chain
-  if (!fx || !e.pan) return; const o = ORB[e.orbit]; if (!o) return; const tgt = fx.chain(o.id).input;
+  if (!fx || !e.pan) return; const o = ORB[e.orbit]; if (!o) return; const tgt = fx.chain(o.id).input, dl = fx2.nodes(o.id).delay.delay;
   if (e._route === tgt) return;
-  if (e._route) { try { e.pan.disconnect(e._route); } catch (x) {} try { e.dlp.disconnect(e._route); } catch (x) {} }
-  e.pan.connect(tgt); e.dlp.connect(tgt); e._route = tgt;
+  if (e._route) { try { e.pan.disconnect(e._route); } catch (x) {} try { e.dg.disconnect(e._dl); } catch (x) {} }
+  e.pan.connect(tgt); e.dg.connect(dl); e._route = tgt; e._dl = dl;
 }
 const orbIdx = id => ORB.findIndex(o => o.id === id);
 const offOf = e => (ORB[e.orbit] ? ORB[e.orbit].st.offset : 0);
@@ -1216,7 +1924,7 @@ function posNow() {
 
 /* ---------------- bpm + snap ---------------- */
 const bpmEl = document.getElementById('bpm');
-function setBpm(v) { bpm = clamp(Math.round(v), 70, 150); if (fx) fx.setBpm(bpm); bpmEl.textContent = 'bpm ' + bpm; save(); }
+function setBpm(v) { bpm = clamp(Math.round(v), 70, 150); if (fx) fx.setBpm(bpm); if (fx2) fx2.setBpm(bpm); bpmEl.textContent = 'bpm ' + bpm; save(); }
 setBpm(bpm);
 bpmEl.addEventListener('wheel', e => { e.preventDefault(); setBpm(bpm + (e.deltaY < 0 ? 1 : -1)); }, { passive: false });
 bpmEl.addEventListener('pointerdown', e => {
@@ -1288,9 +1996,7 @@ function updateMix() {
     setP(e, 'v', e.vg.gain, mutedNow ? 0 : Math.pow(e.vol, 1.3) * e.lvl, S);
     setP(e, 'p', e.pan.pan, clamp(e.pn, -1, 1) * 0.9, S);
     setP(e, 's', e.sg.gain, e.verb * 0.9 * og, S); // reverb send follows the orbit's gain / mute
-    setP(e, 'd', e.dg.gain, e.echo * 0.6, S);
-    setP(e, 'f', e.fb.gain, 0.2 + 0.45 * e.echo, S);
-    setP(e, 't', e.dly.delayTime, ECHO_BEATS * 60 / bpm, 0.08);
+    setP(e, 'd', e.dg.gain, e.echo * 0.6 * og, S); // planet echo = its send into the orbit delay
     setP(e, 'c', e.flt.frequency, cutHz(e.cut), S);
   }
 }
@@ -1377,8 +2083,8 @@ function setLap(i, lap) {
   for (const id of IDS) { const e = E[id]; if (e.orbit !== i) continue; const ang = frac(e.a - off + pos / old); e.a = snapA(ang - pos / lap + off, lap); }
   orbSet(i, 'lap', lap / 4); sheetDirty = true;
 }
-function addOrbit() { if (ORB.length >= MAX_ORB) return; const last = ORB[ORB.length - 1], o = mkOrb(last ? Math.min(32, last.lap * 2) : 4, { quantize: snapOn }); ORB.push(o); if (fx) { fx.addOrbit(o.id, o.st); o.st = stState(fx.getOrbit(o.id)); } openOrb = ORB.length - 1; sheetDirty = true; save(); }
-function removeOrbit(i) { if (ORB.length <= 1 || IDS.some(id => E[id].orbit === i)) return; const o = ORB.splice(i, 1)[0]; if (fx) fx.removeOrbit(o.id); IDS.forEach(id => { if (E[id].orbit > i) E[id].orbit--; }); openOrb = Math.min(openOrb, ORB.length - 1); sheetDirty = true; save(); }
+function addOrbit() { if (ORB.length >= MAX_ORB) return; const last = ORB[ORB.length - 1], o = mkOrb(last ? Math.min(32, last.lap * 2) : 4, { quantize: snapOn }); ORB.push(o); if (fx) addOrbitFx(o); openOrb = ORB.length - 1; sheetDirty = true; save(); }
+function removeOrbit(i) { if (ORB.length <= 1 || IDS.some(id => E[id].orbit === i)) return; const o = ORB.splice(i, 1)[0]; if (fx2) fx2.removeOrbit(o.id); if (fx) fx.removeOrbit(o.id); IDS.forEach(id => { if (E[id].orbit > i) E[id].orbit--; }); openOrb = Math.min(openOrb, ORB.length - 1); sheetDirty = true; save(); }
 function copyPlanet(id) {
   const e = E[id]; if (!e) return; const base = baseOf(id);
   if (e.side === 'rec' && !e.base) { recMsg('copy works for built-in sounds'); return; }
@@ -1389,7 +2095,7 @@ function copyPlanet(id) {
 function removeEl(id) {
   const e = E[id]; if (!e || !(e.side === 'rec' || e.base)) return;
   IDS.splice(IDS.indexOf(id), 1);
-  try { e.vg.disconnect(); e.pan.disconnect(); e.dlp.disconnect(); } catch (x) {}
+  try { e.vg.disconnect(); e.pan.disconnect(); e.dg.disconnect(); } catch (x) {}
   delete E[id]; if (e.side === 'rec') idbDel(id); if (barId === id) closeBar(); if (pickId === id) closePicker();
   if (selId === id) selId = null; sheetDirty = true; save();
 }
@@ -1425,7 +2131,14 @@ function frame(now) {
     const R = orbitR(i), tgt = drag && drag.tgt && !drag.tgt.mute && drag.tgt.orbit === i;
     const os = ORB[i].st, gA = isFinite(os.gainDb) ? clamp(1 + os.gainDb / 30, 0.45, 1.2) : 0.45;
     g.globalAlpha = (tgt ? 0.2 : (sel && sel.orbit === i ? 0.13 : 0.09)) * gA; g.lineWidth = hair; if (os.muted) g.setLineDash([2, 5]);
-    g.beginPath(); g.ellipse(CX, CY, R, R * K, 0, 0, TAU); g.stroke(); g.setLineDash([]);
+    const t2 = ORB[i].t2;
+    if (Math.abs(t2.lo) + Math.abs(t2.mid) + Math.abs(t2.hi) > 0.05 || t2.drive > 0.05) { // eq: hi bulges at 12, mid at 3/9, lo at 6 · sat: fine jitter
+      const jit = (t2.drive / OrbsFX2.DRIVE_MAX) * 1.6, N = 220; g.beginPath();
+      for (let j = 0; j <= N; j++) { const t = j / N * TAU, n = OrbsFX2.eqOffset(t, t2.lo, t2.mid, t2.hi, 4.5) + (jit ? jit * (Math.sin(t * 29 + i * 1.7 + T * 3) * 0.5 + Math.sin(t * 47 + i * 2.3) * 0.3 + Math.sin(t * 73 + i * 0.9 - T * 2) * 0.2) : 0), rr = R + n;
+        const px = CX + rr * Math.sin(t), py = CY - (R * K + n) * Math.cos(t); j ? g.lineTo(px, py) : g.moveTo(px, py); }
+      g.stroke();
+    } else { g.beginPath(); g.ellipse(CX, CY, R, R * K, 0, 0, TAU); g.stroke(); }
+    g.setLineDash([]);
     const amt = OrbsFX.filterAmountOf(os.filterType, os.cutoff);
     if (os.filterType !== 'bypass' && Math.abs(amt) > 0.04) { // filter fringe: lowpass ticks inside, highpass outside
       const st = Math.abs(amt), len = 2 + 5 * st, inw = os.filterType === 'lowpass'; g.globalAlpha = 0.07 + 0.12 * st;
@@ -1457,9 +2170,11 @@ function frame(now) {
   if (!playing) { g.globalAlpha = 0.5; g.beginPath(); g.moveTo(CX - 1.6, CY - 2.4); g.lineTo(CX + 2.6, CY); g.lineTo(CX - 1.6, CY + 2.4); g.closePath(); g.fillStyle = '#000'; g.fill(); g.fillStyle = '#fff'; }
   // --- echo: faint ghost dots trailing on the orbit ---
   for (const id of IDS) {
-    const e = E[id]; if (e.muted || e.echo < 0.03 || (drag && drag.e === e && drag.moved)) continue;
-    const L = lapOf(e), fb = 0.2 + 0.45 * e.echo;
-    for (let j = 1; j <= 3; j++) { const back = j * ECHO_BEATS / L; if (back >= 0.95) break; const p = onOrbit(e.orbit, frac(still ? e.ang + back : e.ang - back)); g.globalAlpha = 0.5 * Math.min(1, e.echo * 1.8) * Math.pow(fb, j - 1); g.lineWidth = 0.7; g.beginPath(); g.arc(p.x, p.y, Math.max(1.2, e.r * (0.55 - 0.1 * j)), 0, TAU); j === 1 ? g.fill() : g.stroke(); }
+    const e = E[id], o = ORB[e.orbit]; if (!o || e.muted || o.st.muted || (drag && drag.e === e && drag.moved)) continue;
+    const t2 = o.t2, snd = Math.max(t2.send, e.echo * 0.6); if (snd < 0.03) continue;
+    const L = lapOf(e), d = t2.delayBeats / L, ph = still ? [1, 2, 3, 4, 5, 6].map(j => frac(e.ang + d * j)) : OrbsFX2.ghostPhases(e.ang, t2.delayBeats, L, 6);
+    g.lineWidth = 0.7;
+    for (let j = 0; j < ph.length; j++) { const a = snd * Math.pow(Math.max(t2.feedback, 1e-4), j); if (a < 0.03 || d * (j + 1) >= 0.97) break; const p = onOrbit(e.orbit, ph[j]); g.globalAlpha = 0.1 + 0.45 * a; g.beginPath(); g.arc(p.x, p.y, Math.max(1.3, e.r * 0.45), 0, TAU); g.stroke(); }
   }
   // --- ripples ---
   for (let i = ripples.length - 1; i >= 0; i--) {
@@ -1512,11 +2227,29 @@ const ORB_SL = [ // per-orbit fx batch 1 rows; every set goes through orbSet →
   { k: 'amount', grp: 'flt', name: 'lp · hp', get: s => (OrbsFX.filterAmountOf(s.filterType, s.cutoff) + 1) / 2, set: (i, t) => orbSet(i, 'amount', t * 2 - 1), show: s => s.filterType === 'bypass' ? 'off' : (s.filterType === 'lowpass' ? 'lp ' : 'hp ') + OrbsFX.formatHz(s.cutoff) },
   { k: 'q', grp: 'flt', name: 'res', get: s => OrbsFX.logNorm(s.q, OrbsFX.Q_MIN, OrbsFX.Q_MAX), set: (i, t) => orbSet(i, 'q', OrbsFX.expScale(OrbsFX.Q_MIN, OrbsFX.Q_MAX, t)), show: s => s.q.toFixed(1) },
 ];
+const DLY_NOTES = OrbsFX2.NOTE_BEATS;
+const ORB2_SL = [
+  { k: 'lo', grp: 'eq', name: 'lo', get: s => (s.lo + 15) / 30, set: (i, t) => orb2Set(i, 'eq', { lo: eqSnap(t) }), show: s => fmtDb2(s.lo) },
+  { k: 'mid', grp: 'eq', name: 'mid', get: s => (s.mid + 15) / 30, set: (i, t) => orb2Set(i, 'eq', { mid: eqSnap(t) }), show: s => fmtDb2(s.mid) },
+  { k: 'hi', grp: 'eq', name: 'hi', get: s => (s.hi + 15) / 30, set: (i, t) => orb2Set(i, 'eq', { hi: eqSnap(t) }), show: s => fmtDb2(s.hi) },
+  { k: 'drive', grp: 'sat', name: 'drive', get: s => s.drive / OrbsFX2.DRIVE_MAX, set: (i, t) => orb2Set(i, 'sat', { drive: t < 0.02 ? 0 : t * OrbsFX2.DRIVE_MAX }), show: s => s.drive < 0.05 ? 'off' : s.drive.toFixed(1) + ' db' },
+  { k: 'time', grp: 'delay', name: 'time', get: s => Math.max(0, DLY_NOTES.indexOf(OrbsFX2.snapDelayBeats(s.delayBeats, true))) / (DLY_NOTES.length - 1), set: (i, t) => orb2Set(i, 'delay', { beats: DLY_NOTES[Math.round(t * (DLY_NOTES.length - 1))], sync: true }), show: s => OrbsFX2.formatDelayBeats(s.delayBeats) },
+  { k: 'fb', grp: 'delay', name: 'feedback', get: s => s.feedback / OrbsFX2.FB_MAX, set: (i, t) => orb2Set(i, 'delay', { feedback: t * OrbsFX2.FB_MAX }), show: s => Math.round(s.feedback * 100) + '' },
+  { k: 'send', grp: 'delay', name: 'send', get: s => s.send, set: (i, t) => orb2Set(i, 'delay', { send: t < 0.02 ? 0 : t }), show: s => Math.round(s.send * 100) + '' },
+];
+const eqSnap = t => { const db = t * 30 - 15; return Math.abs(db) < 0.8 ? 0 : db; };
+const fmtDb2 = db => Math.abs(db) < 0.05 ? '0 db' : OrbsFX2.formatDb(db) + ' db';
+function orb2SliderHTML(i, s) { const t = clamp(s.get(ORB[i].t2), 0, 1); return '<div class="sl" data-o2sl="' + s.k + '" data-i="' + i + '"><b>' + s.name + '</b><div class="tr"><div class="fi" style="width:' + (t * 100) + '%"></div><div class="kn" style="left:' + (t * 100) + '%"></div></div><em>' + s.show(ORB[i].t2) + '</em></div>'; }
 function orbSliderHTML(i, s) { const t = clamp(s.get(ORB[i].st), 0, 1); return '<div class="sl" data-osl="' + s.k + '" data-i="' + i + '"><b>' + s.name + '</b><div class="tr"><div class="fi" style="width:' + (t * 100) + '%"></div><div class="kn" style="left:' + (t * 100) + '%"></div></div><em>' + s.show(ORB[i].st) + '</em></div>'; }
 function orbFxHTML(i) {
   const s = ORB[i].st, tg = (k, label, on) => '<span class="tg' + (on ? ' on' : '') + '" data-act="otog" data-k="' + k + '" data-i="' + i + '">' + label + '</span>';
   let h = '<div class="grp"><b>clip</b><span class="gv">' + lapTxt(ORB[i].lap) + ' · ' + OrbsFX.formatOffset(s.offset) + (swing > 0 ? ' · swing ' + Math.round(swing) + '%' : '') + '</span></div>' + ORB_SL.filter(q => q.grp === 'clip').map(q => orbSliderHTML(i, q)).join('');
   h += '<div class="grp"><b>util</b>' + tg('mute', 'mute', s.muted) + tg('phase', 'ø phase', s.phase === 180) + tg('mono', 'mono', s.mono) + '</div>' + ORB_SL.filter(q => q.grp === 'util').map(q => orbSliderHTML(i, q)).join('');
+  const t2 = ORB[i].t2, row2 = (grp, gv) => '<div class="grp"><b>' + grp + '</b><span class="gv">' + gv + '</span></div>' + ORB2_SL.filter(q => q.grp === grp).map(q => orb2SliderHTML(i, q)).join('');
+  const eqOn = Math.abs(t2.lo) + Math.abs(t2.mid) + Math.abs(t2.hi) > 0.05;
+  h += row2('eq', eqOn ? 'shelf 200 · peak 1k · shelf 5k' : 'flat');
+  h += '<div class="grp"><b>sat</b><span class="tg' + (t2.curve === 'soft' ? ' on' : '') + '" data-act="scurve" data-c="soft" data-i="' + i + '">soft</span><span class="tg' + (t2.curve === 'hard' ? ' on' : '') + '" data-act="scurve" data-c="hard" data-i="' + i + '">hard</span></div>' + ORB2_SL.filter(q => q.grp === 'sat').map(q => orb2SliderHTML(i, q)).join('');
+  h += row2('delay', 'synced · planet echo sends here too');
   h += '<div class="grp"><b>flt</b><span class="gv">' + (s.filterType === 'bypass' ? 'off · drag left for lowpass, right for highpass' : s.filterType) + '</span></div>' + ORB_SL.filter(q => q.grp === 'flt').map(q => orbSliderHTML(i, q)).join('');
   return h;
 }
@@ -1566,12 +2299,14 @@ sheet.addEventListener('click', ev => {
   else if (act === 'del') removeEl(id);
   else if (act === 'addorb') addOrbit();
   else if (act === 'delorb') removeOrbit(i);
+  else if (act === 'scurve') { orb2Set(i, 'sat', { curve: t.dataset.c }); sheetDirty = true; }
   else if (act === 'otog') { const k = t.dataset.k, s = ORB[i].st; orbSet(i, k, k === 'mute' ? !s.muted : k === 'phase' ? s.phase !== 180 : !s.mono); sheetDirty = true; }
 });
 let slDrag = null;
 function slSet(el, x) {
   const tr = el.querySelector('.tr').getBoundingClientRect(), u = clamp((x - tr.left) / tr.width, 0, 1); let t, txt;
   if (el.dataset.gsl) { setSwing(u * 60); t = swing / 60; txt = Math.round(swing) + '%'; }
+  else if (el.dataset.o2sl) { const q = ORB2_SL.find(z => z.k === el.dataset.o2sl), i = +el.dataset.i; if (!q || !ORB[i]) return; q.set(i, u); t = clamp(q.get(ORB[i].t2), 0, 1); txt = q.show(ORB[i].t2); }
   else if (el.dataset.osl) { const q = ORB_SL.find(z => z.k === el.dataset.osl), i = +el.dataset.i; if (!q || !ORB[i]) return; q.set(i, u); t = clamp(q.get(ORB[i].st), 0, 1); txt = q.show(ORB[i].st); }
   else { const s = SLIDERS.find(q => q.k === el.dataset.sl), e = E[el.dataset.id]; if (!s || !e) return; s.set(e, u); t = clamp(s.get(e), 0, 1); txt = s.show(e); }
   el.querySelector('.fi').style.width = (t * 100) + '%'; el.querySelector('.kn').style.left = (t * 100) + '%'; el.querySelector('em').textContent = txt;
@@ -1927,7 +2662,7 @@ requestAnimationFrame(frame);
 window.SS = { E, ORB, IDS, hitLog, nextHit, genBar, play, stop, setBpm, setLap, select, copyPlanet, removeEl, addOrbit, layout, posNow, pointerOrbit, dragTarget, openPicker, closePicker, openBar, closeBar, startRecording, audition,
   get playing() { return playing; }, get bpm() { return bpm; }, get ac() { return ac; }, get pickId() { return pickId; }, get barId() { return barId; }, get barData() { return barData; }, get selId() { return selId; },
   set snap(v) { snapOn = !!v; renderSnap(); }, get snap() { return snapOn; },
-  get fx() { return fx; }, orbSet, setSwing, labelOverlaps, layoutLabels, get swing() { return swing; }, setStill, get still() { return still; }, aEff,
+  get fx() { return fx; }, get fx2() { return fx2; }, orb2Set, orbSet, setSwing, labelOverlaps, layoutLabels, get swing() { return swing; }, setStill, get still() { return still; }, aEff,
   geom: () => ({ CX, CY, K, RMAX, SA, R: ORB.map((o, i) => orbitR(i)) }) };
 })();
 </script>
