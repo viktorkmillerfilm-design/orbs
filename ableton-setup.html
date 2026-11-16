@@ -1,0 +1,118 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#000000"><link rel="icon" href="orbs-icon-180.png"><title>orbs · ableton setup</title>
+<style>
+html,body{margin:0;background:#000;color:#fff}
+body{font:400 14px/1.75 ui-rounded,"SF Pro Rounded","Nunito","Quicksand","Varela Round",system-ui,sans-serif;letter-spacing:.03em;padding:calc(40px + env(safe-area-inset-top)) 22px 80px}
+main{max-width:680px;margin:0 auto}
+h1,h2,h3{font-weight:500;letter-spacing:.14em;text-transform:lowercase} h1{font-size:18px;margin:0 0 24px} h2{font-size:14px;margin:40px 0 10px;opacity:.9} h3{font-size:13px;opacity:.8}
+p,li{opacity:.78} strong{font-weight:500;opacity:1} a{color:#fff;border-bottom:1px solid rgba(255,255,255,.35);text-decoration:none}
+code{font:12px ui-monospace,Menlo,monospace;background:rgba(255,255,255,.06);padding:1px 5px} pre{border:1px solid rgba(255,255,255,.15);padding:12px 14px;overflow-x:auto} pre code{background:none;padding:0}
+hr{border:0;border-top:1px dotted rgba(255,255,255,.25);margin:34px 0}
+table{border-collapse:collapse;width:100%;font-size:13px} th,td{border-bottom:1px solid rgba(255,255,255,.14);padding:6px 8px;text-align:left;font-weight:400} th{opacity:.5}
+.back{display:inline-block;opacity:.5;margin-bottom:28px;font-size:12px}
+</style></head><body><main><a class="back" href="orbs-solar.html">‹ orbs solar</a>
+<h1>orbs → ableton live, on a mac</h1>
+<p>a short setup so the solar app can play instruments in ableton live over midi. use <strong>chrome</strong> or <strong>edge</strong> (firefox desktop is fine too). <strong>safari does not support web midi</strong>, including on iphone and ipad, so the midi button will say <code>midi n/a</code>.</p>
+<p>if chrome blocks midi on a <code>file://</code> url, serve the folder from a terminal:</p>
+<pre><code>python3 -m http.server
+</code></pre>
+<p>then open http://localhost:8000 and grant the midi permission when chrome asks.</p>
+<hr />
+<h2>1. turn on the iac driver</h2>
+<p>this is macos's built-in virtual midi cable, so orbs and live can talk on the same computer.</p>
+<ol>
+<li>open <strong>audio midi setup</strong> (in <code>/applications/utilities</code>, or spotlight it).</li>
+<li>choose <strong>window → show midi studio</strong> (or press ⌘2).</li>
+<li>double-click <strong>iac driver</strong> and tick <strong>device is online</strong>.</li>
+<li>click <strong>+</strong> to add a second port. name them <code>orbs notes</code> and <code>orbs clock</code>. (one port is enough to get started; two ports keep clock and notes from interfering.)</li>
+</ol>
+<hr />
+<h2>2. tell live which ports to listen to</h2>
+<p>in ableton: <strong>settings / preferences → link, tempo &amp; midi</strong>, then the <strong>midi ports</strong> list.</p>
+<ul>
+<li><strong>in: orbs notes</strong> (or “iac driver bus 1”) — <strong>track on</strong>, <strong>remote on</strong>, <strong>sync off</strong>.
+  track lets notes through; remote lets you midi-map knobs and faders.</li>
+<li><strong>in: orbs clock</strong> — <strong>track off</strong>, <strong>remote off</strong>, <strong>sync on</strong>, only if you want orbs to drive live's tempo.</li>
+<li>leave <strong>sync out</strong> off on those ports unless live is the clock master.</li>
+</ul>
+<p>never turn <strong>sync</strong> on for both in and out of the same port — that can loop midi clock back into itself. only enable sync in on one port.</p>
+<hr />
+<h2>3. make one midi track per planet</h2>
+<p>create eight midi tracks and name them after the planets. load a drum rack or an instrument on each.</p>
+<table>
+<thead>
+<tr>
+<th>track</th>
+<th>midi channel</th>
+<th>typical note</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>kick</td>
+<td>1</td>
+<td>36 (c1)</td>
+</tr>
+<tr>
+<td>snare</td>
+<td>2</td>
+<td>38 (d1)</td>
+</tr>
+<tr>
+<td>hats</td>
+<td>3</td>
+<td>42 closed, 46 open</td>
+</tr>
+<tr>
+<td>perc</td>
+<td>4</td>
+<td>45 / 48 / 50</td>
+</tr>
+<tr>
+<td>bass</td>
+<td>5</td>
+<td>low bass notes</td>
+</tr>
+<tr>
+<td>pad</td>
+<td>6</td>
+<td>chord tones</td>
+</tr>
+<tr>
+<td>chords</td>
+<td>7</td>
+<td>chord tones</td>
+</tr>
+<tr>
+<td>lead</td>
+<td>8</td>
+<td>melody notes</td>
+</tr>
+</tbody>
+</table>
+<p>recorded planets (<code>rec 1</code> … <code>rec 8</code>) use channels 9–16 and note 60 (c3). add those tracks when you need them.</p>
+<p>on every track:</p>
+<ol>
+<li><strong>midi from</strong> = <code>orbs notes</code> (the iac port).</li>
+<li><strong>channel</strong> = the number in the table, not “all”.</li>
+<li><strong>monitor = in</strong> (this is enough to hear it). arm the track only when you want to record a clip.</li>
+</ol>
+<hr />
+<h2>4. connect orbs and play</h2>
+<p>open orbs in chrome, click <strong>midi</strong>, and choose the <code>orbs notes</code> port (the picker prefers an iac port automatically). press play. you should see the tracks light up in live.</p>
+<p>if a note hangs, click <strong>panic</strong> (or stop in orbs). that sends all-notes-off and all-sound-off on every channel.</p>
+<hr />
+<h2>5. map volume, pan, and fx (optional)</h2>
+<p>orbs also sends control changes on each planet's channel:</p>
+<ul>
+<li>cc 7 volume · cc 10 pan · cc 74 filter cutoff · cc 71 resonance · cc 91 reverb send · cc 94 delay send</li>
+</ul>
+<p>to map a live control: press <strong>⌘m</strong> (midi map), click the fader or knob in live, then move the matching control in orbs. press <strong>⌘m</strong> again to exit. save the set so the mappings stick.</p>
+<p>if an instrument already reacts to cc 7 or 10, don't also map live's track volume or pan to the same cc — the two will stack.</p>
+<hr />
+<h2>6. sync tempo (optional)</h2>
+<p>if orbs is the clock master: in live, enable <strong>sync in</strong> on <code>orbs clock</code>, press <strong>ext</strong> on the transport, then play in orbs. live's tempo follows. if the metronomes don't quite line up, unfold that port in live's midi preferences and nudge <strong>midi clock sync delay</strong>. it may take a bar or two to settle.</p>
+<p>if you'd rather live be the master, that comes later — for now, start orbs first.</p>
+<hr />
+<h2>7. record a clip</h2>
+<p>arm the tracks, record in live while orbs is playing, then set each clip's loop length to that planet's orbit (1 beat, 2 beats, 1 bar, 2 bars, or 4 bars).</p>
+</main></body></html>
