@@ -111,6 +111,7 @@
   #gmenu .gm span{cursor:pointer;opacity:.35;border-bottom:1px solid transparent;padding-bottom:2px} #gmenu .gm span.on{opacity:.95;border-bottom-color:#fff}
   #gmenu .gi{padding:7px 16px;cursor:pointer;opacity:.5} #gmenu .gi:hover{opacity:1} #gmenu .gi.on{opacity:1} #gmenu .gi.on::before{content:"";display:inline-block;width:4px;height:4px;border-radius:50%;background:#fff;margin:0 8px 1px -12px}
   #genre.on{opacity:.9}
+  #top > #genre{padding-left:12px}
   .midi .mrow{display:flex;align-items:center;gap:16px;padding:6px 0 4px} .midi select{flex:1;background:#000;color:#fff;border:0;border-bottom:1px solid rgba(255,255,255,.25);font:inherit;letter-spacing:inherit;padding:4px 0;opacity:.7;outline:none;-webkit-appearance:none;appearance:none;border-radius:0} .midi .na{opacity:.5} .midi a{color:#fff;opacity:.8;text-decoration:none;border-bottom:1px solid rgba(255,255,255,.3)}
   /* planet window: fx left, play pad right */
   #win{inset:0;z-index:6;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.55);opacity:0;pointer-events:none;transition:opacity .25s}
@@ -3382,10 +3383,11 @@
       }
     }
 
-    function clockStart() {
+    function clockStart(tAudio) {
       if (disposed) return;
       if (clockRunning) clockStop();
-      const t0 = performance.now() + 60;
+      // optional audio-clock start time: convert it like the notes so start / spp line up with the first note
+      const t0 = (tAudio != null && isFinite(+tAudio)) ? Math.max(performance.now(), audioToPerf(ctx, +tAudio)) : performance.now() + 60;
       emit([0xF2, 0, 0], t0);
       emit([0xFA], t0);
       nextTickPerf = t0;
@@ -3445,6 +3447,7 @@
       const p = findPort(id);
       if (!p) return false;
       output = p;
+      clearCcTimers(); // new port: forget the dedupe cache so the current cc state goes out again
       try { if (p.open) p.open(); } catch (e) {}
       lsWrite(p.id, p.name || '');
       if (onPorts) try { onPorts(ports()); } catch (e) {}
@@ -3599,7 +3602,7 @@ const links = new Set(DEF_LINKS);
 let TETH = DEF_TETH.map(t => Object.assign({}, t));
 let ROOM = { size: 2.4, wet: 0.8, predelay: 0 };
 const baseOf = id => (E[id] && E[id].base) || id;
-let GENRE = null, GMODE = 'sounds';
+let GENRE = null, GMODE = 'sounds', GTRIM = 0; // GTRIM: the applied genre's output trim (db), keeps genres within a few db of each other
 let still = false, bpm = 108, snapOn = true, recCount = 0, cloneCount = 0, sheetDirty = true, selId = null, openG = null;
 
 /* ---------------- persistence ---------------- */
@@ -3610,7 +3613,7 @@ const KEEP = ['trimS', 'trimE', 'rev', 'loop', 'bars', 'recBpm', 'phase', 'recor
 const dbOut = st => Object.assign({}, st, { gainDb: isFinite(st.gainDb) ? st.gainDb : '-inf' });
 function save() { if (!ready) return; try {
   const els = {}; IDS.forEach(id => { const e = E[id], o = els[id] = { v: e.variant }; PKEYS.concat(KEEP).forEach(k => { if (e[k] !== undefined) o[k] = e[k]; }); o.a = +(+e.a).toFixed(5); o.rad = +(+e.rad).toFixed(4); });
-  localStorage.setItem(LS, JSON.stringify({ v: 2, els, order: IDS.slice(), groups: ORB.map(o => ({ id: o.id, lap: o.lap, st: dbOut(o.st), t2: o.t2, rsend: o.rsend, solo: !!o.solo })), links: [...links], tethers: TETH.map(t => ({ src: t.src, tgt: t.tgt, depth: t.depth, attack: t.attack, release: t.release })), room: ROOM, genre: GENRE, gmode: GMODE, swing, still, bpm, snapOn, recCount, cloneCount })); } catch (e) {} }
+  localStorage.setItem(LS, JSON.stringify({ v: 2, els, order: IDS.slice(), groups: ORB.map(o => ({ id: o.id, lap: o.lap, st: dbOut(o.st), t2: o.t2, rsend: o.rsend, solo: !!o.solo })), links: [...links], tethers: TETH.map(t => ({ src: t.src, tgt: t.tgt, depth: t.depth, attack: t.attack, release: t.release })), room: ROOM, genre: GENRE, gmode: GMODE, gtrim: GTRIM, swing, still, bpm, snapOn, recCount, cloneCount })); } catch (e) {} }
 function applySaved(e, o) {
   ['rad', 'a', 'vol', 'pn', 'echo', 'verb', 'cut', 'seed', 'orbit'].forEach(k => { if (typeof o[k] === 'number' && isFinite(o[k])) e[k] = o[k]; });
   e.muted = !!o.muted;
@@ -3628,7 +3631,7 @@ function load() { try { const s = JSON.parse(localStorage.getItem(LS) || 'null')
   else if (oldOrbs) links.clear();
   if (Array.isArray(s.tethers)) TETH = s.tethers.filter(t => t && typeof t.src === 'string' && typeof t.tgt === 'string').map(t => ({ src: t.src, tgt: t.tgt, depth: +t.depth || 0.5, attack: +t.attack || 8, release: +t.release || 180 }));
   if (s.room && isFinite(s.room.size)) ROOM = { size: clamp(+s.room.size, 0.3, 8), wet: clamp(+s.room.wet || 0, 0, 1), predelay: clamp(+s.room.predelay || 0, 0, 100) };
-  if (typeof s.genre === 'string' && OrbsGenres.list().some(x => x.id === s.genre)) GENRE = s.genre; if (s.gmode === 'relayout') GMODE = 'relayout';
+  if (typeof s.genre === 'string' && OrbsGenres.list().some(x => x.id === s.genre)) GENRE = s.genre; if (s.gmode === 'relayout') GMODE = 'relayout'; if (GENRE && isFinite(+s.gtrim)) GTRIM = clamp(+s.gtrim, -12, 6);
   if (typeof s.swing === 'number') swing = clamp(s.swing, 0, 60);
   for (const id of (s.order || Object.keys(s.els || {}))) { const o = (s.els || {})[id]; if (!o) continue;
     if (E[id]) applySaved(E[id], o);
@@ -3683,7 +3686,7 @@ const pickOf = (r, arr) => arr[Math.floor(r() * arr.length) % arr.length];
 
 /* ---------------- audio (from orbs) ---------------- */
 /* ---------------- audio ---------------- */
-let ac = null, master, comp, rev, noiseBuf;
+let ac = null, master, comp, rev, noiseBuf, gtrim, lim, clipper;
 function ensureNodes(e) { // planet strip: in → duck (unused, tethers duck the group chain) → filter → vol → pan → master, + reverb send, + synced echo
   if (e.in) return;
   e.in = ac.createGain(); e.duck = ac.createGain(); e.flt = ac.createBiquadFilter(); e.flt.type = 'lowpass'; e.flt.Q.value = 0.7; e.flt.frequency.value = cutHz(e.cut);
@@ -3697,7 +3700,11 @@ function initAudio() {
   if (ac) return;
   ac = new (window.AudioContext || window.webkitAudioContext)();
   comp = ac.createDynamicsCompressor(); comp.threshold.value = -14; comp.ratio.value = 3; comp.attack.value = 0.01; comp.release.value = 0.2;
-  master = ac.createGain(); master.gain.value = 0.8; master.connect(comp); comp.connect(ac.destination);
+  master = ac.createGain(); master.gain.value = 0.8; gtrim = ac.createGain(); gtrim.gain.value = Math.pow(10, GTRIM / 20); master.connect(gtrim); gtrim.connect(comp);
+  // brickwall: a fast, hard compressor at -1.5 dbfs, then a soft clipper whose curve tops out at -1 dbfs, so the output can never pass 0 dbfs
+  lim = ac.createDynamicsCompressor(); lim.threshold.value = -1.5; lim.knee.value = 0; lim.ratio.value = 20; lim.attack.value = 0.001; lim.release.value = 0.08;
+  clipper = ac.createWaveShaper(); { const n = 4097, cv = new Float32Array(n), ce = Math.pow(10, -1 / 20), k0 = 0.7; for (let i = 0; i < n; i++) { const x = i / (n - 1) * 2 - 1, ax = Math.abs(x); cv[i] = Math.sign(x) * (ax <= k0 ? ax : k0 + (ce - k0) * Math.tanh((ax - k0) / (ce - k0))); } clipper.curve = cv; clipper.oversample = 'none'; }
+  comp.connect(lim); lim.connect(clipper); clipper.connect(ac.destination);
   rev = ac.createConvolver(); const len = Math.floor(ac.sampleRate * 2.4), ir = ac.createBuffer(2, len, ac.sampleRate);
   for (let c = 0; c < 2; c++) { const d = ir.getChannelData(c); let lp = 0; for (let i = 0; i < len; i++) { lp += 0.35 * ((Math.random() * 2 - 1) - lp); d[i] = lp * Math.pow(1 - i / len, 2.6); } }
   rev.buffer = ir; const rg = ac.createGain(); rg.gain.value = 0.9; rev.connect(rg); rg.connect(master);
@@ -4028,14 +4035,19 @@ function orbSet(i, key, v) { // all group edits go through the module's setters 
   const id = o.id;
   ({ gain: () => fx.setGain(id, v), pan: () => fx.setPan(id, v), mute: () => fx.setMute(id, v), phase: () => fx.setPhase(id, v ? 180 : 0), mono: () => fx.setMono(id, v),
      amount: () => fx.setFilterAmount(id, v), q: () => fx.setFilter(id, { q: v }), offset: () => fx.setOffset(id, v), quantize: () => fx.setQuantize(id, v), lap: () => fx.setLap(id, v) })[key]();
-  o.st = stState(fx.getOrbit(id)); o.lap = o.st.lap * 4; save();
+  o.st = stState(fx.getOrbit(id)); o.lap = o.st.lap * 4; save(); if (key === 'mute' || key === 'gain') updateMix(); // sends follow the group mute / gain right away
 }
 function setSwing(v) { swing = clamp(+v || 0, 0, 60); if (fx) swing = fx.setSwing(swing); save(); }
 const playIcon = document.getElementById('playIcon');
 function play() {
   initAudio(); if (ac.state !== 'running') ac.resume();
-  if (playing) return; playing = true; stepN = 0; stepTimes.length = 0; barTimes.length = 0; nextT = ac.currentTime + 0.06; schedule(); timer = setInterval(schedule, 25); if (bridge && CLOCK) bridge.clock.start();
+  if (playing) return; playing = true; stepN = 0; stepTimes.length = 0; barTimes.length = 0; updateMix(); snapMutes(); nextT = ac.currentTime + (ac.currentTime < 0.25 ? 0.25 : 0.06); const t0 = nextT; schedule(); timer = setInterval(schedule, 25); if (bridge && CLOCK) bridge.clock.start(t0); // fresh context: let mute / gain smoothing settle first; clock start = first step
   playIcon.setAttribute('d', 'M6 6 H16 V16 H6 Z');
+}
+function snapMutes() { // play right after a mute: jump muted groups / planets to silence instead of waiting on the 20 ms smoothing
+  const t = ac.currentTime, z = pr => { pr.cancelScheduledValues(t); pr.setValueAtTime(0, t); };
+  ORB.forEach(o => { if (o.st && o.st.muted) { try { z(fx.chain(o.id).utilGain.gain); } catch (x) {} membersOf(o).forEach(e => { if (e.sg) { z(e.sg.gain); z(e.dg.gain); } }); } });
+  IDS.forEach(id => { const e = E[id]; if (e.muted && e.vg) z(e.vg.gain); });
 }
 function stop() {
   if (!playing) return; playing = false; clearInterval(timer); timer = null; if (bridge) bridge.clock.stop(); allOff(); visQ.length = 0; if (prec) endPadRec(true);
@@ -4245,16 +4257,19 @@ function select(id, from) {
 let scrollSel = false;
 const linkR = () => Math.max(touchMode ? 30 : 22, M * 0.04); // drop this close to another planet to connect
 const breakR = () => Math.max(80, M * 0.15); // drag a planet this much further from a partner to disconnect
-function linkAt(x, y) { // nearest connection line under the pointer
+function linkAt(x, y, mid) { // nearest connection line under the pointer (mid: only its middle part, between the two discs)
   let best = null, bd = touchMode ? 14 : 7;
-  for (const k of links) { const [a, b] = k.split('|'), A = E[a], B = E[b]; if (!A || !B) continue; const d = OrbsFX3.distToSegment(x, y, A.x, A.y, B.x, B.y); if (d < bd && Math.hypot(x - A.x, y - A.y) > A.r && Math.hypot(x - B.x, y - B.y) > B.r) { bd = d; best = [a, b]; } }
+  for (const k of links) { const [a, b] = k.split('|'), A = E[a], B = E[b]; if (!A || !B) continue; const d = OrbsFX3.distToSegment(x, y, A.x, A.y, B.x, B.y);
+    if (mid) { const L2 = (B.x - A.x) ** 2 + (B.y - A.y) ** 2 || 1, u = ((x - A.x) * (B.x - A.x) + (y - A.y) * (B.y - A.y)) / L2; if (u < 0.25 || u > 0.75 || d > (touchMode ? 8 : 5)) continue; }
+    if (d < bd && Math.hypot(x - A.x, y - A.y) > A.r + 1 && Math.hypot(x - B.x, y - B.y) > B.r + 1) { bd = d; best = [a, b]; } }
   return best;
 }
 let lastTap = { t: 0, x: 0, y: 0 };
 cv.addEventListener('pointerdown', ev => {
   const x = ev.clientX, y = ev.clientY; layout(); touchMode = ev.pointerType === 'touch' || (COARSE && ev.pointerType !== 'mouse');
   if (barId) { closeBar(); return; }
-  const h = hitDot(x, y, touchMode ? 6 : 4);
+  let h = hitDot(x, y, touchMode ? 6 : 4);
+  if (h && h.d > h.e.r + 1) { const lk = linkAt(x, y, true); if (lk && lk.includes(h.e.id)) h = null; } // between two connected planets (outside their discs) the line wins, so short lines can be cut
   if (!h) {
     const now = performance.now(), dbl = now - lastTap.t < 380 && Math.hypot(x - lastTap.x, y - lastTap.y) < 24; lastTap = { t: now, x, y };
     const onSun = Math.hypot(x - CX, y - CY) < SUNR + (touchMode ? 20 : 12), lk = onSun ? null : linkAt(x, y);
@@ -4269,7 +4284,7 @@ cv.addEventListener('pointerdown', ev => {
   for (const p of partnersOf(h.e.id)) d0.d0[p] = Math.hypot(E[p].x - h.e.x, E[p].y - h.e.y);
   if (!d0.tether) d0.lp = setTimeout(() => { if (drag === d0 && !d0.moved) { drag = null; select(d0.e.id); openBar(d0.e.id); } }, 550);
 });
-cv.addEventListener('dblclick', ev => { layout(); const lk = linkAt(ev.clientX, ev.clientY); if (lk) unlink(lk[0], lk[1]); });
+cv.addEventListener('dblclick', ev => { layout(); const lk = linkAt(ev.clientX, ev.clientY, true) || linkAt(ev.clientX, ev.clientY); if (lk && linked(lk[0], lk[1])) unlink(lk[0], lk[1]); });
 cv.addEventListener('pointermove', ev => {
   const x = ev.clientX, y = ev.clientY;
   if (!drag) { layout(); const h = hitDot(x, y, 4); cv.style.cursor = h ? (ev.shiftKey ? 'crosshair' : 'grab') : hitLabel(x, y) ? 'pointer' : linkAt(x, y) ? 'pointer' : Math.hypot(x - CX, y - CY) < SUNR + 12 ? 'pointer' : 'default'; return; }
@@ -4287,7 +4302,8 @@ function dragTarget(d) { // what happens if released now
   const T = nearPlanet(d.px, d.py, e.id, linkR());
   if (T && !T.muted && !linked(e.id, T.id)) { const o = grpOf(T); return { connect: T, lap: o.lap, rad: pp.rad, ang: pp.ang }; }
   const breaks = partnersOf(e.id).filter(p => d.d0[p] != null && Math.hypot(E[p].x - d.px, E[p].y - d.py) - d.d0[p] > breakR());
-  return { rad: pp.rad, ang: pp.ang, lap: pp.lap, breaks };
+  const og = grpOf(e), lap = og && bandOfLap(og.lap) === pp.band ? og.lap : pp.lap; // a nudge inside the band keeps the group's lap (e.g. 3 bars)
+  return { rad: pp.rad, ang: pp.ang, lap, breaks };
 }
 function endDrag(ev) {
   if (!drag) return; const d = drag; drag = null; clearTimeout(d.lp); cv.style.cursor = 'default';
@@ -4297,10 +4313,10 @@ function endDrag(ev) {
   const pos = posNow();
   if (t.mute) { e.muted = true; recMsg((e.label || e.id) + ' muted · drag it back in to play'); }
   else if (t.connect) {
-    e.muted = false; const T = t.connect; links.add(lkey(e.id, T.id)); regroup(T.gid);
+    e.muted = false; const T = t.connect, took = ev && ev.altKey ? 0 : partnersOf(e.id).length; if (ev && ev.altKey) { for (const p of partnersOf(e.id)) links.delete(lkey(e.id, p)); } links.add(lkey(e.id, T.id)); regroup(T.gid); // alt-drop brings the planet alone
     const o = grpOf(T); let rad = clampRadLap(t.rad, o.lap); const sp = 0.055; if (Math.abs(rad - T.rad) < sp) rad = clampRadLap(T.rad + (rad >= T.rad ? sp : -sp), o.lap); if (Math.abs(rad - T.rad) < sp * 0.7) rad = clampRadLap(T.rad - (rad >= T.rad ? sp : -sp), o.lap); // sit a little apart so the line shows
     e.rad = rad; e.a = snapA(aFromAngG(o, t.ang, pos), o.lap);
-    recMsg((e.label || e.id) + ' connected to ' + (T.label || T.id) + ' · ' + lapTxt(o.lap) + ' lap');
+    recMsg((e.label || e.id) + ' connected to ' + (T.label || T.id) + ' · ' + lapTxt(o.lap) + ' lap' + (took ? ' · its partners came too (alt-drop to bring it alone)' : ''));
   } else {
     e.muted = false;
     if (t.breaks.length) { t.breaks.forEach(p => links.delete(lkey(e.id, p))); regroup(); recMsg((e.label || e.id) + ' disconnected'); }
@@ -4628,7 +4644,7 @@ function renderWin() {
     + '<div class="pr"><b>length</b>' + chip('len', 'lap', '1 lap', PAD.len === 'lap') + chip('len', '2', '2 bars', PAD.len === '2') + chip('len', '4', '4 bars', PAD.len === '4') + '</div>'
     + '<div class="pr"><b>quantize</b>' + chip('q', 0, 'off', PAD.q === 0) + chip('q', 0.5, '1/8', PAD.q === 0.5) + chip('q', 0.25, '1/16', PAD.q === 0.25) + chip('q', 0.125, '1/32', PAD.q === 0.125) + '</div>'
     + '<div class="pr"><b>velocity</b>' + chip('vel', 'pos', 'from click', PAD.vel === 'pos') + chip('vel', 'fixed', 'fixed', PAD.vel === 'fixed') + '</div>';
-  wPad.querySelector('small').textContent = 'click · or keys ' + padKeys(e).join(' ').toUpperCase();
+  wPad.querySelector('small').textContent = 'click · or keys ' + padKeys(e).join(' ').toLowerCase();
 }
 wFx.addEventListener('click', ev => { panelClick(ev); if (winId) renderWin(); });
 bindSliders(wFx);
@@ -4658,13 +4674,14 @@ wPad.addEventListener('pointerdown', ev => {
 });
 // a live hit: sounds now through the planet's own strip (so every fx applies), low latency; recorded while armed
 function padHit(v, t) {
-  const e = E[winId]; if (!e) return null; t = t == null ? ac.currentTime + 0.004 : t;
+  const e = E[winId]; if (!e) return null; const live = t == null; t = live ? ac.currentTime + 0.004 : t;
   const p = posAt(t), ev = hitEvent(e, p, Math.floor(p)); ev.v *= v;
   playPlanet(e, t, ev, Math.min(ev.dur, 1.2)); midiNote(e, ev, t, Math.min(ev.dur, 1.2));
   e.pulse = Math.max(e.pulse, v); visQ.push({ t, id: e.id, v });
-  if (prec && prec.phase === 'rec' && playing) padRecHit(e, p, v);
+  if (prec && prec.phase === 'rec' && playing) padRecHit(e, live ? posAt(t - padLat()) : p, v); // record where you heard it: minus output latency
   return { t, p };
 }
+function padLat() { return ac ? clamp((ac.outputLatency || 0) + (ac.baseLatency || 0), 0, 0.08) : 0; }
 function pushPat(e) { (e.patUndo = e.patUndo || []).push(e.pat ? e.pat.map(h => Object.assign({}, h)) : []); if (e.patUndo.length > 24) e.patUndo.shift(); }
 function padUndo(e) { if (!e.patUndo || !e.patUndo.length) return; e.pat = e.patUndo.pop(); save(); sheetDirty = true; }
 // rec: 1 bar count-in (clicks), then one lap (or 2 / 4 bars, which becomes the lap) of your hits → the planet's pattern
@@ -4681,15 +4698,15 @@ function click(t, acc) { const o = ac.createOscillator(), gn = ac.createGain(); 
 function tickPadRec() {
   const e = E[prec.id]; if (!e || !playing) { endPadRec(true); return; }
   const p = posNow();
-  if (prec.phase === 'count' && p >= prec.start - 1 / 64) { prec.phase = 'rec'; if (!PAD.overdub) { e.pat = []; prec.cleared = true; } renderWin(); }
+  if (prec.phase === 'count' && p >= prec.start - 1 / 64) { prec.phase = 'rec'; if (!PAD.overdub) { e.pat = []; prec.cleared = true; } else if (!e.pat || !e.pat.length) e.pat = ONE.map(h => Object.assign({}, h)); renderWin(); } // overdub keeps the planet's own crossing hit
   if (prec.phase === 'count') wNote.textContent = 'count-in · ' + Math.max(1, Math.ceil(prec.start - p));
-  else wNote.textContent = 'recording · ' + Math.max(0, Math.ceil(prec.end - p)) + ' beats left · ' + prec.n + ' hits';
+  else wNote.textContent = 'recording · ' + Math.max(0, Math.ceil(prec.end - p)) + ' beats left · ' + prec.n + (prec.n === 1 ? ' hit' : ' hits');
   if (prec.phase === 'rec' && p >= prec.end) endPadRec();
 }
 function padRecHit(e, p, v) {
-  if (p < prec.start - 1 / 32 || p >= prec.end) return;
-  const L = lapOf(e); let o = frac(p / L + aEff(e)); // where in the planet's lap (0 = its own crossing)
-  if (PAD.q > 0) o = frac(Math.round(o * L / PAD.q) * PAD.q / L);
+  if (p < prec.start - 1 / 8 || p >= prec.end) return; // a little early (or latency-compensated) still counts: it wraps to the lap start
+  const L = lapOf(e); if (PAD.q > 0) p = Math.round(p / PAD.q) * PAD.q; // quantize on the bar grid, not relative to the planet
+  let o = frac(p / L + aEff(e)); // where in the planet's lap (0 = its own crossing)
   o = +o.toFixed(6); e.pat = e.pat || [];
   const near = e.pat.find(h => Math.min(Math.abs(h.o - o), 1 - Math.abs(h.o - o)) < Math.min(1 / 128, (PAD.q || 0.0625) / L / 2));
   if (near) near.v = Math.max(near.v, v); else e.pat.push({ o, v: +v.toFixed(3) });
@@ -4698,7 +4715,7 @@ function padRecHit(e, p, v) {
 function endPadRec(abort) {
   const r = prec; prec = null; if (!r) return; const e = E[r.id];
   if (e && abort && r.phase === 'count') { if (e.patUndo) e.patUndo.pop(); }
-  wNote.textContent = r.phase === 'rec' ? (r.n ? 'recorded ' + r.n + ' hits · they play every lap' : 'nothing recorded') : '';
+  wNote.textContent = r.phase === 'rec' ? (r.n ? 'recorded ' + r.n + (r.n === 1 ? ' hit' : ' hits') + ' · they play every lap' : 'nothing recorded') : '';
   if (e && r.phase === 'rec' && !r.n && r.cleared) padUndo(e);
   save(); sheetDirty = true; if (winId) renderWin();
 }
@@ -4738,9 +4755,15 @@ function applyGenre(id, mode) {
   if (d.fx && d.fx.reverb && isFinite(d.fx.reverb.decay)) { setRoom({ size: d.fx.reverb.decay }, true); }
   if (d.fx && d.fx.delay) { const dl = d.fx.delay; ORB.forEach((o, i) => orb2Set(i, 'delay', { beats: dl.delayBeats, feedback: dl.feedback, send: dl.send, sync: true })); }
   if (mode === 'relayout' && d.layout) relayout(d.layout);
+  setGenreTrim(GTRIM_DB[GENRE + ':' + mode] || 0);
   sheetDirty = true; renderGenre(); save(); if (winId) renderWin();
   recMsg(GENRE + (mode === 'relayout' ? ' · relayout' : ' · sounds') + ' · ' + bpm + ' bpm');
 }
+// output trim per genre (db), measured at default volumes so every genre sits near -23 dbfs rms (raw spread was ~11 db)
+const GTRIM_DB = {
+  'house:sounds': 2, 'techno:sounds': 1, 'lofi:sounds': 0.9, 'trap:sounds': 0.7, 'dnb:sounds': 0.2, 'ambient:sounds': -4.8, 'dub:sounds': -4.2, 'afrobeat:sounds': 3.1, 'synthwave:sounds': 3.4, 'meditation:sounds': -6.5,
+  'house:relayout': 1.8, 'techno:relayout': 0.5, 'lofi:relayout': -0.9, 'trap:relayout': -1.1, 'dnb:relayout': 1.3, 'ambient:relayout': -3.6, 'dub:relayout': -7, 'afrobeat:relayout': 4.1, 'synthwave:relayout': 2.7, 'meditation:relayout': -4.5 };
+function setGenreTrim(db) { GTRIM = clamp(+db || 0, -12, 6); if (gtrim) gtrim.gain.setTargetAtTime(Math.pow(10, GTRIM / 20), ac.currentTime, 0.05); }
 function relayout(lay) { // free orbits: lap (or distance) → radius band, a → angle; orbit indices ignored. same-lap planets get connected.
   const pos = posNow(), plan = {};
   for (const pid in lay.planets) { const e = E[pid], lp = lay.planets[pid]; if (!e || e.side === 'rec' || e.muted && false) continue;
@@ -4758,7 +4781,22 @@ function relayout(lay) { // free orbits: lap (or distance) → radius band, a �
   const byBand = {}; ids.forEach(id => { const b = bandOfLap(plan[id].L); (byBand[b] = byBand[b] || []).push(id); });
   for (const b in byBand) { const c = byBand[b], lo = RIN + b * BW + 0.01, w = BW - 0.02; // spread the planets of one band across its width
     c.forEach((id, k) => { const e = E[id], p = plan[id], o = grpOf(e); if (!o) return; e.rad = clampRadLap(lo + w * (c.length > 1 ? k / (c.length - 1) : 0.5), o.lap); e.a = frac(p.a + o.st.offset); e.pat = p.pat; e.muted = false; }); }
-  sheetDirty = true;
+  unstack(ids); sheetDirty = true;
+}
+// planets that share a band and an angle would sit on top of each other: turn the later ones a little along the orbit
+// (and shift their hits back by the same amount, so the rhythm is unchanged) until each disc is clear of the others
+function unstack(ids) {
+  layout(); const placed = [];
+  for (const id of ids) {
+    const e = E[id]; if (!e || e.muted) continue;
+    const clear = () => placed.every(q => Math.hypot(q.x - e.x, q.y - e.y) >= q.r + e.r + 10 * DS);
+    if (!clear()) {
+      const Rpx = Math.max(40, Math.hypot(e.x - CX, e.y - CY)), d = Math.max(1, Math.ceil((2 * e.r + 12 * DS) / (TAU * Rpx) * 1024)) / 1024, a0 = e.a, pat0 = (e.pat && e.pat.length ? e.pat : ONE).map(h => Object.assign({}, h));
+      for (let k = 1; k <= 16; k++) { const dl = (k & 1 ? 1 : -1) * Math.ceil(k / 2) * d;
+        e.a = frac(a0 + dl); e.pat = pat0.map(h => ({ o: frac(h.o + dl), v: h.v })); layout(); if (clear()) break; }
+    }
+    placed.push(e);
+  }
 }
 function renderGenre() {
   genreEl.textContent = GENRE || 'genre'; genreEl.classList.toggle('on', !!GENRE);
