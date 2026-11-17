@@ -7012,7 +7012,7 @@ function resize() {
   if (document.body.classList.contains('clean')) { SIDE = W > H; SA = { x: 0, y: 0, w: W, h: H }; } // clean view: the system gets the whole screen
   CX0 = SA.x + SA.w / 2; CY0 = SA.y + SA.h / 2;
   const hw = SA.w / 2 - (SIDE ? 50 : 20), hh = SA.h / 2 - 22;
-  K = clamp(hh / hw, 0.55, SIDE ? 0.8 : 0.72);
+  K = clamp(hh / hw, 0.55, SIDE ? 0.8 : (document.body.classList.contains('lvPhone') ? 0.9 : 0.72)); // live on a phone (portrait): a rounder system uses the tall screen
   RMAX0 = Math.max(50, Math.min(hw, hh / K)); applyView();
   DS = clamp(M / 700, 0.9, 1.3); SUNR = 5.5 * DS;
   ctlZone = document.getElementById('lsys') ? { x: SA.x + 16, y: SA.y + 16 } : { x: 0, y: tb + 16 };
@@ -7343,8 +7343,8 @@ function frame(now) {
     const L = o.lap, R = e.rad * RMAX;
     if (e.pat && e.pat.length) { // moving: ticks trail the planet and cross 12 exactly when each hit plays · still: ticks sit where the hand will fire them
       g.lineWidth = 0.7; const mx = Math.max(...e.pat.map(h => h.o));
-      if (!still && mx > 0.01) { g.globalAlpha = 0.09; g.setLineDash([1, 4]); g.beginPath(); g.ellipse(CX, CY, R, R * K, 0, (e.ang - mx) * TAU - Math.PI / 2, e.ang * TAU - Math.PI / 2); g.stroke(); g.setLineDash([]); }
-      for (const h of e.pat) { const an = still ? frac(e.ang + h.o) : frac(e.ang - h.o), s = Math.sin(an * TAU), c = Math.cos(an * TAU); g.globalAlpha = 0.25 + 0.4 * h.v; g.beginPath(); g.moveTo(CX + (R - 3) * s, CY - (R - 3) * K * c); g.lineTo(CX + (R + 3) * s, CY - (R + 3) * K * c); g.stroke(); }
+      if (!still && mx > 0.01 && !LITE) { g.globalAlpha = 0.09; g.setLineDash([1, 4]); g.beginPath(); g.ellipse(CX, CY, R, R * K, 0, (e.ang - mx) * TAU - Math.PI / 2, e.ang * TAU - Math.PI / 2); g.stroke(); g.setLineDash([]); }
+      for (const h of e.pat) { const an = still ? frac(e.ang + h.o) : frac(e.ang - h.o), s = Math.sin(an * TAU), c = Math.cos(an * TAU); g.globalAlpha = (LITE ? 0.5 : 1) * (0.25 + 0.4 * h.v); g.beginPath(); g.moveTo(CX + (R - 3) * s, CY - (R - 3) * K * c); g.lineTo(CX + (R + 3) * s, CY - (R + 3) * K * c); g.stroke(); }
     }
     const t2 = o.t2, snd = Math.max(t2.send, e.echo * 0.6); if (snd < 0.03) continue;
     const d = t2.delayBeats / L, ph = still ? [1, 2, 3, 4, 5, 6].map(j => frac(e.ang + d * j)) : OrbsFX2.ghostPhases(e.ang, t2.delayBeats, L, 6);
@@ -7375,7 +7375,7 @@ function frame(now) {
     after: S => { g.font = LABEL_FONT; g.textBaseline = 'middle';
   for (const id of IDS) {
     const e = E[id], r = e.r * (1 + 0.35 * e.pulse), dragging = drag && drag.e === e && drag.moved, mutedLook = e.muted || (ORB[e.orbit] && (ORB[e.orbit].st.muted || (anySolo() && !ORB[e.orbit].solo)) && !dragging) || (dragging && drag.tgt && drag.tgt.mute) || e._ghost;
-    if (!mutedLook && e.verb > 0.2) { g.globalAlpha = 0.12 + 0.18 * e.verb; g.lineWidth = 0.6; g.setLineDash([0.5, 3]); g.beginPath(); g.arc(e.x, e.y, r + 3 + 6 * e.verb, 0, TAU); g.stroke(); g.setLineDash([]); }
+    if (!mutedLook && e.verb > 0.2 && !LITE) { g.globalAlpha = 0.12 + 0.18 * e.verb; g.lineWidth = 0.6; g.setLineDash([0.5, 3]); g.beginPath(); g.arc(e.x, e.y, r + 3 + 6 * e.verb, 0, TAU); g.stroke(); g.setLineDash([]); }
     if (e.side === 'rec') { g.globalAlpha = 0.35; g.lineWidth = 0.7; g.beginPath(); g.arc(e.x, e.y, r + 3.5, 0, TAU); g.stroke(); }
     if (id === selId) { g.globalAlpha = 0.65; g.lineWidth = 0.8; g.beginPath(); g.arc(e.x, e.y, r + 7, 0, TAU); g.stroke(); }
     if (baseOf(id) === pickId || id === barId || id === winId) { g.save(); g.translate(e.x, e.y); g.rotate(T * 0.5); g.globalAlpha = 0.6; g.lineWidth = 0.8; g.setLineDash([2, 5]); g.beginPath(); g.arc(0, 0, r + 12, 0, TAU); g.stroke(); g.setLineDash([]); g.restore(); }
@@ -8507,7 +8507,7 @@ function drawXfade(now) { if (!XFADE) return; const a = 1 - (now - XFADE.t0) / 4
   g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = 'source-over'; g.globalAlpha = a; g.drawImage(XFADE.c, 0, 0); g.globalAlpha = 1; g.setTransform(DPR, 0, 0, DPR, 0, 0); }
 const SKSTAT = []; // frame cost (ms) of the last 240 frames
 /* clean view: hide the whole interface; H / esc bring it back · F browser full screen · [ ] skins · L labels */
-let CLEAN = false, CLEAN_LABELS = true, LABELS_ON = true; const cleanHint = document.getElementById('cleanHint');
+let CLEAN = false, CLEAN_LABELS = true, LABELS_ON = true, LITE = false; // LITE: live on a phone, fewer decorations const cleanHint = document.getElementById('cleanHint');
 function setClean(on) {
   on = !!on; if (on === CLEAN) return; CLEAN = on;
   if (on) { if (winId) closeWin(); if (pad9Open()) pad9Toggle(false); if (pickId) closePicker(); if (barId) closeBar(); moreOpen(false); gmenu.classList.remove('open'); }

@@ -341,9 +341,9 @@ body.live.clean #lv{display:none}
 #lv .rail:hover{opacity:1}
 #railL{border-right-width:1px!important} #railR{border-left-width:1px!important}
 #detBar{display:none;height:8px;border-top:1px solid var(--l2);align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;background:#000} #detBar i{width:32px;height:1px;background:rgba(255,255,255,.55)}
-body.noB #brw{display:none} body.noB #railL{display:flex}
-body.noM #mix{display:none} body.noM #railR{display:flex}
-body.noD #det{display:none} body.noD #detBar{display:flex}
+body.noB #brw{display:none!important} body.noB #railL{display:flex}
+body.noM #mix{display:none!important} body.noM #railR{display:flex}
+body.noD #det{display:none!important} body.noD #detBar{display:flex}
 #lstat{border-top:1px solid var(--l2);display:flex;align-items:center;padding:0 8px;gap:12px;white-space:nowrap;overflow:hidden}
 #lstat .h{opacity:.62;flex:1;overflow:hidden;text-overflow:ellipsis}
 #lstat .r{display:flex;gap:12px;align-items:center}
@@ -377,10 +377,10 @@ body.live #mmenu.lmenu .mn{padding:4px 12px 6px;opacity:.55;line-height:1.45;fon
 body.live #mmenu.lmenu .ch{cursor:pointer;opacity:.62;padding:0 2px} body.live #mmenu.lmenu .ch.on{opacity:1;border-bottom:1px solid #fff}
 body.live #mmenu.lmenu select{background:#000;color:#fff;border:1px solid rgba(255,255,255,.3);font:inherit;max-width:150px}
 body.live #mmenu.lmenu a{color:#fff}
-body.live #gmenu{font:11px/1.3 ui-monospace,Menlo,Consolas,monospace;top:35px!important}
+body.live #gmenu{font:11px/1.3 ui-monospace,Menlo,Consolas,monospace;top:calc(var(--lvtop,36px) - 1px)!important}
 
 /* ===== batch G: minimal · the system fills the screen, 4 edge boxes open the panels (all closed on open) ===== */
-body.noT #ltop{display:none}
+body.noT #ltop{display:none!important}
 body.live.noT #picker{top:0!important}
 #sysHd,#railL,#railR,#detBar{display:none!important}
 #lv{--l:rgba(255,255,255,.1);--l2:rgba(255,255,255,.2)}
@@ -399,6 +399,39 @@ body.live.noT #picker{top:0!important}
 #lv>#lstat.show{opacity:1} #lstat .r{display:none!important} #lstat .h{opacity:.55;font-size:10px;line-height:1.4;display:block}
 #lv .strips{overflow-x:auto;overflow-y:hidden;scrollbar-width:thin} #lv .st{min-width:42px;flex-shrink:0;flex-basis:0;flex-grow:1}
 #lv .st.master{position:sticky;right:0;z-index:1;background:#000;border-left:1px solid var(--l)}
+/* ===== batch H: phones (portrait + landscape) · safe areas · 100dvh · sheets · 40px touch targets ===== */
+:root{--lv-sat:env(safe-area-inset-top,0px);--lv-sar:env(safe-area-inset-right,0px);--lv-sab:env(safe-area-inset-bottom,0px);--lv-sal:env(safe-area-inset-left,0px)}
+#lv{height:100vh;height:100dvh;bottom:auto}
+body.live #picker:not(.open){visibility:hidden;transition:transform .45s cubic-bezier(.2,.7,.2,1),visibility 0s .45s}
+body.live #picker{top:var(--lvtop,0px)!important;bottom:0!important}
+body.live #start{pointer-events:none;background:transparent;justify-content:flex-end;padding-bottom:calc(64px + var(--lv-sab))}
+body.live #start b{font-size:10px;opacity:.5} body.live #start b::before{display:none} body.live #start small{font-size:9px;opacity:.3}
+body.lvPhone #lsys{margin:var(--lv-sat) var(--lv-sar) var(--lv-sab) var(--lv-sal)}
+body.lvPhone #lv>.lbx::after{content:"";position:absolute;inset:-14px}
+body.lvPhone #lv>.lbx{font-size:11px;height:20px;opacity:.4} body.lvPhone #lv>.lbx.v{width:20px;height:auto}
+body.lvPhone.lvAny #lv>.lbx:not(.on){display:none}
+body.lvPhone #ltop,body.lvPhone #brw,body.lvPhone #mix,body.lvPhone #det{position:fixed;z-index:5;background:rgba(0,0,0,.96)!important}
+body.lvPhone #ltop{left:0;right:0;top:0;height:auto;display:flex;flex-wrap:wrap;gap:0 4px;padding:var(--lv-sat) calc(8px + var(--lv-sar)) 4px calc(8px + var(--lv-sal));border-bottom:1px solid var(--l2)}
+body.lvPhone #ltop .zone{flex-wrap:wrap;height:auto;gap:2px 10px;width:100%;justify-content:flex-start} body.lvPhone #ltop .zone.c{border:0;padding:0;order:-1;justify-content:center}
+body.lvPhone #ltop .sepv{display:none}
+body.lvPhone #brw{left:0;top:0;bottom:0;width:min(86vw,360px);padding:var(--lv-sat) 0 var(--lv-sab) var(--lv-sal)}
+body.lvPhone #mix{right:0;top:0;bottom:0;width:min(86vw,440px);padding:var(--lv-sat) var(--lv-sar) var(--lv-sab) 0}
+body.lvPhone #det{left:0;right:0;bottom:0;height:auto!important;max-height:74dvh;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding:0 var(--lv-sar) var(--lv-sab) var(--lv-sal)}
+body.lvPhone #det .handle{display:none}
+body.lvPhone #lv .dbody{flex-direction:column;flex:none} body.lvPhone #lv .dleft{overflow:visible} body.lvPhone #lv .dright{width:auto;border-left:0;border-top:1px solid var(--l2);overflow:visible}
+body.lvPhone #lv .chain{height:auto;min-height:132px} body.lvPhone #lv .clip{flex:none;overflow:visible;padding-bottom:6px} body.lvPhone #lv .clip > *{flex-wrap:wrap}
+body.lvPhone #lv .hd{height:40px} body.lvPhone #lv .hd .x,body.lvPhone #det .hd .act{min-width:40px;min-height:40px;display:inline-flex;align-items:center;justify-content:center}
+body.lvPhone #lv .tb,body.lvPhone #lv .ico{min-height:40px;min-width:40px;justify-content:center} body.lvPhone #lv .box{height:32px}
+body.lvPhone #lv .ch{min-height:40px;min-width:40px;display:inline-flex;align-items:center;justify-content:center}
+body.lvPhone #lv .cat,body.lvPhone #lv .it{height:40px} body.lvPhone #lv .it .gr{width:24px;height:24px;background-size:6px 6px}
+body.lvPhone #lv .st{min-width:92px} body.lvPhone #lv .sq{width:40px;height:40px} body.lvPhone #lv .k{min-width:40px;min-height:40px}
+body.lvPhone #lv [data-ldev]{position:relative} body.lvPhone #lv [data-ldev]::after{content:"";position:absolute;inset:-17px}
+body.lvPhone #padc .orbs-pad9 .p9-grid{grid-template-rows:repeat(3,56px)!important} body.lvPhone #padc .orbs-pad9 .p9-cell{height:56px!important}
+body.lvPhone #padc .orbs-pad9 .p9-chips span,body.lvPhone #padc .orbs-pad9 .p9-acts span{min-height:40px;min-width:40px;display:inline-flex;align-items:center;justify-content:center}
+body.lvPhone #mmenu.lmenu{left:0!important;right:0!important;width:auto!important;max-height:calc(100dvh - var(--lvtop,40px) - 10px)!important;padding-bottom:var(--lv-sab)}
+body.lvPhone #mmenu.lmenu .mi{min-height:40px} body.lvPhone #mmenu.lmenu .ch{min-height:40px;min-width:40px;display:inline-flex;align-items:center;justify-content:center}
+body.lvPhone #gmenu{left:0!important;right:0!important;width:auto!important}
+body.lvPhone #gmenu [data-g]{min-height:40px;display:flex;align-items:center}
 
 </style>
 </head>
@@ -7245,7 +7278,7 @@ function resize() {
   if (document.body.classList.contains('clean')) { SIDE = W > H; SA = { x: 0, y: 0, w: W, h: H }; } // clean view: the system gets the whole screen
   CX0 = SA.x + SA.w / 2; CY0 = SA.y + SA.h / 2;
   const hw = SA.w / 2 - (SIDE ? 50 : 20), hh = SA.h / 2 - 22;
-  K = clamp(hh / hw, 0.55, SIDE ? 0.8 : 0.72);
+  K = clamp(hh / hw, 0.55, SIDE ? 0.8 : (document.body.classList.contains('lvPhone') ? 0.9 : 0.72)); // live on a phone (portrait): a rounder system uses the tall screen
   RMAX0 = Math.max(50, Math.min(hw, hh / K)); applyView();
   DS = clamp(M / 700, 0.9, 1.3); SUNR = 5.5 * DS;
   ctlZone = document.getElementById('lsys') ? { x: SA.x + 16, y: SA.y + 16 } : { x: 0, y: tb + 16 };
@@ -7576,8 +7609,8 @@ function frame(now) {
     const L = o.lap, R = e.rad * RMAX;
     if (e.pat && e.pat.length) { // moving: ticks trail the planet and cross 12 exactly when each hit plays · still: ticks sit where the hand will fire them
       g.lineWidth = 0.7; const mx = Math.max(...e.pat.map(h => h.o));
-      if (!still && mx > 0.01) { g.globalAlpha = 0.09; g.setLineDash([1, 4]); g.beginPath(); g.ellipse(CX, CY, R, R * K, 0, (e.ang - mx) * TAU - Math.PI / 2, e.ang * TAU - Math.PI / 2); g.stroke(); g.setLineDash([]); }
-      for (const h of e.pat) { const an = still ? frac(e.ang + h.o) : frac(e.ang - h.o), s = Math.sin(an * TAU), c = Math.cos(an * TAU); g.globalAlpha = 0.25 + 0.4 * h.v; g.beginPath(); g.moveTo(CX + (R - 3) * s, CY - (R - 3) * K * c); g.lineTo(CX + (R + 3) * s, CY - (R + 3) * K * c); g.stroke(); }
+      if (!still && mx > 0.01 && !LITE) { g.globalAlpha = 0.09; g.setLineDash([1, 4]); g.beginPath(); g.ellipse(CX, CY, R, R * K, 0, (e.ang - mx) * TAU - Math.PI / 2, e.ang * TAU - Math.PI / 2); g.stroke(); g.setLineDash([]); }
+      for (const h of e.pat) { const an = still ? frac(e.ang + h.o) : frac(e.ang - h.o), s = Math.sin(an * TAU), c = Math.cos(an * TAU); g.globalAlpha = (LITE ? 0.5 : 1) * (0.25 + 0.4 * h.v); g.beginPath(); g.moveTo(CX + (R - 3) * s, CY - (R - 3) * K * c); g.lineTo(CX + (R + 3) * s, CY - (R + 3) * K * c); g.stroke(); }
     }
     const t2 = o.t2, snd = Math.max(t2.send, e.echo * 0.6); if (snd < 0.03) continue;
     const d = t2.delayBeats / L, ph = still ? [1, 2, 3, 4, 5, 6].map(j => frac(e.ang + d * j)) : OrbsFX2.ghostPhases(e.ang, t2.delayBeats, L, 6);
@@ -7608,7 +7641,7 @@ function frame(now) {
     after: S => { g.font = LABEL_FONT; g.textBaseline = 'middle';
   for (const id of IDS) {
     const e = E[id], r = e.r * (1 + 0.35 * e.pulse), dragging = drag && drag.e === e && drag.moved, mutedLook = e.muted || (ORB[e.orbit] && (ORB[e.orbit].st.muted || (anySolo() && !ORB[e.orbit].solo)) && !dragging) || (dragging && drag.tgt && drag.tgt.mute) || e._ghost;
-    if (!mutedLook && e.verb > 0.2) { g.globalAlpha = 0.12 + 0.18 * e.verb; g.lineWidth = 0.6; g.setLineDash([0.5, 3]); g.beginPath(); g.arc(e.x, e.y, r + 3 + 6 * e.verb, 0, TAU); g.stroke(); g.setLineDash([]); }
+    if (!mutedLook && e.verb > 0.2 && !LITE) { g.globalAlpha = 0.12 + 0.18 * e.verb; g.lineWidth = 0.6; g.setLineDash([0.5, 3]); g.beginPath(); g.arc(e.x, e.y, r + 3 + 6 * e.verb, 0, TAU); g.stroke(); g.setLineDash([]); }
     if (e.side === 'rec') { g.globalAlpha = 0.35; g.lineWidth = 0.7; g.beginPath(); g.arc(e.x, e.y, r + 3.5, 0, TAU); g.stroke(); }
     if (id === selId) { g.globalAlpha = 0.65; g.lineWidth = 0.8; g.beginPath(); g.arc(e.x, e.y, r + 7, 0, TAU); g.stroke(); }
     if (baseOf(id) === pickId || id === barId || id === winId) { g.save(); g.translate(e.x, e.y); g.rotate(T * 0.5); g.globalAlpha = 0.6; g.lineWidth = 0.8; g.setLineDash([2, 5]); g.beginPath(); g.arc(0, 0, r + 12, 0, TAU); g.stroke(); g.setLineDash([]); g.restore(); }
@@ -8740,7 +8773,7 @@ function drawXfade(now) { if (!XFADE) return; const a = 1 - (now - XFADE.t0) / 4
   g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = 'source-over'; g.globalAlpha = a; g.drawImage(XFADE.c, 0, 0); g.globalAlpha = 1; g.setTransform(DPR, 0, 0, DPR, 0, 0); }
 const SKSTAT = []; // frame cost (ms) of the last 240 frames
 /* clean view: hide the whole interface; H / esc bring it back · F browser full screen · [ ] skins · L labels */
-let CLEAN = false, CLEAN_LABELS = true, LABELS_ON = true; const cleanHint = document.getElementById('cleanHint');
+let CLEAN = false, CLEAN_LABELS = true, LABELS_ON = true, LITE = false; // LITE: live on a phone, fewer decorations const cleanHint = document.getElementById('cleanHint');
 function setClean(on) {
   on = !!on; if (on === CLEAN) return; CLEAN = on;
   if (on) { if (winId) closeWin(); if (pad9Open()) pad9Toggle(false); if (pickId) closePicker(); if (barId) closeBar(); moreOpen(false); gmenu.classList.remove('open'); }
@@ -8820,27 +8853,34 @@ pad9Btn.addEventListener('click', ev => { ev.stopPropagation(); pad9Toggle(); })
 document.body.classList.add('live');
 const LV = id => document.getElementById(id);
 const lvEsc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const lvAnyOpen = () => LVP.T || LVP.B || LVP.M || LVP.D;
 let LVP = { det: 248, cat: 'sounds' }; try { const sv = JSON.parse(localStorage.getItem('orbs-live-panels') || '{}') || {}; if (sv.det) LVP.det = sv.det; if (sv.cat) LVP.cat = sv.cat; } catch (x) {}
 Object.assign(LVP, { T: false, B: false, M: false, D: false }); // batch G: always opens clean (the system fills the screen); open panels are never remembered
 let LVOFF = {}; try { LVOFF = JSON.parse(localStorage.getItem('orbs-live-off') || '{}') || {}; } catch (x) {} // device on / off: the values a switched-off device had
 let LVMASTER = 48 / 54; try { const v = +localStorage.getItem('orbs-live-master'); if (localStorage.getItem('orbs-live-master') != null && isFinite(v)) LVMASTER = clamp(v, 0, 1); } catch (x) {}
 let LVD = true, lvDrag = null, lvMenu = null, lvMenuT = 0, lvOpenSnd = new Set(['kick']), lvOd = null, lvTemp = new Set(), lvLastSel = undefined, lvAn = null, lvHelp = false;
 const lvSave = () => { try { localStorage.setItem('orbs-live-panels', JSON.stringify({ det: LVP.det, cat: LVP.cat })); localStorage.setItem('orbs-live-off', JSON.stringify(LVOFF)); } catch (x) {} };
+let LV_PHONE = false;
+const lvPhoneNow = () => matchMedia('(max-width: 700px), (max-height: 500px)').matches;
 function lvPanels() {
+  LV_PHONE = LITE = lvPhoneNow(); document.body.classList.toggle('lvPhone', LV_PHONE); document.body.classList.toggle('lvAny', lvAnyOpen());
   document.body.classList.toggle('noT', !LVP.T); document.body.classList.toggle('noB', !LVP.B); document.body.classList.toggle('noM', !LVP.M); document.body.classList.toggle('noD', !LVP.D);
-  LV('lv').style.setProperty('--det', clamp(LVP.det | 0, 170, Math.max(170, innerHeight - 260)) + 'px'); resize(); LVD = true; lvBoxes();
+  LV('lv').style.setProperty('--det', clamp(LVP.det | 0, 170, Math.max(170, innerHeight - 260)) + 'px'); resize(); LVD = true; lvBoxes(); lvTopVar();
 }
+function lvTopVar() { const t = LVP.T ? Math.round(LV('ltop').getBoundingClientRect().bottom) : 0; document.documentElement.style.setProperty('--lvtop', t + 'px'); return t; }
 const LV_BXH = { T: 'transport · bpm · genre · view · share · midi', B: 'drag a sound onto an orbit · distance from the sun sets the lap', M: 'drag a fader · m / s · rev sends · room', D: 'click a device dot to switch it off · drag knobs · click a hit to set its chance' };
-function lvCollapse(k, on) { const was = LVP[k]; LVP[k] = on == null ? !LVP[k] : !!on; lvSave(); lvPanels(); if (LVP[k] && !was) lvHint(LV_BXH[k]); }
-const lvAnyOpen = () => LVP.T || LVP.B || LVP.M || LVP.D;
+function lvCollapse(k, on) { const was = LVP[k]; LVP[k] = on == null ? !LVP[k] : !!on; if (LVP[k] && lvPhoneNow()) for (const j of ['T', 'B', 'M', 'D']) if (j !== k) LVP[j] = false; // phone: one sheet at a time
+  lvSave(); lvPanels(); if (LVP[k] && !was) lvHint(LV_BXH[k]); }
 function lvCloseAll() { LVP.T = LVP.B = LVP.M = LVP.D = false; lvPanels(); }
 let lvBxK = '';
-function lvBoxes() { // the 4 edge boxes sit centred on the system's edges = the open panels' inner edges
-  const r = LV('lsys').getBoundingClientRect(), k = [r.left, r.top, r.right, r.bottom, LVP.T, LVP.B, LVP.M, LVP.D].map(v => typeof v === 'number' ? Math.round(v) : +v).join();
-  if (k === lvBxK) return; lvBxK = k; const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+function lvBoxes() { // the 4 edge boxes: centred on the system's real edges (safe areas respected) · an open panel's inner edge
+  const r = LV('lsys').getBoundingClientRect(), V = LV('lv').getBoundingClientRect(), Q = id => LV(id).getBoundingClientRect();
+  const top = LVP.T ? Q('ltop').bottom : r.top, bot = LVP.D ? Q('det').top : r.bottom, lft = LVP.B ? Q('brw').right : r.left, rgt = LVP.M ? Q('mix').left : r.right;
+  const k = [top, bot, lft, rgt, V.height, LVP.T, LVP.B, LVP.M, LVP.D, LV_PHONE].map(v => typeof v === 'number' ? Math.round(v) : +v).join();
+  if (k === lvBxK) return; lvBxK = k; const cx = (lft + rgt) / 2, cy = (top + bot) / 2;
   const S = (id, x, y, tx, ty, on) => { const b = LV(id); b.style.left = x + 'px'; b.style.top = y + 'px'; b.style.transform = 'translate(' + tx + ',' + ty + ')'; b.classList.toggle('on', on); };
-  S('bxT', cx, r.top, '-50%', '0', LVP.T); S('bxB', cx, r.bottom, '-50%', '-100%', LVP.D); S('bxL', r.left, cy, '0', '-50%', LVP.B); S('bxR', r.right, cy, '-100%', '-50%', LVP.M);
-  LV('lstat').style.bottom = (innerHeight - r.bottom + 24) + 'px'; LV('lstat').style.left = cx + 'px';
+  S('bxT', cx, top, '-50%', '0', LVP.T); S('bxB', cx, bot, '-50%', '-100%', LVP.D); S('bxL', lft, cy, '0', '-50%', LVP.B); S('bxR', rgt, cy, '-100%', '-50%', LVP.M);
+  LV('lstat').style.bottom = (V.height - bot + 28) + 'px'; LV('lstat').style.left = cx + 'px';
 }
 let lvHintT = 0;
 function lvHint(t, ms) { const el = LV('lstat'); LV('lHint').textContent = t; lvBoxes(); el.classList.add('show'); clearTimeout(lvHintT); lvHintT = setTimeout(() => el.classList.remove('show'), ms || 2600); }
@@ -8853,6 +8893,8 @@ cv.addEventListener('pointerdown', ev => { // a click on empty system closes the
   if (hitDot(x, y, 4) || hitLabel(x, y) || linkAt(x, y) || Math.hypot(x - CX, y - CY) < SUNR + 12) return;
   setTimeout(lvCloseAll, 0);
 });
+let lvTap = { t: 0, id: null }, lvDbl = null; cv.addEventListener('pointerup', () => { if (!lvDbl) return; const id = lvDbl; lvDbl = null; setTimeout(() => { if (E[id]) { select(id); lvCollapse('D', true); } }, 0); });
+ cv.addEventListener('pointerdown', ev => { if (ev.pointerType === 'mouse' || CLEAN) return; const h = hitDot(ev.clientX, ev.clientY, 6), now = performance.now(); if (h && h.e.id === lvTap.id && now - lvTap.t < 380) { lvTap.t = 0; lvDbl = h.e.id; return; } lvTap = { t: now, id: h ? h.e.id : null }; }); // double-tap a planet (touch: no dblclick on ios)
 cv.addEventListener('dblclick', ev => { const h = hitDot(ev.clientX, ev.clientY, 4); if (h && !CLEAN) { select(h.e.id); lvCollapse('D', true); } }); // double-click a planet: its detail
 /* ---- knobs (svg like the mockup), faders and the one value path (slApply) ---- */
 function lvGet(d) { // {t, txt} of a control without changing it
@@ -8961,7 +9003,7 @@ moreOpen = function (on) {
   if (!on) { if (mmenu.classList.contains('open')) { lvMenuT = performance.now(); lvMenu0 = lvMenu; } mmenu.classList.remove('open', 'lmenu'); lvMenu = null; document.querySelectorAll('#ltop [data-menu]').forEach(x => x.classList.remove('open')); return; }
   if (!lvMenu) lvMenu = 'view'; renderMore(); mmenu.classList.add('open', 'lmenu'); mmenu.classList.remove('panel'); document.body.classList.remove('more-open');
   const b = document.querySelector('#ltop [data-menu="' + lvMenu + '"]'); document.querySelectorAll('#ltop [data-menu]').forEach(x => x.classList.toggle('open', x === b));
-  if (b) { const r = b.getBoundingClientRect(); mmenu.style.left = Math.max(4, Math.min(innerWidth - 246, r.left - 12)) + 'px'; mmenu.style.top = '35px'; }
+  if (b) { const r = b.getBoundingClientRect(); mmenu.style.left = Math.max(4, Math.min(innerWidth - 246, r.left - 12)) + 'px'; mmenu.style.top = (lvTopVar() - 1) + 'px'; }
 };
 function lvOpenMenu(k) {
   if (k === 'genre') { moreOpen(false); if (lvGWas) { lvGWas = false; gmenu.classList.remove('open'); return; } renderGenre(); const b = document.querySelector('#ltop [data-menu="genre"]'), r = b.getBoundingClientRect(); gmenu.style.left = Math.max(4, Math.min(innerWidth - 180, r.left - 12)) + 'px'; gmenu.style.top = '35px'; gmenu.classList.add('open'); return; }
@@ -9234,6 +9276,7 @@ addEventListener('keydown', ev => {
   if (ev.code === 'KeyL' && !CLEAN && !winId && !ev.metaKey && !ev.ctrlKey && !ev.altKey) { LABELS_ON = !LABELS_ON; }
 }, true);
 /* ---- per-frame bits (cheap) + panel rendering when something changed ---- */
+drawSunChord = function () { if (CHORD.held == null || CLEAN) return; g.font = LABEL_FONT; g.textAlign = 'center'; g.textBaseline = 'middle'; g.globalAlpha = 0.28 + 0.4 * sunFlash; g.fillText(chordName(PROG[CHORD.held]), CX, CY + SUNR + (LV_PHONE ? 14 : 18)); }; // subtle, only while the chord sun is manual
 renderSheet = function () { sheetDirty = false; LVD = true; };
 renderMidi = (f => function () { f(); LV('lMidiDot').classList.toggle('on', !!midiPorts.find(p => p.selected)); LVD = true; })(renderMidi);
 function lvMeterInit() { if (lvAn || !ac || !clipper) return; try { const sp = ac.createChannelSplitter(2), a = ac.createAnalyser(), b = ac.createAnalyser(); a.fftSize = b.fftSize = 512; clipper.connect(sp); sp.connect(a, 0); sp.connect(b, 1); lvAn = { a, b, buf: new Float32Array(512), l: 0, r: 0 }; } catch (x) { lvAn = false; } }
@@ -9249,7 +9292,7 @@ function lvLive() { // values that change every frame
   LV('sysMeta').textContent = IDS.length + ' planets · ' + ORB.length + ' groups';
 }
 function lvTick() {
-  lvLive();
+  lvLive(); lvBoxes();
   if (lvAn == null || lvAn === null) lvMeterInit();
   const ob = LV('lOut').querySelectorAll('.meter b'); let l = 0, r = 0; if (lvAn && playing) { l = lvRms(lvAn.a); r = lvRms(lvAn.b); } lvLvl.l = Math.max(l, lvLvl.l * 0.86); lvLvl.r = Math.max(r, lvLvl.r * 0.86);
   ob[0].style.width = Math.min(100, lvLvl.l * 100).toFixed(1) + '%'; ob[1].style.width = Math.min(100, lvLvl.r * 100).toFixed(1) + '%';
@@ -9265,7 +9308,10 @@ function lvTick() {
   requestAnimationFrame(lvTick);
 }
 const lvLvl = { l: 0, r: 0 };
-function liveInit() { lvPanels(); addEventListener('resize', () => { lvBxK = ''; lvBoxes(); }); setTimeout(() => lvHint('the boxes on the edges open the panels · space plays · double-click a planet for its detail · h hides', 4200), 600); if (master) master.gain.value = LVMASTER < 0.02 ? 0 : 0.8 * Math.pow(10, (-48 + 54 * LVMASTER) / 20); requestAnimationFrame(lvTick); }
+addEventListener('pointerdown', ev => { if (ev.target === cv && LV_PHONE && lvAnyOpen() && !CLEAN) { ev.stopImmediatePropagation(); ev.preventDefault(); lvCloseAll(); lvSwallow = performance.now(); } }, true);
+let lvSwallow = 0; addEventListener('click', ev => { if (performance.now() - lvSwallow < 600) { lvSwallow = 0; ev.stopImmediatePropagation(); ev.preventDefault(); } }, true); // the tap's click must not land on a box that just came back // phone: a tap on the system next to an open sheet only closes it
+['pointerdown', 'touchend'].forEach(t => addEventListener(t, () => { const st = document.getElementById('start'); if (st && st.isConnected && !st.classList.contains('gone')) dismissStart(); }, true)); // live: tap-to-start never blocks the first tap (it still unlocks ios audio)
+function liveInit() { lvPanels(); const lvRs = () => { lvPanels(); lvBxK = ''; lvBoxes(); }; addEventListener('resize', lvRs); addEventListener('orientationchange', () => setTimeout(lvRs, 250)); if (window.visualViewport) visualViewport.addEventListener('resize', lvRs); const lvHello = () => { const st = document.getElementById('start'); if (st && st.isConnected && !st.classList.contains('gone')) return setTimeout(lvHello, 400); lvHint(LV_PHONE ? 'the boxes on the edges open the panels · double-tap a planet for its detail' : 'the boxes on the edges open the panels · space plays · double-click a planet for its detail · h hides', 4200); }; setTimeout(lvHello, 600); if (master) master.gain.value = LVMASTER < 0.02 ? 0 : 0.8 * Math.pow(10, (-48 + 54 * LVMASTER) / 20); requestAnimationFrame(lvTick); }
 const lvInitAudio0 = initAudio; initAudio = function () { const fresh = !ac; lvInitAudio0(); if (fresh && master) master.gain.value = LVMASTER < 0.02 ? 0 : 0.8 * Math.pow(10, (-48 + 54 * LVMASTER) / 20); };
 
 
