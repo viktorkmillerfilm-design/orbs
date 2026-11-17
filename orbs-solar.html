@@ -105,6 +105,14 @@
   #bRec::before{content:"";display:inline-block;width:5px;height:5px;border-radius:50%;border:1px solid #fff;margin-right:6px;vertical-align:1px}
   #bRec.on::before{background:#fff}
   #barNote{opacity:.3;margin-top:10px;min-height:1.2em}
+  #zoom{display:flex;gap:9px} #zoom em{font-style:normal;opacity:.75} #zoom em:hover{opacity:1} #zoom em.on{opacity:1;border-bottom:1px solid rgba(255,255,255,.6)}
+  .laps.poly .pt{opacity:.25;cursor:default;border:0!important}
+  #mmenu{z-index:8;background:rgba(0,0,0,.96);border:1px solid rgba(255,255,255,.2);padding:8px 0;min-width:190px;display:none;font-size:11px}
+  #mmenu.open{display:block}
+  #mmenu .mi{display:flex;align-items:center;gap:10px;padding:7px 16px;cursor:pointer;opacity:.55} #mmenu .mi:hover{opacity:1} #mmenu .mi.on{opacity:1}
+  #mmenu .mi b{font-weight:500;flex:1} #mmenu .mi .ck{width:7px;height:7px;border:1px solid #fff;border-radius:50%;opacity:.7} #mmenu .mi.on .ck{background:#fff}
+  #mmenu .mi .ch{opacity:.4;cursor:pointer;padding:0 2px} #mmenu .mi .ch.on{opacity:1;border-bottom:1px solid rgba(255,255,255,.6)}
+  #mmenu .ms{height:1px;background:rgba(255,255,255,.1);margin:6px 0} #mmenu .mn{padding:2px 16px 6px;opacity:.3;font-size:10px;line-height:1.5;white-space:normal;max-width:210px}
   #gmenu{z-index:8;background:rgba(0,0,0,.96);border:1px solid rgba(255,255,255,.2);padding:10px 0;min-width:150px;display:none;font-size:11px}
   #gmenu.open{display:block}
   #gmenu .gm{display:flex;gap:8px;padding:4px 16px 10px;border-bottom:1px solid rgba(255,255,255,.1);margin-bottom:6px} #gmenu .gm i{opacity:.2;font-style:normal}
@@ -182,9 +190,12 @@
   <span id="mode" title="moving: planets orbit and hit at 12 · still: planets stay put and a hand sweeps from the sun">moving</span>
   <span id="snap" class="on" title="snap planets to the 1/16 grid">snap 1/16</span>
   <span id="midi" title="send midi to ableton (ch 1–8)">midi</span>
+  <span id="zoom" title="zoom: wheel or pinch around the cursor · + / − keys · space-drag or middle-drag to pan"><em data-z="fit">fit</em><em data-z="1">1:1</em></span>
+  <span id="more" title="more: comets, share link …">more</span>
 </div>
 <div id="sheet" class="ui"></div>
 <div id="gmenu" class="ui"></div>
+<div id="mmenu" class="ui"></div>
 <div id="toast" class="ui"></div>
 <div id="picker" class="ui"><div class="ph"><span>samples</span><span id="pkClose">close</span></div><div id="pkTabs"></div><div id="pkList"></div><label class="pkfile"><i></i><span>load file…</span><input id="pkFile" type="file" accept="audio/*" hidden></label><div class="pkfile" id="pkRec"><i></i><span>record a bar…</span></div><div class="pkfile" id="pkBar"><i></i><span>bar view ›</span></div><div id="pkNote"></div></div>
 <div id="bar" class="ui"><div class="bh"><input id="barName" maxlength="14" spellcheck="false" autocomplete="off"><span id="barInfo"></span><span id="barClose">close</span></div><canvas id="barCv"></canvas><div class="bc"><span id="bRec">rec</span><span id="bBars">1 bar</span><span id="bPlay">play</span><span id="bLoop">loop</span><span id="bRev">reverse</span><span id="bUndo">undo</span><span id="bDel">remove</span></div><div id="barNote"></div></div>
@@ -3602,6 +3613,8 @@ const links = new Set(DEF_LINKS);
 let TETH = DEF_TETH.map(t => Object.assign({}, t));
 let ROOM = { size: 2.4, wet: 0.8, predelay: 0 };
 const baseOf = id => (E[id] && E[id].base) || id;
+let COMET = { on: false, every: 16 }; // comets: a riser + crash sweep every 8 or 16 bars
+const POLY = [3, 5, 7]; // polymeter laps (beats) next to the 4/4 bands
 let GENRE = null, GMODE = 'sounds', GTRIM = 0; // GTRIM: the applied genre's output trim (db), keeps genres within a few db of each other
 let still = false, bpm = 108, snapOn = true, recCount = 0, cloneCount = 0, sheetDirty = true, selId = null, openG = null;
 
@@ -3609,11 +3622,11 @@ let still = false, bpm = 108, snapOn = true, recCount = 0, cloneCount = 0, sheet
 const LS = 'orbs-solar-v1';
 let ready = false, pending = [], savedGroups = null, oldOrbs = null;
 const PKEYS = ['rad', 'a', 'vol', 'pn', 'echo', 'verb', 'cut', 'muted', 'seed'];
-const KEEP = ['trimS', 'trimE', 'rev', 'loop', 'bars', 'recBpm', 'phase', 'recorded', 'label', 'side', 'base', 'gid', 'pat', 'voice'];
+const KEEP = ['trimS', 'trimE', 'rev', 'loop', 'bars', 'recBpm', 'phase', 'recorded', 'label', 'side', 'base', 'gid', 'pat', 'voice', 'prob', 'moons'];
 const dbOut = st => Object.assign({}, st, { gainDb: isFinite(st.gainDb) ? st.gainDb : '-inf' });
-function save() { if (!ready) return; try {
+function save() { if (!ready || window.__orbsShareLoading) return; try {
   const els = {}; IDS.forEach(id => { const e = E[id], o = els[id] = { v: e.variant }; PKEYS.concat(KEEP).forEach(k => { if (e[k] !== undefined) o[k] = e[k]; }); o.a = +(+e.a).toFixed(5); o.rad = +(+e.rad).toFixed(4); });
-  localStorage.setItem(LS, JSON.stringify({ v: 2, els, order: IDS.slice(), groups: ORB.map(o => ({ id: o.id, lap: o.lap, st: dbOut(o.st), t2: o.t2, rsend: o.rsend, solo: !!o.solo })), links: [...links], tethers: TETH.map(t => ({ src: t.src, tgt: t.tgt, depth: t.depth, attack: t.attack, release: t.release })), room: ROOM, genre: GENRE, gmode: GMODE, gtrim: GTRIM, swing, still, bpm, snapOn, recCount, cloneCount })); } catch (e) {} }
+  localStorage.setItem(LS, JSON.stringify({ v: 2, els, order: IDS.slice(), groups: ORB.map(o => ({ id: o.id, lap: o.lap, st: dbOut(o.st), t2: o.t2, rsend: o.rsend, solo: !!o.solo })), links: [...links], tethers: TETH.map(t => ({ src: t.src, tgt: t.tgt, depth: t.depth, attack: t.attack, release: t.release })), room: ROOM, genre: GENRE, gmode: GMODE, gtrim: GTRIM, comet: COMET, swing, still, bpm, snapOn, recCount, cloneCount })); } catch (e) {} }
 function applySaved(e, o) {
   ['rad', 'a', 'vol', 'pn', 'echo', 'verb', 'cut', 'seed', 'orbit'].forEach(k => { if (typeof o[k] === 'number' && isFinite(o[k])) e[k] = o[k]; });
   e.muted = !!o.muted;
@@ -3621,7 +3634,8 @@ function applySaved(e, o) {
   ['trimS', 'trimE', 'rev', 'loop', 'bars', 'recBpm', 'phase', 'recorded'].forEach(k => { if (o[k] !== undefined) e[k] = o[k]; });
   if (typeof o.gid === 'string') e.gid = o.gid;
   if (o.voice && typeof o.voice === 'object') e.voice = o.voice;
-  e.pat = Array.isArray(o.pat) ? o.pat.filter(h => h && isFinite(h.o) && isFinite(h.v)).map(h => ({ o: frac(+h.o), v: clamp(+h.v, 0, 1) })).slice(0, 128) : [];
+  if (isFinite(o.prob)) e.prob = clamp(+o.prob, 0, 1); if (isFinite(o.moons)) e.moons = clamp(o.moons | 0, 0, 3);
+  e.pat = Array.isArray(o.pat) ? o.pat.filter(h => h && isFinite(h.o) && isFinite(h.v)).map(h => { const q = { o: frac(+h.o), v: clamp(+h.v, 0, 1) }; if (isFinite(h.c) && +h.c < 1) q.c = clamp(+h.c, 0, 1); return q; }).slice(0, 128) : [];
   if (e.side === 'rec' && o.label) e.label = String(o.label).slice(0, 14);
 }
 function load() { try { const s = JSON.parse(localStorage.getItem(LS) || 'null'); if (!s) return;
@@ -3633,6 +3647,7 @@ function load() { try { const s = JSON.parse(localStorage.getItem(LS) || 'null')
   if (s.room && isFinite(s.room.size)) ROOM = { size: clamp(+s.room.size, 0.3, 8), wet: clamp(+s.room.wet || 0, 0, 1), predelay: clamp(+s.room.predelay || 0, 0, 100) };
   if (typeof s.genre === 'string' && OrbsGenres.list().some(x => x.id === s.genre)) GENRE = s.genre; if (s.gmode === 'relayout') GMODE = 'relayout'; if (GENRE && isFinite(+s.gtrim)) GTRIM = clamp(+s.gtrim, -12, 6);
   if (typeof s.swing === 'number') swing = clamp(s.swing, 0, 60);
+  if (s.comet && typeof s.comet === 'object') COMET = { on: !!s.comet.on, every: s.comet.every === 8 ? 8 : 16 };
   for (const id of (s.order || Object.keys(s.els || {}))) { const o = (s.els || {})[id]; if (!o) continue;
     if (E[id]) applySaved(E[id], o);
     else if ((o.side === 'rec' && /^rec\d+$/.test(id)) || (o.base && E[o.base] && /^[a-z]+~\d+$/.test(id))) pending.push(Object.assign({ id }, o)); }
@@ -3658,7 +3673,7 @@ function buildGroups() { // after every planet exists: saved groups → ORB, or 
       mem.forEach((id, j) => { const e = E[id]; e.gid = o.id; e.rad = bandMid(bandOfLap(o.lap)) + (j % 3 - 1) * 0.025; if (j) links.add(lkey(mem[j - 1], id)); }); });
     IDS.forEach(id => { if (!E[id].gid || !ORB.some(o => o.id === E[id].gid)) E[id].gid = ORB[0].id; });
   } else if (savedGroups) {
-    savedGroups.slice(0, 64).forEach(sg => { const o = mkOrb(LAPS.includes(sg.lap) ? sg.lap : 4, sg.st, sg.t2); o.rsend = clamp(+sg.rsend || 0, 0, 1); o.solo = !!sg.solo; o._sid = sg.id; ORB.push(o); });
+    savedGroups.slice(0, 64).forEach(sg => { const o = mkOrb(LAPS.includes(sg.lap) ? sg.lap : POLY.includes(sg.lap) ? 4 : 4, sg.st, sg.t2); if (POLY.includes(sg.lap)) { o.poly = sg.lap; o.lap = sg.lap; } o.rsend = clamp(+sg.rsend || 0, 0, 1); o.solo = !!sg.solo; o._sid = sg.id; ORB.push(o); });
     IDS.forEach(id => { const e = E[id], o = ORB.find(x => x._sid === e.gid); e.gid = o ? o.id : null; });
   } else { // fresh: one group per connected set, lap from distance
     components().forEach(c => { const o = mkOrb(BANDS[bandOf(E[c[0]].rad)], { quantize: snapOn }); o.rsend = 0; o.solo = false; ORB.push(o); c.forEach(id => E[id].gid = o.id); });
@@ -3900,7 +3915,7 @@ const cutHz = c => 120 * Math.pow(2, clamp(c, 0, 1) * 7.3); // 120 Hz … ~19 kH
 const COARSE = matchMedia('(pointer: coarse)').matches;
 let touchMode = COARSE;
 const hideHint = () => {};
-let playing = false, nextT = 0, stepN = 0, timer = null;
+let playing = false, nextT = 0, stepN = 0, timer = null, spaceDown = false, spacePanned = false;
 const visQ = [], stepTimes = [], hitLog = [];
 const stepDur = () => 60 / bpm / 4;
 const grpOf = e => ORB[e.orbit];
@@ -3922,10 +3937,18 @@ function playStep(n, t) {
     const L = lapOf(e), a0 = aEff(e), hs = hitsOf(e);
     for (let j = 0; j < hs.length; j++) {
       const h = nextHitA(L, a0 - hs[j].o, pb);
-      if (h.p < pb + 0.25 - 1e-9) fireHit(e, t + (h.p - pb) * 4 * sd + swingAt(h.p, sd), h.p, h.k, hs[j].v, j);
+      if (h.p < pb + 0.25 - 1e-9 && chanceOk(e, hs[j], h.k, j)) fireHit(e, t + (h.p - pb) * 4 * sd + swingAt(h.p, sd), h.p, h.k, hs[j].v, j);
     }
+    if (e.moons) for (let m = 0; m < e.moons; m++) { const d = MOON_OFF[m]; // moons: ghost notes a 16th before / an 8th after / a 16th after each hit
+      for (let j = 0; j < hs.length; j++) { const h = nextHitA(L, a0 - hs[j].o, pb - d), gp = h.p + d;
+        if (gp >= pb - 1e-9 && gp < pb + 0.25 - 1e-9 && !hitAtP(e, gp) && chanceOk(e, hs[j], h.k, 100 + m)) fireHit(e, t + (gp - pb) * 4 * sd + swingAt(gp, sd), gp, h.k, hs[j].v * MOON_V[m], 100 + m); } }
   }
+  if (COMET.on) cometStep(n, t, sd);
 }
+const MOON_OFF = [-0.25, 0.5, 0.25], MOON_V = [0.34, 0.3, 0.26];
+function hitAtP(e, p) { const L = lapOf(e), a0 = aEff(e); return hitsOf(e).some(h => { const f = frac(p / L + a0 - h.o + 1e-9); return f < 2e-9 || f > 1 - 2e-9; }); }
+// chance (like live's note chance): planet chance × hit chance, seeded per lap so a replay from the start sounds the same
+function chanceOk(e, h, k, j) { const c = (e.prob == null ? 1 : e.prob) * (h.c == null ? 1 : h.c); if (c >= 0.999) return true; if (c <= 0.001) return false; return rng((e.seed | 0) * 7919 + k * 131 + j * 17 + 3)() < c; }
 const chordNotes = C => C.t.map(x => C.r + x + (x < 5 ? 12 : 0)).sort((a, c) => a - c);
 function hitEvent(e, p, k) {
   const base = baseOf(e.id), B0 = E[base], bar = Math.floor(p / 4 + 1e-9), C = PROG[((bar % 4) + 4) % 4], L = lapOf(e), bd = 60 / bpm;
@@ -3950,12 +3973,12 @@ function hitEvent(e, p, k) {
   return ev;
 }
 function fireHit(e, t, p, k, v = 1, j = 0) {
-  const ev = hitEvent(e, p, k + j * 101); ev.v *= v;
+  const ghost = j >= 100, ev = hitEvent(e, p, k + j * 101); ev.v *= v; if (ghost) { ev.dur = Math.min(ev.dur, 0.12); ev.roll = null; if (e.mflash) e.mflash[j - 100] = t; else e.mflash = { [j - 100]: t }; }
   const om = ORB[e.orbit] && ORB[e.orbit].st.muted;
   playPlanet(e, t, ev, ev.dur); if (!om) midiNote(e, ev, t, ev.dur);
   if (ev.roll) for (let r = 1; r < ev.roll.length; r++) { const tr = t + ev.roll[r] * 60 / bpm, er = Object.assign({}, ev, { v: ev.v * (0.75 + 0.2 * r / ev.roll.length), roll: null }); playPlanet(e, tr, er, Math.min(er.dur, 0.08)); if (!om) midiNote(e, er, tr, 0.05); } // trap rolls
   visQ.push({ t, id: e.id, v: ev.v }); hitLog.push({ id: e.id, t, p, j }); if (hitLog.length > 5000) hitLog.shift();
-  if (fx3 && e.tsrc && ORB[e.orbit]) fx3.trigger(ORB[e.orbit].id, t); // sidechain tethers (batch 3) duck their target group's chain
+  if (!ghost && fx3 && e.tsrc && ORB[e.orbit]) fx3.trigger(ORB[e.orbit].id, t); // sidechain tethers (batch 3) duck their target group's chain
 }
 function genBar(b) { // hits inside bar b, in 16th steps (used by the bar view render)
   const out = {}, sd = stepDur();
@@ -4035,7 +4058,7 @@ function orbSet(i, key, v) { // all group edits go through the module's setters 
   const id = o.id;
   ({ gain: () => fx.setGain(id, v), pan: () => fx.setPan(id, v), mute: () => fx.setMute(id, v), phase: () => fx.setPhase(id, v ? 180 : 0), mono: () => fx.setMono(id, v),
      amount: () => fx.setFilterAmount(id, v), q: () => fx.setFilter(id, { q: v }), offset: () => fx.setOffset(id, v), quantize: () => fx.setQuantize(id, v), lap: () => fx.setLap(id, v) })[key]();
-  o.st = stState(fx.getOrbit(id)); o.lap = o.st.lap * 4; save(); if (key === 'mute' || key === 'gain') updateMix(); // sends follow the group mute / gain right away
+  o.st = stState(fx.getOrbit(id)); o.lap = o.poly || o.st.lap * 4; save(); if (key === 'mute' || key === 'gain') updateMix(); // sends follow the group mute / gain right away
 }
 function setSwing(v) { swing = clamp(+v || 0, 0, 60); if (fx) swing = fx.setSwing(swing); save(); }
 const playIcon = document.getElementById('playIcon');
@@ -4059,11 +4082,14 @@ addEventListener('keydown', e => {
   if (e.target && e.target.tagName === 'INPUT') return;
   if (e.metaKey || e.ctrlKey || e.altKey) return;
   if (winId && padKey(e)) return;
-  if (e.code === 'Space') { e.preventDefault(); toggle(); }
+  if (e.code === 'Space') { e.preventDefault(); if (!e.repeat) { spaceDown = true; spacePanned = false; } } // space: play / stop on release, or hold + drag to pan
+  else if (e.key === '+' || e.key === '=') { e.preventDefault(); zoomKey(1.25); } else if (e.key === '-' || e.key === '_') { e.preventDefault(); zoomKey(0.8); }
   else if (e.code === 'KeyT') { e.preventDefault(); tapTempo(); }
   else if (e.code === 'Escape' && winId) closeWin();
   else if (e.code === 'ArrowUp') setBpm(bpm + 1); else if (e.code === 'ArrowDown') setBpm(bpm - 1);
 });
+addEventListener('keyup', e => { if (e.code !== 'Space' || !spaceDown) return; spaceDown = false; if (e.target && e.target.tagName === 'INPUT') return; if (!spacePanned) toggle(); spacePanned = false; cv.style.cursor = 'default'; });
+addEventListener('blur', () => { spaceDown = false; });
 // song position in beats (frozen at 0 when stopped, so the layout is the score)
 function posAt(t) {
   if (!ac || !playing) return 0;
@@ -4108,16 +4134,21 @@ const snapA = (a, L) => { a = frac(a); if (!snapOn) return a; const n = L * 4; r
 /* ---------------- geometry: free orbits ---------------- */
 const sheet = document.getElementById('sheet'), topEl = document.getElementById('top');
 let SA = { x: 0, y: 0, w: 0, h: 0 }, K = 0.62, RMAX = 120, SIDE = false, SUNR = 6, DS = 1, ctlZone = { x: 0, y: 60 };
+// zoom: the view only moves the sun (pan) and scales the orbit radius; planets, lines and text keep their pixel size so it stays thin
+let VIEW = { z: 1, px: 0, py: 0 }, CX0 = 0, CY0 = 0, RMAX0 = 120;
+const ZMIN = 0.35, ZMAX = 6;
+try { const v = JSON.parse(localStorage.getItem('orbs-solar-view') || 'null'); if (v && isFinite(v.z)) VIEW = { z: clamp(+v.z, ZMIN, ZMAX), px: +v.px || 0, py: +v.py || 0 }; } catch (x) {}
+function applyView() { CX = CX0 + VIEW.px; CY = CY0 + VIEW.py; RMAX = RMAX0 * VIEW.z; }
 function resize() {
   DPR = Math.min(2, window.devicePixelRatio || 1);
   W = innerWidth; H = innerHeight; cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR); M = Math.min(W, H);
   const sr = sheet.getBoundingClientRect(), tb = topEl.getBoundingClientRect().bottom;
   SIDE = sr.left > 40;
   SA = SIDE ? { x: 0, y: tb, w: sr.left, h: H - tb } : { x: 0, y: tb, w: W, h: Math.max(160, sr.top - tb) };
-  CX = SA.x + SA.w / 2; CY = SA.y + SA.h / 2;
+  CX0 = SA.x + SA.w / 2; CY0 = SA.y + SA.h / 2;
   const hw = SA.w / 2 - (SIDE ? 50 : 20), hh = SA.h / 2 - 22;
   K = clamp(hh / hw, 0.55, SIDE ? 0.8 : 0.72);
-  RMAX = Math.max(50, Math.min(hw, hh / K));
+  RMAX0 = Math.max(50, Math.min(hw, hh / K)); applyView();
   DS = clamp(M / 700, 0.9, 1.3); SUNR = 5.5 * DS;
   ctlZone = { x: 0, y: tb + 16 };
 }
@@ -4154,7 +4185,7 @@ const partnersOf = id => { const out = []; for (const k of links) { const [a, b]
 const membersOf = o => IDS.filter(id => E[id].gid === o.id).map(id => E[id]);
 const clampRadLap = (rad, L) => { const b = bandOfLap(L), lo = RIN + b * BW + 0.008, hi = RIN + (b + 1) * BW - 0.008; return clamp(rad, lo, hi); };
 function newGroup(L, src) {
-  const o = mkOrb(L, Object.assign({}, src ? src.st : { quantize: snapOn }, { lap: L / 4 }), src ? src.t2 : null);
+  const o = mkOrb(L, Object.assign({}, src ? src.st : { quantize: snapOn }, { lap: L / 4 }), src ? src.t2 : null); if (POLY.includes(L)) { o.poly = L; o.lap = L; }
   o.rsend = src ? src.rsend : 0; o.solo = false; ORB.push(o); if (fx) addOrbitFx(o); return o;
 }
 function syncIdx() { IDS.forEach(id => { const e = E[id]; e.orbit = orbIdx(e.gid); }); }
@@ -4183,9 +4214,9 @@ function regroup(prefer) {
   syncIdx(); IDS.forEach(id => routePlanet(E[id])); syncTethers(); sheetDirty = true; save();
 }
 function setGroupLap(i, L, skip) { // whole group changes lap: every planet keeps where it is on screen and slides into the new distance band
-  const o = ORB[i]; if (!o) return; L = OrbsFX.snapLap(L / 4) * 4; if (o.lap === L) return;
+  const o = ORB[i]; if (!o) return; L = POLY.includes(L) ? L : OrbsFX.snapLap(L / 4) * 4; if (o.lap === L) return;
   const pos = posNow(), dr = bandMid(bandOfLap(L)) - bandMid(bandOfLap(o.lap)), mem = membersOf(o), angs = mem.map(e => visAngG(o, e.a, pos));
-  orbSet(i, 'lap', L / 4);
+  o.poly = POLY.includes(L) ? L : null; orbSet(i, 'lap', o.poly ? OrbsFX.snapLap(L / 4) : L / 4); // polymeter laps (3 / 5 / 7 beats) live in the app; the fx module keeps its nearest bar lap
   mem.forEach((e, j) => { if (e === skip) return; e.a = snapA(aFromAngG(o, angs[j], pos), o.lap); e.rad = clampRadLap(e.rad + dr, o.lap); });
   sheetDirty = true; save();
 }
@@ -4266,6 +4297,7 @@ function linkAt(x, y, mid) { // nearest connection line under the pointer (mid: 
 }
 let lastTap = { t: 0, x: 0, y: 0 };
 cv.addEventListener('pointerdown', ev => {
+  if (panDown(ev)) return; // zoom / pan gestures (middle drag, space-drag, two-finger pinch) come first
   const x = ev.clientX, y = ev.clientY; layout(); touchMode = ev.pointerType === 'touch' || (COARSE && ev.pointerType !== 'mouse');
   if (barId) { closeBar(); return; }
   let h = hitDot(x, y, touchMode ? 6 : 4);
@@ -4286,6 +4318,7 @@ cv.addEventListener('pointerdown', ev => {
 });
 cv.addEventListener('dblclick', ev => { layout(); const lk = linkAt(ev.clientX, ev.clientY, true) || linkAt(ev.clientX, ev.clientY); if (lk && linked(lk[0], lk[1])) unlink(lk[0], lk[1]); });
 cv.addEventListener('pointermove', ev => {
+  if (panMove(ev)) return;
   const x = ev.clientX, y = ev.clientY;
   if (!drag) { layout(); const h = hitDot(x, y, 4); cv.style.cursor = h ? (ev.shiftKey ? 'crosshair' : 'grab') : hitLabel(x, y) ? 'pointer' : linkAt(x, y) ? 'pointer' : Math.hypot(x - CX, y - CY) < SUNR + 12 ? 'pointer' : 'default'; return; }
   if (!drag.moved && Math.hypot(x - drag.sx, y - drag.sy) > (touchMode ? 10 : 5)) { drag.moved = true; clearTimeout(drag.lp); }
@@ -4306,6 +4339,7 @@ function dragTarget(d) { // what happens if released now
   return { rad: pp.rad, ang: pp.ang, lap, breaks };
 }
 function endDrag(ev) {
+  if (panUp(ev)) return;
   if (!drag) return; const d = drag; drag = null; clearTimeout(d.lp); cv.style.cursor = 'default';
   if (!d.moved) { if (d.tether) return; select(d.e.id); openWin(d.e.id); return; } // click = select + open its window
   layout(); const t = dragTarget(d), e = d.e;
@@ -4444,6 +4478,13 @@ function frame(now) {
     g.lineWidth = 0.7;
     for (let j = 0; j < ph.length; j++) { const a = snd * Math.pow(Math.max(t2.feedback, 1e-4), j); if (a < 0.03 || d * (j + 1) >= 0.97) break; const p = onRing(e.rad, ph[j]); g.globalAlpha = 0.1 + 0.45 * a; g.beginPath(); g.arc(p.x, p.y, Math.max(1.3, e.r * 0.45), 0, TAU); g.stroke(); }
   }
+  // --- moons: tiny dots circling their planet once per hit interval; they flash on their ghost notes ---
+  const tn = ac ? ac.currentTime : 0;
+  for (const id of IDS) { const e = E[id]; if (!e.moons || e.muted || (dragging && dragging.e === e)) continue; const n = e.moons, iv = lapOf(e) / hitsOf(e).length;
+    for (let m = 0; m < n; m++) { const rr = e.r + 5 + 3.2 * m, an = (curPos / iv + m / n) * TAU * (m & 1 ? -1 : 1), fl = e.mflash && e.mflash[m] != null ? Math.max(0, 1 - Math.abs(tn - e.mflash[m]) * 6) * (tn >= e.mflash[m] ? 1 : 0) : 0;
+      g.globalAlpha = 0.05; g.lineWidth = hair; g.beginPath(); g.arc(e.x, e.y, rr, 0, TAU); g.stroke();
+      g.globalAlpha = 0.55 + 0.45 * fl; g.beginPath(); g.arc(e.x + rr * Math.sin(an), e.y - rr * Math.cos(an), 1.15 + 0.9 * fl, 0, TAU); g.fill(); } }
+  drawComets(now);
   // --- ripples ---
   for (let i = ripples.length - 1; i >= 0; i--) {
     const rp = ripples[i], life = rp.big ? 1400 : 1000, a = (now - rp.t0) / life;
@@ -4485,6 +4526,7 @@ const SLIDERS = [
   { k: 'pn', name: 'pan', get: e => (e.pn + 1) / 2, set: (e, t) => e.pn = Math.abs(t - 0.5) < 0.03 ? 0 : t * 2 - 1, show: e => Math.abs(e.pn) < 0.02 ? 'c' : (e.pn < 0 ? 'l' : 'r') + Math.round(Math.abs(e.pn) * 50) },
   { k: 'echo', name: 'echo', get: e => e.echo, set: (e, t) => e.echo = t, show: e => Math.round(e.echo * 100) },
   { k: 'verb', name: 'reverb', get: e => e.verb, set: (e, t) => e.verb = t, show: e => Math.round(e.verb * 100) },
+  { k: 'prob', name: 'chance', get: e => (e.prob == null ? 1 : e.prob), set: (e, t) => e.prob = t > 0.985 ? 1 : Math.round(t * 100) / 100, show: e => Math.round((e.prob == null ? 1 : e.prob) * 100) + '%' },
   { k: 'cut', name: 'filter', get: e => e.cut, set: (e, t) => e.cut = t, show: e => e.cut > 0.985 ? 'open' : fmtHz(cutHz(e.cut)) },
 ];
 const panTxt = p => Math.abs(p) < 0.02 ? 'c' : (p < 0 ? 'l' : 'r') + Math.round(Math.abs(p) * 50);
@@ -4541,14 +4583,15 @@ function orbFxHTML(i, target) {
   return h;
 }
 const fmtHz = f => f >= 1000 ? (f / 1000).toFixed(f < 10000 ? 1 : 0) + 'k' : Math.round(f) + '';
-const lapTxt = L => OrbsFX.formatLap(L / 4);
-function hitsTxt(L) { return L <= 4 ? (4 / L) + (4 / L > 1 ? ' hits' : ' hit') + ' / bar' : '1 hit / ' + (L / 4) + ' bars'; }
+const lapTxt = L => POLY.includes(L) ? L + ' beats' : OrbsFX.formatLap(L / 4);
+function hitsTxt(L) { if (POLY.includes(L)) return '1 hit / ' + L + ' beats'; return L <= 4 ? (4 / L) + (4 / L > 1 ? ' hits' : ' hit') + ' / bar' : '1 hit / ' + (L / 4) + ' bars'; }
 function whereTxt(e) { const off = frac(-aEff(e)) * lapOf(e) + 1e-6; return (Math.floor(off / 4) + 1) + '.' + (Math.floor(off % 4) + 1) + '.' + (Math.floor((off * 4) % 4) + 1); }
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const planetsOn = i => IDS.filter(id => E[id].orbit === i).sort((a, b) => frac(-aEff(E[a])) - frac(-aEff(E[b])));
 function sliderHTML(e, s) { const t = clamp(s.get(e), 0, 1); return '<div class="sl" data-sl="' + s.k + '" data-id="' + e.id + '"><b>' + s.name + '</b><div class="tr"><div class="fi" style="width:' + (t * 100) + '%"></div><div class="kn" style="left:' + (t * 100) + '%"></div></div><em>' + s.show(e) + '</em></div>'; }
 const planetsIn = o => membersOf(o).map(e => e.id).sort((a, b) => frac(-aEff(E[a])) - frac(-aEff(E[b])));
-const lapChips = i => '<div class="laps">' + LAPS.map(L => '<span data-act="lap" data-i="' + i + '" data-l="' + L + '" class="' + (L === ORB[i].lap ? 'on' : '') + '">' + lapTxt(L) + '</span>').join('') + '</div>';
+const lapChips = i => '<div class="laps">' + LAPS.map(L => '<span data-act="lap" data-i="' + i + '" data-l="' + L + '" class="' + (L === ORB[i].lap ? 'on' : '') + '">' + lapTxt(L) + '</span>').join('') + '</div>'
+  + '<div class="laps poly" title="polymeter: laps of 3, 5 or 7 beats drift against the 4/4 bar and line up again later"><span class="pt">poly</span>' + POLY.map(L => '<span data-act="lap" data-i="' + i + '" data-l="' + L + '" class="' + (L === ORB[i].lap ? 'on' : '') + '">' + L + '</span>').join('') + '<span class="pt">beats</span></div>';
 const patTxt = (e, L) => e.pat && e.pat.length ? e.pat.length + (e.pat.length > 1 ? ' hits' : ' hit') + ' / ' + lapTxt(L) : hitsTxt(L);
 function renderSheet() {
   sheetDirty = false; let h = '<div class="hd"><span>groups</span><span>' + IDS.filter(id => !E[id].muted).length + ' planets · ' + bpm + ' bpm</span></div>';
@@ -4569,7 +4612,7 @@ function renderSheet() {
     h += '<div class="ofx">' + orbFxHTML(i, selId) + '</div>';
     h += '</div></div>';
   });
-  h += '<div class="foot">' + (still ? 'still: planets stay put and a hand sweeps from the sun at each group\'s lap; a planet plays when its hand passes it' : 'moving: each planet plays once per lap, when it crosses the line at 12') + ' · distance from the sun sets the lap · drop a planet on another to connect · drag it away or double-click the line to cut · shift-drag to duck · off the edge mutes · click a planet for its window · hold for its bar · tap the sun to play</div>';
+  h += '<div class="foot">' + (still ? 'still: planets stay put and a hand sweeps from the sun at each group\'s lap; a planet plays when its hand passes it' : 'moving: each planet plays once per lap, when it crosses the line at 12') + ' · distance from the sun sets the lap · drop a planet on another to connect · drag it away or double-click the line to cut · shift-drag to duck · off the edge mutes · click a planet for its window · hold for its bar · tap the sun or space to play · wheel / pinch zooms, + / − too, space-drag or middle-drag pans, fit · 1:1 up top · in a planet\'s window: moons add ghost notes, chance thins its hits, click a tick on the ring to set that hit\'s chance · poly laps (3 · 5 · 7 beats) drift against the bar · more: comets, share link</div>';
   sheet.innerHTML = h;
   if (scrollSel && selId) { scrollSel = false; const el = sheet.querySelector('.pl.sel'); if (el) { const r = el.getBoundingClientRect(), sr = sheet.getBoundingClientRect(); if (r.top < sr.top + 30 || r.bottom > sr.bottom - 120) sheet.scrollTop += r.top - sr.top - 40; } }
 }
@@ -4584,6 +4627,7 @@ function panelClick(ev) {
   else if (act === 'bar') openBar(id);
   else if (act === 'rec') { openBar(id); startRecording(baseOf(id), recBarsN); }
   else if (act === 'copy') copyPlanet(id);
+  else if (act === 'moons') { E[id].moons = clamp(+t.dataset.n | 0, 0, 3); save(); sheetDirty = true; }
   else if (act === 'mute') { E[id].muted = !E[id].muted; sheetDirty = true; save(); }
   else if (act === 'unlink') unlink(id, t.dataset.p);
   else if (act === 'del') removeEl(id);
@@ -4636,6 +4680,7 @@ function renderWin() {
   let h = '<div class="grp"><b>planet</b><span class="gv">' + esc(e.label || e.id) + '</span></div>' + SLIDERS.map(s => sliderHTML(e, s)).join('');
   const vars = (VAR_NAMES[base] || []).slice(); if (E[base].buf && !vars.includes('file')) vars.push('file');
   if (vars.length) h += '<div class="grp"><b>sound</b><span class="gv"><span data-act="pick" data-id="' + e.id + '">all samples ›</span></span></div><div class="laps vars">' + vars.map(v => '<span data-act="var" data-id="' + e.id + '" data-v="' + v + '" class="' + (E[base].variant === v ? 'on' : '') + '">' + esc(v === 'file' ? (E[base].fileName || 'file') : v) + '</span>').join('') + '</div>';
+  h += '<div class="grp"><b>moons</b><span class="gv">ghost notes around each hit</span></div><div class="laps">' + [0, 1, 2, 3].map(n => '<span data-act="moons" data-id="' + e.id + '" data-n="' + n + '" class="' + ((e.moons | 0) === n ? 'on' : '') + '">' + (n ? n + (n > 1 ? ' moons' : ' moon') : 'none') + '</span>').join('') + '</div>';
   h += '<div class="grp"><b>lap</b><span class="gv">' + (membersOf(o).length > 1 ? 'whole group' : 'distance from the sun') + '</span></div>' + lapChips(i);
   h += orbFxHTML(i, e.id) + roomHTML();
   if (!(slDrag && wFx.contains(slDrag))) { const st = wFx.scrollTop; wFx.innerHTML = h; wFx.scrollTop = st; }
@@ -4719,6 +4764,13 @@ function endPadRec(abort) {
   if (e && r.phase === 'rec' && !r.n && r.cleared) padUndo(e);
   save(); sheetDirty = true; if (winId) renderWin();
 }
+// click a tick on the window ring: that hit's chance steps 100 → 75 → 50 → 25 → 100
+wRing.addEventListener('click', ev => { const e = E[winId]; if (!e) return; const r = wRing.getBoundingClientRect(), x = ev.clientX - r.left - r.width / 2, y = ev.clientY - r.top - r.height / 2, R = Math.min(r.width, r.height) / 2 - 10;
+  if (Math.abs(Math.hypot(x, y) - R) > 16) return; const an = frac(Math.atan2(x, -y) / TAU);
+  if (!e.pat || !e.pat.length) e.pat = ONE.map(h => Object.assign({}, h));
+  let best = null, bd = 0.04; for (const h of e.pat) { const d = Math.min(Math.abs(h.o - an), 1 - Math.abs(h.o - an)); if (d < bd) { bd = d; best = h; } } if (!best) return;
+  pushPat(e); const c = best.c == null ? 1 : best.c, nx = c > 0.8 ? 0.75 : c > 0.6 ? 0.5 : c > 0.3 ? 0.25 : 1; if (nx >= 1) delete best.c; else best.c = nx;
+  wNote.textContent = 'hit chance ' + Math.round(nx * 100) + '%'; save(); sheetDirty = true; renderWin(); });
 function sizeRing() { const r = wRing.getBoundingClientRect(); wRing.width = Math.round(r.width * DPR); wRing.height = Math.round(r.height * DPR); }
 addEventListener('resize', () => { if (winId) sizeRing(); });
 function drawWinRing() { // small lap ring: playhead, the planet's hits as ticks, the recording window
@@ -4728,7 +4780,8 @@ function drawWinRing() { // small lap ring: playhead, the planet's hits as ticks
   wr.globalAlpha = 0.18; wr.lineWidth = 0.8; wr.beginPath(); wr.arc(cx, cy, R, 0, TAU); wr.stroke();
   const n = Math.min(64, L * 4); for (let j = 0; j < n; j++) { const a = j / n * TAU, l = j % 4 ? 2 : 4; wr.globalAlpha = j % 4 ? 0.14 : 0.3; wr.beginPath(); wr.moveTo(cx + (R - l) * Math.sin(a), cy - (R - l) * Math.cos(a)); wr.lineTo(cx + R * Math.sin(a), cy - R * Math.cos(a)); wr.stroke(); }
   if (prec && prec.id === e.id) { const a0 = frac(prec.start / L + aEff(e)); wr.globalAlpha = prec.phase === 'rec' ? 0.55 : 0.25; wr.lineWidth = 2; wr.beginPath(); wr.arc(cx, cy, R + 5, a0 * TAU - Math.PI / 2, a0 * TAU - Math.PI / 2 + TAU * 0.999); if (prec.phase === 'count') wr.setLineDash([2, 5]); wr.stroke(); wr.setLineDash([]); }
-  wr.lineWidth = 1.2; for (const hh of hitsOf(e)) { const a = hh.o * TAU; wr.globalAlpha = 0.35 + 0.6 * hh.v; wr.beginPath(); wr.moveTo(cx + (R - 9) * Math.sin(a), cy - (R - 9) * Math.cos(a)); wr.lineTo(cx + (R + 1) * Math.sin(a), cy - (R + 1) * Math.cos(a)); wr.stroke(); }
+  wr.lineWidth = 1.2; for (const hh of hitsOf(e)) { const a = hh.o * TAU, c = hh.c == null ? 1 : hh.c, l0 = R - 2 - 7 * c; wr.globalAlpha = (0.35 + 0.6 * hh.v) * (0.4 + 0.6 * c); wr.beginPath(); wr.moveTo(cx + l0 * Math.sin(a), cy - l0 * Math.cos(a)); wr.lineTo(cx + (R + 1) * Math.sin(a), cy - (R + 1) * Math.cos(a)); wr.stroke();
+    if (c < 1) { wr.globalAlpha = 0.5; wr.font = '400 8px ui-rounded, system-ui, sans-serif'; wr.textAlign = 'center'; wr.fillText(Math.round(c * 100) + '', cx + (R + 9) * Math.sin(a), cy - (R + 9) * Math.cos(a) + 3); } }
   wr.globalAlpha = 0.85; wr.lineWidth = 0.8; wr.beginPath(); wr.moveTo(cx, cy); wr.lineTo(cx + (R - 2) * Math.sin(ph * TAU), cy - (R - 2) * Math.cos(ph * TAU)); wr.stroke();
   wr.globalAlpha = 0.9; wr.beginPath(); wr.arc(cx, cy, 2 + 2 * e.pulse, 0, TAU); wr.fill();
   wr.font = '400 10px ui-rounded, system-ui, sans-serif'; wr.textAlign = 'center'; wr.globalAlpha = 0.45; wr.fillText(lapTxt(L), cx, cy + R * 0.45);
@@ -4793,7 +4846,7 @@ function unstack(ids) {
     if (!clear()) {
       const Rpx = Math.max(40, Math.hypot(e.x - CX, e.y - CY)), d = Math.max(1, Math.ceil((2 * e.r + 12 * DS) / (TAU * Rpx) * 1024)) / 1024, a0 = e.a, pat0 = (e.pat && e.pat.length ? e.pat : ONE).map(h => Object.assign({}, h));
       for (let k = 1; k <= 16; k++) { const dl = (k & 1 ? 1 : -1) * Math.ceil(k / 2) * d;
-        e.a = frac(a0 + dl); e.pat = pat0.map(h => ({ o: frac(h.o + dl), v: h.v })); layout(); if (clear()) break; }
+        e.a = frac(a0 + dl); e.pat = pat0.map(h => Object.assign({}, h, { o: frac(h.o + dl) })); layout(); if (clear()) break; }
     }
     placed.push(e);
   }
@@ -4870,6 +4923,138 @@ sheet.addEventListener('change', ev => { if (ev.target.id === 'midiPort') { init
 sheet.addEventListener('focusin', ev => { if (ev.target.id === 'midiPort') { initAudio(); } });
 renderMidi();
 midiEl.addEventListener('click', midiClick);
+
+/* ---------------- zoom + pan: wheel / pinch around the cursor, + / −, space-drag or middle-drag, fit · 1:1 ---------------- */
+const zoomEl = document.getElementById('zoom');
+let viewSaveT = 0;
+function viewChanged() { clearTimeout(viewSaveT); viewSaveT = setTimeout(() => { try { localStorage.setItem('orbs-solar-view', JSON.stringify(VIEW)); } catch (x) {} }, 250); renderZoom(); }
+function renderZoom() { if (!zoomEl) return; const one = Math.abs(VIEW.z - 1) < 1e-3 && Math.abs(VIEW.px) < 0.5 && Math.abs(VIEW.py) < 0.5; zoomEl.querySelector('[data-z="1"]').classList.toggle('on', one); zoomEl.querySelector('[data-z="1"]').textContent = one ? '1:1' : Math.round(VIEW.z * 100) + '%'; }
+function setView(z, px, py) { VIEW.z = clamp(z, ZMIN, ZMAX); VIEW.px = px; VIEW.py = py; applyView(); viewChanged(); }
+function zoomAt(f, mx, my) { // keep the point under (mx, my) fixed
+  const z = clamp(VIEW.z * f, ZMIN, ZMAX); f = z / VIEW.z; if (Math.abs(f - 1) < 1e-6) return;
+  setView(z, mx - (mx - CX) * f - CX0, my - (my - CY) * f - CY0);
+}
+const zoomKey = f => zoomAt(f, SA.x + SA.w / 2, SA.y + SA.h / 2);
+function zoomFit() { // the outermost planet (plus its label) fills the view, sun centred
+  const rads = IDS.filter(id => !E[id].muted).map(id => E[id].rad), mr = Math.max(0.35, ...rads) + 0.07;
+  setView(1 / mr, 0, 0);
+}
+const zoom11 = () => setView(1, 0, 0);
+zoomEl.addEventListener('click', ev => { const t = ev.target.closest('[data-z]'); if (!t) return; t.dataset.z === 'fit' ? zoomFit() : zoom11(); });
+cv.addEventListener('wheel', ev => {
+  ev.preventDefault();
+  const dy = ev.deltaY * (ev.deltaMode === 1 ? 16 : ev.deltaMode === 2 ? 400 : 1);
+  zoomAt(Math.exp(-dy * (ev.ctrlKey ? 0.01 : 0.0015)), ev.clientX, ev.clientY); // ctrl+wheel = trackpad pinch
+}, { passive: false });
+cv.addEventListener('mousedown', ev => { if (ev.button === 1) ev.preventDefault(); }); // no autoscroll on middle-drag
+let pan = null, pinch = null; const TOUCH = new Map();
+function panDown(ev) {
+  if (ev.pointerType === 'touch') { TOUCH.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+    if (TOUCH.size === 2) { if (drag) { clearTimeout(drag.lp); drag = null; } const [a, b] = [...TOUCH.values()]; pinch = { d0: Math.hypot(a.x - b.x, a.y - b.y) || 1, z0: VIEW.z, mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2, cx: CX, cy: CY }; return true; }
+    return TOUCH.size > 2; }
+  if (ev.button === 1 || (spaceDown && ev.button === 0)) { ev.preventDefault(); cv.setPointerCapture(ev.pointerId); pan = { x: ev.clientX, y: ev.clientY, px: VIEW.px, py: VIEW.py }; cv.style.cursor = 'grabbing'; if (spaceDown) spacePanned = true; return true; }
+  return false;
+}
+function panMove(ev) {
+  if (ev.pointerType === 'touch' && TOUCH.has(ev.pointerId)) TOUCH.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+  if (pinch && TOUCH.size >= 2) { const [a, b] = [...TOUCH.values()], d = Math.hypot(a.x - b.x, a.y - b.y) || 1, mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+    const z = clamp(pinch.z0 * d / pinch.d0, ZMIN, ZMAX), f = z / pinch.z0; // pinch: scale around the first midpoint, then follow the midpoint
+    setView(z, mx - (pinch.mx - pinch.cx) * f - CX0, my - (pinch.my - pinch.cy) * f - CY0); return true; }
+  if (pan) { setView(VIEW.z, pan.px + ev.clientX - pan.x, pan.py + ev.clientY - pan.y); return true; }
+  if (spaceDown && !drag) { cv.style.cursor = 'grab'; return true; }
+  return false;
+}
+function panUp(ev) {
+  if (ev && ev.pointerType === 'touch') { TOUCH.delete(ev.pointerId); if (pinch) { if (TOUCH.size < 2) pinch = null; return true; } }
+  if (pan) { pan = null; cv.style.cursor = spaceDown ? 'grab' : 'default'; return true; }
+  return false;
+}
+renderZoom();
+
+/* ---------------- comets: a riser sweeps in over the last bar, a crash lands on the downbeat, every 8 or 16 bars ---------------- */
+const comets = [];
+function cometStep(n, t, sd) {
+  const per = COMET.every * 16; if (n % per !== per - 16) return;
+  const dur = 16 * sd, t1 = t + dur; cometSound(t, t1); comets.push({ t0: t, t1, seed: n, side: (n / per) & 1 }); if (comets.length > 4) comets.shift();
+}
+function cometSound(t0, t1) {
+  if (!ac || !noiseBuf) return; const dest = master, room = fx3 && fx3.room ? fx3.room.input : null;
+  // riser: noise through a bandpass sweeping up, swelling in
+  const s = ac.createBufferSource(); s.buffer = noiseBuf; s.loop = true; const bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 3.5;
+  bp.frequency.setValueAtTime(300, t0); bp.frequency.exponentialRampToValueAtTime(9000, t1); const gn = ac.createGain();
+  gn.gain.setValueAtTime(0.0001, t0); gn.gain.exponentialRampToValueAtTime(0.16, t1 - 0.01); gn.gain.linearRampToValueAtTime(0, t1 + 0.02);
+  s.connect(bp); bp.connect(gn); gn.connect(dest); if (room) { const sg = ac.createGain(); sg.gain.value = 0.35; gn.connect(sg); sg.connect(room); }
+  s.start(t0); s.stop(t1 + 0.05);
+  // crash: bright noise, long decay
+  const c = ac.createBufferSource(); c.buffer = noiseBuf; c.loop = true; const hp = ac.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 4200; const cg = ac.createGain();
+  cg.gain.setValueAtTime(0, t1); cg.gain.linearRampToValueAtTime(0.22, t1 + 0.004); cg.gain.exponentialRampToValueAtTime(0.0008, t1 + 2.2);
+  c.connect(hp); hp.connect(cg); cg.connect(dest); if (room) { const sg = ac.createGain(); sg.gain.value = 0.5; cg.connect(sg); sg.connect(room); }
+  c.start(t1); c.stop(t1 + 2.3);
+}
+function drawComets(now) {
+  if (!ac || !comets.length) return; const tn = ac.currentTime;
+  for (let i = comets.length - 1; i >= 0; i--) { const c = comets[i], u = (tn - c.t0) / (c.t1 - c.t0); if (u > 1.6) { comets.splice(i, 1); continue; } if (u < 0) continue;
+    // straight sweep from outside the system to the trigger line at 12, arriving on the downbeat, then fading on through
+    const A = onRing(1.45, c.side ? 0.78 : 0.22), B = onRing(1.04, 0), P = q => ({ x: A.x + (B.x - A.x) * q, y: A.y + (B.y - A.y) * q });
+    const q = Math.pow(Math.min(u, 1.6), 1.6), fade = u > 1 ? Math.max(0, 1 - (u - 1) / 0.6) : Math.min(1, u * 3), h = P(q);
+    g.lineWidth = 0.7; for (let j = 1; j <= 14; j++) { const p0 = P(Math.max(0, q - j * 0.018)), p1 = P(Math.max(0, q - (j - 1) * 0.018)); g.globalAlpha = 0.5 * fade * (1 - j / 15); g.beginPath(); g.moveTo(p0.x, p0.y); g.lineTo(p1.x, p1.y); g.stroke(); }
+    g.globalAlpha = 0.9 * fade; g.beginPath(); g.arc(h.x, h.y, 1.6, 0, TAU); g.fill();
+    if (u >= 1 && !c.hit) { c.hit = true; ripples.push({ x: B.x, y: B.y, t0: now, r0: 3, big: true }); }
+  }
+}
+function setComet(p) { COMET = Object.assign({}, COMET, p); save(); renderMore(); }
+
+/* ---------------- share link: the whole system in the url hash (recordings stay local) ---------------- */
+const b64u = u8 => { let s = ''; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); };
+const ub64 = s => { s = s.replace(/-/g, '+').replace(/_/g, '/'); while (s.length % 4) s += '='; const b = atob(s), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u; };
+async function zipStr(str, inflate) {
+  if (typeof CompressionStream === 'undefined') return null;
+  const st = new Blob([str]).stream().pipeThrough(inflate ? new DecompressionStream('deflate-raw') : new CompressionStream('deflate-raw'));
+  return new Uint8Array(await new Response(st).arrayBuffer());
+}
+function shareState() { // the saved state minus recorded planets (their audio lives in this browser only)
+  save(); const s = JSON.parse(localStorage.getItem(LS) || '{}'), rec = id => s.els && s.els[id] && (s.els[id].side === 'rec' || (s.els[id].base && s.els[id].base.startsWith('rec')));
+  const drop = new Set(Object.keys(s.els || {}).filter(rec));
+  drop.forEach(id => delete s.els[id]); s.order = (s.order || []).filter(id => !drop.has(id));
+  s.links = (s.links || []).filter(k => !k.split('|').some(x => drop.has(x))); s.tethers = (s.tethers || []).filter(t => !drop.has(t.src) && !drop.has(t.tgt));
+  for (const id in s.els) if (s.els[id].v === 'file') s.els[id].v = undefined;
+  return { s, dropped: drop.size };
+}
+let lastShare = '';
+async function shareLink() {
+  const { s, dropped } = shareState(), js = JSON.stringify(s); let tag = 'j', body;
+  const z = await zipStr(js); if (z) { tag = 'z'; body = b64u(z); } else body = b64u(new TextEncoder().encode(js));
+  const url = location.href.split('#')[0] + '#s=' + tag + body;
+  let copied = false; try { await navigator.clipboard.writeText(url); copied = true; } catch (x) {}
+  lastShare = url; if (!copied) { renderMore(); mmenu.classList.add('open'); const inp = mmenu.querySelector('input'); if (inp) { inp.focus(); inp.select(); } } // no clipboard: show it to copy by hand
+  recMsg((copied ? 'link copied' : 'copy the link from the menu') + (dropped ? ' · recordings not included' : '') + ' · ' + Math.round(url.length / 100) / 10 + 'k chars');
+  return url;
+}
+async function loadShared() { // opening a share link: write the state, drop the hash, reload into it
+  const m = location.hash.match(/^#s=([zj])([A-Za-z0-9_-]+)$/); if (!m) return false;
+  try { const u = ub64(m[2]), js = m[1] === 'z' ? new TextDecoder().decode(await zipStr(u, true)) : new TextDecoder().decode(u); const s = JSON.parse(js); if (!s || !s.els) throw 0;
+    localStorage.setItem(LS, JSON.stringify(s)); sessionStorage.setItem('orbs-shared', '1'); location.replace(location.href.split('#')[0]); return true;
+  } catch (x) { recMsg('that share link could not be read'); history.replaceState(null, '', location.href.split('#')[0]); return false; }
+}
+if (/^#s=/.test(location.hash)) { window.__orbsShareLoading = true; loadShared().then(ok => { if (!ok) window.__orbsShareLoading = false; }); }
+addEventListener('hashchange', () => { if (/^#s=/.test(location.hash)) { window.__orbsShareLoading = true; loadShared().then(ok => { if (!ok) window.__orbsShareLoading = false; }); } });
+try { if (sessionStorage.getItem('orbs-shared')) { sessionStorage.removeItem('orbs-shared'); setTimeout(() => recMsg('shared system loaded · recordings are not part of links'), 300); } } catch (x) {}
+
+/* ---------------- more menu: the extra toggles, so the top bar stays small ---------------- */
+const moreEl = document.getElementById('more'), mmenu = document.getElementById('mmenu');
+function renderMore() {
+  const ch = (k, v, on, label) => '<span class="ch' + (on ? ' on' : '') + '" data-mk="' + k + '" data-v="' + v + '">' + label + '</span>';
+  mmenu.innerHTML = '<div class="mi' + (COMET.on ? ' on' : '') + '" data-m="comet"><i class="ck"></i><b>comets</b>' + ch('every', 8, COMET.every === 8, '8') + ch('every', 16, COMET.every === 16, '16') + '<span style="opacity:.3">bars</span></div>'
+    + '<div class="mn">a riser sweeps in, a crash lands on the downbeat</div><div class="ms"></div>'
+    + '<div class="mi" data-m="share"><i class="ck" style="border-style:dashed"></i><b>share link</b></div><div class="mn">copies a link with the whole system · recordings are not included</div>' + (lastShare ? '<div class="mn"><input readonly value="' + esc(lastShare) + '" style="width:100%;background:#000;color:#fff;border:0;border-bottom:1px solid rgba(255,255,255,.3);font:inherit;font-size:10px;padding:3px 0;opacity:.8"></div>' : '');
+}
+moreEl.addEventListener('click', ev => { ev.stopPropagation(); renderMore(); const r = moreEl.getBoundingClientRect(); mmenu.style.left = Math.max(8, Math.min(innerWidth - 230, r.right - 200)) + 'px'; mmenu.style.top = (r.bottom + 4) + 'px'; mmenu.classList.toggle('open'); gmenu.classList.remove('open'); });
+mmenu.addEventListener('click', ev => { ev.stopPropagation(); const k = ev.target.closest('[data-mk]'), m = ev.target.closest('[data-m]');
+  if (k) { if (k.dataset.mk === 'every') setComet({ every: +k.dataset.v, on: true }); return; }
+  if (!m) return; initAudio();
+  if (m.dataset.m === 'comet') setComet({ on: !COMET.on });
+  else if (m.dataset.m === 'share') { mmenu.classList.remove('open'); shareLink(); } });
+addEventListener('pointerdown', ev => { if (!ev.target.closest('#mmenu,#more')) mmenu.classList.remove('open'); });
 
 
 /* ---------------- sample picker ---------------- */
@@ -5218,7 +5403,8 @@ window.SS = { E, get ORB() { return ORB; }, IDS, links, get TETH() { return TETH
   get playing() { return playing; }, get bpm() { return bpm; }, get ac() { return ac; }, get pickId() { return pickId; }, get barId() { return barId; }, get barData() { return barData; }, get selId() { return selId; },
   set snap(v) { snapOn = !!v; renderSnap(); }, get snap() { return snapOn; },
   get fx() { return fx; }, get fx2() { return fx2; }, orb2Set, orbSet, setSwing, labelOverlaps, layoutLabels, get swing() { return swing; }, setStill, get still() { return still; }, aEff,
-  geom: () => ({ CX, CY, K, RMAX, SA }) };
+  geom: () => ({ CX, CY, K, RMAX, SA }),
+  get VIEW() { return VIEW; }, zoomAt, setView, zoomFit, zoom11, get COMET() { return COMET; }, setComet, comets, shareLink, shareState, chanceOk, MOON_OFF, POLY, renderMore, get spaceDown() { return spaceDown; } };
 })();
 </script>
 </body>
