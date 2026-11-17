@@ -7000,7 +7000,7 @@ let SA = { x: 0, y: 0, w: 0, h: 0 }, K = 0.62, RMAX = 120, SIDE = false, SUNR = 
 let VIEW = { z: 1, px: 0, py: 0 }, CX0 = 0, CY0 = 0, RMAX0 = 120, HOLE = { x: 0, y: 0, r: 15 }; // HOLE: the black hole drop target (bottom left of the system)
 const ZMIN = 0.35, ZMAX = 6;
 try { const v = JSON.parse(localStorage.getItem('orbs-solar-view') || 'null'); if (v && isFinite(v.z)) VIEW = { z: clamp(+v.z, ZMIN, ZMAX), px: +v.px || 0, py: +v.py || 0 }; } catch (x) {}
-let GEO = null, GEO_EASE = false; const GEO_MS = 200;
+let GEO = null, GEO_EASE = false, GEO_KF = null; const GEO_MS = 200; // GEO_KF: the live page picks the tilt (3d view / flat)
 function geoTween(now) { if (!GEO) return; const u = Math.min(1, ((now || performance.now()) - GEO.t0) / GEO_MS), q = 1 - Math.pow(1 - u, 3), F = GEO.f, T = GEO.t; // ease-out cubic, same feel as the panel slide
   CX0 = F.cx + (T.cx - F.cx) * q; CY0 = F.cy + (T.cy - F.cy) * q; K = F.k + (T.k - F.k) * q; RMAX0 = F.r + (T.r - F.r) * q; if (u >= 1) GEO = null; applyView(); }
 function applyView() { CX = CX0 + VIEW.px; CY = CY0 + VIEW.py; RMAX = RMAX0 * VIEW.z; }
@@ -7015,7 +7015,7 @@ function resize() {
   if (document.body.classList.contains('clean')) { SIDE = W > H; SA = { x: 0, y: 0, w: W, h: H }; } // clean view: the system gets the whole screen
   const lvPh = document.body.classList.contains('lvPhone') && !document.body.classList.contains('clean'), tall = lvPh && SA.h > SA.w * 1.3; // live on a portrait phone: a taller system fills the screen (room for the top / bottom edge boxes)
   const hw = SA.w / 2 - (SIDE ? 50 : tall ? 10 : 20), hh = SA.h / 2 - (tall ? 56 : 22);
-  const tK = clamp(hh / hw, 0.55, SIDE ? 0.8 : tall ? 1.25 : lvPh ? 0.9 : 0.72), tg = { cx: SA.x + SA.w / 2, cy: SA.y + SA.h * (tall ? 0.47 : 0.5), k: tK, r: Math.max(50, Math.min(hw, hh / tK)) };
+  const tK0 = clamp(hh / hw, 0.55, SIDE ? 0.8 : tall ? 1.25 : lvPh ? 0.9 : 0.72), tK = GEO_KF ? GEO_KF(tK0, tall, lvPh) : tK0, tg = { cx: SA.x + SA.w / 2, cy: SA.y + SA.h * (tall ? 0.47 : 0.5), k: tK, r: Math.max(50, Math.min(hw, hh / tK)) };
   if (GEO_EASE && RMAX0 > 0 && !matchMedia('(prefers-reduced-motion: reduce)').matches) GEO = { f: { cx: CX0, cy: CY0, k: K, r: RMAX0 }, t: tg, t0: performance.now() }; // a panel opened / closed: ease the system to its new place
   else { GEO = null; CX0 = tg.cx; CY0 = tg.cy; K = tg.k; RMAX0 = tg.r; }
   applyView();
@@ -7259,7 +7259,7 @@ function placeRec(e, rs) { // a fresh take gets its own group, at the distance w
 }
 
 /* ---------------- drawing ---------------- */
-let kickPulse = 0, trigFlash = 0, last = performance.now();
+let kickPulse = 0, trigFlash = 0, last = performance.now(), SEL_FLAT_OFF = false; // live: the wire sphere draws its own selection ring
 const handFlash = {};
 function ghostRing(rad, o, alpha, T, hair) { // faint ring at a planet's distance, shaped by its group's eq / sat / filter
   const R = rad * RMAX, t2 = o ? o.t2 : null, os = o ? o.st : null; g.lineWidth = hair; g.globalAlpha = alpha;
@@ -7383,7 +7383,7 @@ function frame(now) {
     const e = E[id], r = e.r * (1 + 0.35 * e.pulse), dragging = drag && drag.e === e && drag.moved, mutedLook = e.muted || (ORB[e.orbit] && (ORB[e.orbit].st.muted || (anySolo() && !ORB[e.orbit].solo)) && !dragging) || (dragging && drag.tgt && drag.tgt.mute) || e._ghost;
     if (!mutedLook && e.verb > 0.2 && !LITE) { g.globalAlpha = 0.12 + 0.18 * e.verb; g.lineWidth = 0.6; g.setLineDash([0.5, 3]); g.beginPath(); g.arc(e.x, e.y, r + 3 + 6 * e.verb, 0, TAU); g.stroke(); g.setLineDash([]); }
     if (e.side === 'rec') { g.globalAlpha = 0.35; g.lineWidth = 0.7; g.beginPath(); g.arc(e.x, e.y, r + 3.5, 0, TAU); g.stroke(); }
-    if (id === selId) { g.globalAlpha = 0.65; g.lineWidth = 0.8; g.beginPath(); g.arc(e.x, e.y, r + 7, 0, TAU); g.stroke(); }
+    if (id === selId && !SEL_FLAT_OFF) { g.globalAlpha = 0.65; g.lineWidth = 0.8; g.beginPath(); g.arc(e.x, e.y, r + 7, 0, TAU); g.stroke(); }
     if (baseOf(id) === pickId || id === barId || id === winId) { g.save(); g.translate(e.x, e.y); g.rotate(T * 0.5); g.globalAlpha = 0.6; g.lineWidth = 0.8; g.setLineDash([2, 5]); g.beginPath(); g.arc(0, 0, r + 12, 0, TAU); g.stroke(); g.setLineDash([]); g.restore(); }
     if (JAM && !CLEAN && jamIds().includes(id)) { g.font = LABEL_FONT; g.textAlign = 'center'; g.globalAlpha = 0.38; g.fillText(String(jamIds().indexOf(id) + 1), e.x, e.y - r - 9); }
     const b = e.lb; if (b && e.lbA > 0.02 && !e.inHole && (CLEAN ? CLEAN_LABELS : LABELS_ON)) { g.textAlign = b.al; g.globalAlpha = (mutedLook ? 0.3 : (id === selId ? 0.95 : 0.62)) * e.lbA; g.fillText(b.txt, b.tx, b.ty + 0.5); }
@@ -8496,7 +8496,7 @@ function drawScene(gx, skin, st) {
   if (st.mid) st.mid(S);
   S.sun(st.sr, st.kick); g.globalAlpha = 1; g.globalCompositeOperation = 'source-over'; g.fillStyle = '#fff';
   if (st.over) st.over(S);
-  for (const p of st.planets) { if (p.muted) { g.globalAlpha = 0.4; g.lineWidth = 0.9; g.strokeStyle = skin === 'galaxy' ? 'rgb(200,214,235)' : '#fff'; g.beginPath(); g.arc(p.e.x, p.e.y, p.r, 0, TAU); g.stroke(); g.strokeStyle = '#fff'; } else S.planet(p.e, p.r); }
+  for (const p of st.planets) { if (p.muted && S.mutedPlanet) S.mutedPlanet(p.e, p.r); else if (p.muted) { g.globalAlpha = 0.4; g.lineWidth = 0.9; g.strokeStyle = skin === 'galaxy' ? 'rgb(200,214,235)' : '#fff'; g.beginPath(); g.arc(p.e.x, p.e.y, p.r, 0, TAU); g.stroke(); g.strokeStyle = '#fff'; } else S.planet(p.e, p.r); }
   g.globalAlpha = 1; g.globalCompositeOperation = 'source-over'; g.fillStyle = g.strokeStyle = '#fff';
   if (st.after) st.after(S);
 }

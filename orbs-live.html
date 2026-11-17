@@ -8987,7 +8987,7 @@ let SA = { x: 0, y: 0, w: 0, h: 0 }, K = 0.62, RMAX = 120, SIDE = false, SUNR = 
 let VIEW = { z: 1, px: 0, py: 0 }, CX0 = 0, CY0 = 0, RMAX0 = 120, HOLE = { x: 0, y: 0, r: 15 }; // HOLE: the black hole drop target (bottom left of the system)
 const ZMIN = 0.35, ZMAX = 6;
 try { const v = JSON.parse(localStorage.getItem('orbs-solar-view') || 'null'); if (v && isFinite(v.z)) VIEW = { z: clamp(+v.z, ZMIN, ZMAX), px: +v.px || 0, py: +v.py || 0 }; } catch (x) {}
-let GEO = null, GEO_EASE = false; const GEO_MS = 200;
+let GEO = null, GEO_EASE = false, GEO_KF = null; const GEO_MS = 200; // GEO_KF: the live page picks the tilt (3d view / flat)
 function geoTween(now) { if (!GEO) return; const u = Math.min(1, ((now || performance.now()) - GEO.t0) / GEO_MS), q = 1 - Math.pow(1 - u, 3), F = GEO.f, T = GEO.t; // ease-out cubic, same feel as the panel slide
   CX0 = F.cx + (T.cx - F.cx) * q; CY0 = F.cy + (T.cy - F.cy) * q; K = F.k + (T.k - F.k) * q; RMAX0 = F.r + (T.r - F.r) * q; if (u >= 1) GEO = null; applyView(); }
 function applyView() { CX = CX0 + VIEW.px; CY = CY0 + VIEW.py; RMAX = RMAX0 * VIEW.z; }
@@ -9002,7 +9002,7 @@ function resize() {
   if (document.body.classList.contains('clean')) { SIDE = W > H; SA = { x: 0, y: 0, w: W, h: H }; } // clean view: the system gets the whole screen
   const lvPh = document.body.classList.contains('lvPhone') && !document.body.classList.contains('clean'), tall = lvPh && SA.h > SA.w * 1.3; // live on a portrait phone: a taller system fills the screen (room for the top / bottom edge boxes)
   const hw = SA.w / 2 - (SIDE ? 50 : tall ? 10 : 20), hh = SA.h / 2 - (tall ? 56 : 22);
-  const tK = clamp(hh / hw, 0.55, SIDE ? 0.8 : tall ? 1.25 : lvPh ? 0.9 : 0.72), tg = { cx: SA.x + SA.w / 2, cy: SA.y + SA.h * (tall ? 0.47 : 0.5), k: tK, r: Math.max(50, Math.min(hw, hh / tK)) };
+  const tK0 = clamp(hh / hw, 0.55, SIDE ? 0.8 : tall ? 1.25 : lvPh ? 0.9 : 0.72), tK = GEO_KF ? GEO_KF(tK0, tall, lvPh) : tK0, tg = { cx: SA.x + SA.w / 2, cy: SA.y + SA.h * (tall ? 0.47 : 0.5), k: tK, r: Math.max(50, Math.min(hw, hh / tK)) };
   if (GEO_EASE && RMAX0 > 0 && !matchMedia('(prefers-reduced-motion: reduce)').matches) GEO = { f: { cx: CX0, cy: CY0, k: K, r: RMAX0 }, t: tg, t0: performance.now() }; // a panel opened / closed: ease the system to its new place
   else { GEO = null; CX0 = tg.cx; CY0 = tg.cy; K = tg.k; RMAX0 = tg.r; }
   applyView();
@@ -9246,7 +9246,7 @@ function placeRec(e, rs) { // a fresh take gets its own group, at the distance w
 }
 
 /* ---------------- drawing ---------------- */
-let kickPulse = 0, trigFlash = 0, last = performance.now();
+let kickPulse = 0, trigFlash = 0, last = performance.now(), SEL_FLAT_OFF = false; // live: the wire sphere draws its own selection ring
 const handFlash = {};
 function ghostRing(rad, o, alpha, T, hair) { // faint ring at a planet's distance, shaped by its group's eq / sat / filter
   const R = rad * RMAX, t2 = o ? o.t2 : null, os = o ? o.st : null; g.lineWidth = hair; g.globalAlpha = alpha;
@@ -9370,7 +9370,7 @@ function frame(now) {
     const e = E[id], r = e.r * (1 + 0.35 * e.pulse), dragging = drag && drag.e === e && drag.moved, mutedLook = e.muted || (ORB[e.orbit] && (ORB[e.orbit].st.muted || (anySolo() && !ORB[e.orbit].solo)) && !dragging) || (dragging && drag.tgt && drag.tgt.mute) || e._ghost;
     if (!mutedLook && e.verb > 0.2 && !LITE) { g.globalAlpha = 0.12 + 0.18 * e.verb; g.lineWidth = 0.6; g.setLineDash([0.5, 3]); g.beginPath(); g.arc(e.x, e.y, r + 3 + 6 * e.verb, 0, TAU); g.stroke(); g.setLineDash([]); }
     if (e.side === 'rec') { g.globalAlpha = 0.35; g.lineWidth = 0.7; g.beginPath(); g.arc(e.x, e.y, r + 3.5, 0, TAU); g.stroke(); }
-    if (id === selId) { g.globalAlpha = 0.65; g.lineWidth = 0.8; g.beginPath(); g.arc(e.x, e.y, r + 7, 0, TAU); g.stroke(); }
+    if (id === selId && !SEL_FLAT_OFF) { g.globalAlpha = 0.65; g.lineWidth = 0.8; g.beginPath(); g.arc(e.x, e.y, r + 7, 0, TAU); g.stroke(); }
     if (baseOf(id) === pickId || id === barId || id === winId) { g.save(); g.translate(e.x, e.y); g.rotate(T * 0.5); g.globalAlpha = 0.6; g.lineWidth = 0.8; g.setLineDash([2, 5]); g.beginPath(); g.arc(0, 0, r + 12, 0, TAU); g.stroke(); g.setLineDash([]); g.restore(); }
     if (JAM && !CLEAN && jamIds().includes(id)) { g.font = LABEL_FONT; g.textAlign = 'center'; g.globalAlpha = 0.38; g.fillText(String(jamIds().indexOf(id) + 1), e.x, e.y - r - 9); }
     const b = e.lb; if (b && e.lbA > 0.02 && !e.inHole && (CLEAN ? CLEAN_LABELS : LABELS_ON)) { g.textAlign = b.al; g.globalAlpha = (mutedLook ? 0.3 : (id === selId ? 0.95 : 0.62)) * e.lbA; g.fillText(b.txt, b.tx, b.ty + 0.5); }
@@ -10483,7 +10483,7 @@ function drawScene(gx, skin, st) {
   if (st.mid) st.mid(S);
   S.sun(st.sr, st.kick); g.globalAlpha = 1; g.globalCompositeOperation = 'source-over'; g.fillStyle = '#fff';
   if (st.over) st.over(S);
-  for (const p of st.planets) { if (p.muted) { g.globalAlpha = 0.4; g.lineWidth = 0.9; g.strokeStyle = skin === 'galaxy' ? 'rgb(200,214,235)' : '#fff'; g.beginPath(); g.arc(p.e.x, p.e.y, p.r, 0, TAU); g.stroke(); g.strokeStyle = '#fff'; } else S.planet(p.e, p.r); }
+  for (const p of st.planets) { if (p.muted && S.mutedPlanet) S.mutedPlanet(p.e, p.r); else if (p.muted) { g.globalAlpha = 0.4; g.lineWidth = 0.9; g.strokeStyle = skin === 'galaxy' ? 'rgb(200,214,235)' : '#fff'; g.beginPath(); g.arc(p.e.x, p.e.y, p.r, 0, TAU); g.stroke(); g.strokeStyle = '#fff'; } else S.planet(p.e, p.r); }
   g.globalAlpha = 1; g.globalCompositeOperation = 'source-over'; g.fillStyle = g.strokeStyle = '#fff';
   if (st.after) st.after(S);
 }
@@ -10589,8 +10589,9 @@ ripLive = function (rp, age, now) { // hit rings scale with the system, a quicke
   const life = rp.big ? 1100 : 700, a = age / life; if (a > 1 || a < 0) return;
   const sc = clamp(RMAX0 / 480, 0.45, 1.1), reach = (rp.big ? 54 : 12 + 18 * (rp.v || 0.5)) * sc, ease = 1 - Math.pow(1 - a, 3), rings = rp.big ? 1 : ripplesNear(rp, now) >= 3 ? 1 : 2;
   g.lineWidth = 0.6;
-  for (let j = 0; j < rings; j++) { g.globalAlpha = (rp.big ? 0.35 : 0.45 * (rp.v || 0.5)) * Math.pow(1 - a, 1.4) * (1 - j * 0.45); g.beginPath(); g.arc(rp.x, rp.y, Math.max(0.5, rp.r0 + 2 + reach * ease * (1 - j * 0.45)), 0, TAU); g.stroke(); }
+  for (let j = 0; j < rings; j++) { g.globalAlpha = (rp.big ? 0.35 : 0.45 * (rp.v || 0.5)) * Math.pow(1 - a, 1.4) * (1 - j * 0.45); const rr = Math.max(0.5, rp.r0 + 2 + reach * ease * (1 - j * 0.45)); g.beginPath(); g.ellipse(rp.x, rp.y, rr, rr * RIP_K(), 0, 0, TAU); g.stroke(); } /* 3d: rings lie in the orbit plane */
 };
+let RIP_K = () => 1;
 const lvEsc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const lvAnyOpen = () => LVP.T || LVP.B || LVP.M || LVP.D;
 let LVP = { det: 248, cat: 'sounds' }; try { const sv = JSON.parse(localStorage.getItem('orbs-live-panels') || '{}') || {}; if (sv.det) LVP.det = sv.det; if (sv.cat) LVP.cat = sv.cat; } catch (x) {}
@@ -10737,6 +10738,7 @@ renderMore = function () {
   if (k === 'view') {
     h += '<div class="lab">skin</div><div class="mi" style="cursor:default">' + SKIN_IDS.map(s => lvMch('skin', s, SKIN === s, s)).join(' ') + '<span style="flex:1"></span><span class="k">[ ]</span></div>';
     h += '<div class="lab">motion</div><div class="mi" style="cursor:default"><span class="ch' + (!still ? ' on' : '') + '" data-lm="moving">moving</span> <span class="ch' + (still ? ' on' : '') + '" data-lm="still">still</span><span style="flex:1"></span><span class="k">zoom</span> <span class="ch" data-lm="fit">fit</span> <span class="ch" data-lm="z1">1:1</span></div>';
+    h += '<div class="mi" style="cursor:default"><b>view</b><span style="flex:1"></span><span class="ch' + (V3D ? ' on' : '') + '" data-lm="v3d">3d</span> <span class="ch' + (!V3D ? ' on' : '') + '" data-lm="flat">flat</span></div>';
     h += '<div class="ms"></div><div class="mi" data-lm="labels"><b>labels</b><span style="flex:1"></span><span class="k">l</span>' + lvTog(LABELS_ON) + '</div>';
     h += '<div class="mi" data-m="clean"><b>clean view</b><span style="flex:1"></span><span class="k">h</span>' + lvTog(CLEAN) + '</div><div class="mi" data-m="full"><b>full screen</b><span style="flex:1"></span><span class="k">f</span>' + lvTog(!!document.fullscreenElement) + '</div>';
     h += '<div class="lab">space</div>' + [['binaural', 'binaural', 'headphones 3d'], ['eclipse', 'eclipses', 'behind = dips'], ['mood', 'mood light', 'tint by genre']].map(([x, l, n]) => '<div class="mi" data-m="xs" data-k="' + x + '"><b>' + l + '</b><span style="flex:1"></span><span class="k">' + n + '</span>' + lvTog(XS[x]) + '</div>').join('');
@@ -10780,7 +10782,7 @@ mmenu.addEventListener('click', ev => {
   if (!mmenu.classList.contains('lmenu')) return; const m = ev.target.closest('[data-lm],[data-lport]');
   if (m && m.dataset.lport != null) { initAudio(); if (bridge) bridge.selectPort(m.dataset.lport || null); midiPorts = bridge ? bridge.ports() : []; ccResend(); renderMidi(); }
   else if (m) { const a = m.dataset.lm;
-    if (a === 'moving') setStill(false); else if (a === 'still') setStill(true); else if (a === 'fit') zoomFit(); else if (a === 'z1') zoom11();
+    if (a === 'v3d') set3D(true); else if (a === 'flat') set3D(false); else if (a === 'moving') setStill(false); else if (a === 'still') setStill(true); else if (a === 'fit') zoomFit(); else if (a === 'z1') zoom11();
     else if (a === 'labels') LABELS_ON = !LABELS_ON; else if (a === 'help') lvHelp = !lvHelp; else if (a === 'clock') setClock(!CLOCK);
     else if (a === 'midion') { initAudio(); initBridge(); setTimeout(() => { if (lvMenu === 'midi') renderMore(); }, 400); } }
   if (lvMenu) setTimeout(() => { if (lvMenu) renderMore(); }, 0); lvLive(); LVD = true;
@@ -11505,6 +11507,60 @@ function modInit() {
   const a = document.getElementById('lAuto'); if (a) a.addEventListener('click', ev => { ev.stopPropagation(); modAuto(); });
   modDuoWire(); const code = modHas('duoCodeFromUrl') ? XM.duoCodeFromUrl() : null; if (code) setTimeout(() => modDuoJoin(code), 1500);
 }
+/* ================= batch L: wire-sphere planets + a 3d (tilted, depth-cued) view · after vmorphs' mockups/planets-3d.html cell 01 ================= */
+let V3D = true; try { const v = localStorage.getItem('orbs-live-3d'); if (v === '0') V3D = false; } catch (x) {}
+const W3 = { tilt: 0.6, tiltTall: 0.85, inc: 0.42, spin: 0.35 }; /* camera tilt (plane squash) on a desktop / a portrait phone · the equator's own inclination · turns per second (rad) */
+GEO_KF = (k, tall) => V3D ? (tall ? W3.tiltTall : Math.min(k, W3.tilt)) : 1; /* flat: looking straight down, round orbits */
+RIP_K = () => V3D ? K : 1;
+function set3D(on) { on = !!on; if (on === V3D) return; V3D = on; try { localStorage.setItem('orbs-live-3d', on ? '1' : '0'); } catch (x) {} GEO_EASE = true; resize(); GEO_EASE = false; SKC.field = null; sheetDirty = true; LVD = true; if (mmenu.classList.contains('open')) renderMore(); try { lvHint(on ? '3d view · drag, drop and draw work the same' : 'flat view · looking straight down', 1400); } catch (x) {} }
+const dep3 = e => V3D ? (1 - Math.cos(TAU * e.ang)) / 2 : 1; /* 0 = far side (12 o'clock) · 1 = near side */
+const sph3 = () => clamp(RMAX0 / 380, 0.75, 1.15); /* sphere size follows the system like the ripples do */
+
+/* size: r 3..8 px by volume (× size knob), scaled with the system, a touch smaller on the far side */
+const w3Layout0 = layout;
+layout = function () { w3Layout0(); const s = sph3();
+  for (const id of IDS) { const e = E[id], v = Math.pow(e.vol, 0.8), old = (2.6 + 5.6 * v) * DS * sizeScale(e); if (!old) continue; e.r *= (3 + 5 * v) * sizeScale(e) * s * (V3D ? 0.88 + 0.24 * dep3(e) : 1) / old; } };
+
+/* the glyph: outline + a tilted equator that slowly turns (its back half fainter) · per look: line tint and a little glow */
+const W3LOOK = { simple: { c: '255,255,255', a: 0.78, glow: 0 }, solar: { c: '255,255,255', a: 0.9, glow: 0.16 }, galaxy: { c: '222,232,255', a: 0.85, glow: 0.3, lighter: true } };
+function wireSphere(e, r, muted) {
+  const L = W3LOOK[SKIN] || W3LOOK.solar, sel = e.id === selId, d = dep3(e), base = muted ? 0.32 : sel ? 1 : L.a * (0.72 + 0.28 * d), pu = muted ? 0 : Math.min(1, e.pulse || 0), T = performance.now() / 1000, yaw = T * W3.spin + (hash(e.id) % 628) / 100, kc = V3D ? K : 0.55;
+  g.save(); g.lineCap = 'round';
+  if (L.glow && !muted && !LITE) { if (L.lighter) g.globalCompositeOperation = 'lighter'; g.globalAlpha = L.glow * (0.6 + 0.4 * d) + 0.4 * pu; blit(SKC.glow(r * (2.4 + 1.2 * pu), 0.5, L.lighter ? [210, 225, 255] : null), e.x, e.y); g.globalCompositeOperation = 'source-over'; }
+  const col = sel ? '255,255,255' : L.c; g.strokeStyle = 'rgba(' + col + ',1)'; g.fillStyle = 'rgba(' + col + ',1)';
+  if (pu > 0.02) { g.globalAlpha = 0.85 * pu; g.beginPath(); g.arc(e.x, e.y, r, 0, TAU); g.fill(); } /* playing: a brief bright fill */
+  if (!muted) { g.globalAlpha = 0.5; g.fillStyle = '#000'; g.beginPath(); g.arc(e.x, e.y, Math.max(0.5, r - 0.6), 0, TAU); if (pu < 0.3) g.fill(); g.fillStyle = 'rgba(' + col + ',1)'; } /* hollow: links and orbits do not show through the sphere */
+  g.lineWidth = sel ? 1 : 0.9; g.globalAlpha = Math.min(1, base + 0.3 * pu); if (muted) g.setLineDash([1.2, 2.2]); g.beginPath(); g.arc(e.x, e.y, r, 0, TAU); g.stroke(); g.setLineDash([]);
+  /* equator: circle in the planet's own plane (inclined W3.inc), turning about the vertical axis, seen through the camera tilt kc */
+  const se = Math.sqrt(Math.max(0, 1 - kc * kc)), ci = Math.cos(W3.inc), si = Math.sin(W3.inc), cy = Math.cos(yaw), sy = Math.sin(yaw), N = r > 5 ? 28 : 20; let prev = null;
+  g.lineWidth = 0.7;
+  for (let i = 0; i <= N; i++) { const t = i / N * TAU, X = Math.cos(t) * r, Z0 = Math.sin(t) * r, Y = Z0 * si, Z1 = Z0 * ci, X2 = X * cy + Z1 * sy, Z2 = -X * sy + Z1 * cy, sx = e.x + X2, syy = e.y - Y * se + Z2 * kc, front = Z2 * se + Y * kc >= 0;
+    if (prev) { g.globalAlpha = (pu > 0.3 ? 0.25 : base * (front ? 0.62 : 0.24)); g.beginPath(); g.moveTo(prev[0], prev[1]); g.lineTo(sx, syy); g.stroke(); } prev = [sx, syy]; }
+  if (sel) { const rr = r + 6; g.globalAlpha = 0.72; g.lineWidth = 0.8; g.setLineDash([2, 2]); g.beginPath(); g.ellipse(e.x, e.y, rr, rr * (V3D ? K : 1), 0, 0, TAU); g.stroke(); g.setLineDash([]); } /* selected: dashed ring in the orbit plane */
+  g.restore(); g.globalAlpha = 1; g.strokeStyle = g.fillStyle = '#fff';
+}
+for (const s of SKIN_IDS) { const S = SKINS[s]; if (!S) continue;
+  S.planet = (e, r) => wireSphere(e, r, false); S.mutedPlanet = (e, r) => wireSphere(e, r, true);
+  const moon0 = S.moon; S.moon = (e, rr, x, y, fl, hair) => { if (!V3D) return moon0(e, rr, x, y, fl, hair); const y2 = e.y + (y - e.y) * K, L = W3LOOK[s];
+    g.globalAlpha = 0.1; g.lineWidth = hair; g.strokeStyle = 'rgba(' + L.c + ',1)'; g.beginPath(); g.ellipse(e.x, e.y, rr, rr * K, 0, 0, TAU); g.stroke(); g.strokeStyle = '#fff';
+    g.globalAlpha = (0.55 + 0.45 * fl) * (y2 < e.y ? 0.6 : 1); g.lineWidth = 0.8; g.beginPath(); g.arc(x, y2, 1.5 + 0.9 * fl, 0, TAU); if (fl > 0.2) g.fill(); else g.stroke(); }; }
+/* the selection ring in d.js (a flat circle) gives way to the sphere's own dashed plane ring */
+const w3Scene0 = drawScene;
+drawScene = function (gx, skin, st) {
+  if (st.planets) st.planets.sort((a, b) => a.e.y - b.e.y); /* far planets first */
+  SEL_FLAT_OFF = true;
+  w3Scene0(gx, skin, st);
+};
+/* orbits: in 3d the far half is fainter, plus a faint plane ring around the sun */
+const w3Orbits0 = skinOrbits;
+skinOrbits = function (skin, hair, skip) {
+  if (!V3D) return w3Orbits0(skin, hair, skip); const S = SKINS[skin], seen = new Set(); g.lineWidth = hair; g.strokeStyle = S.orbitC;
+  for (const id of IDS) { const e = E[id]; if (e.inHole || e === skip) continue; const k = Math.round(e.rad * RMAX); if (seen.has(k)) continue; seen.add(k); const R = e.rad * RMAX;
+    g.globalAlpha = S.orbitA * 0.5; g.beginPath(); g.ellipse(CX, CY, R, R * K, 0, Math.PI, TAU); g.stroke(); g.globalAlpha = S.orbitA * 1.25; g.beginPath(); g.ellipse(CX, CY, R, R * K, 0, 0, Math.PI); g.stroke(); }
+  g.globalAlpha = 0.22; const sr = SUNR + 4; g.beginPath(); g.ellipse(CX, CY, sr * 1.6, sr * 1.6 * K, 0, 0, TAU); g.stroke();
+  g.strokeStyle = '#fff'; g.globalAlpha = 1;
+};
+function w3Init() { resize(); sheetDirty = true; }
 
 
 /* ---------------- sample picker ---------------- */
@@ -11857,7 +11913,7 @@ window.SS = { E, get ORB() { return ORB; }, IDS, links, get TETH() { return TETH
   get VIEW() { return VIEW; }, zoomAt, setView, zoomFit, zoom11, get COMET() { return COMET; }, setComet, comets, shareLink, shareState, chanceOk, MOON_OFF, POLY, renderMore, get spaceDown() { return spaceDown; },
   sysSnap, applyDiscrete, storeScene, gotoScene, get SCENES() { return SCENES; }, get MORPH() { return MORPH; }, set SCENE_BARS(v) { SCENE_BARS = v; }, mutate, undoMutate, MUT_UNDO, setJam, get JAM() { return JAM; }, jamHit, jamNudge, driftOff, swallow, get HOLE() { return HOLE; }, sunTap, get CHORD() { return CHORD; }, chordIdx, chordName, hitEvent,
   get XS() { return XS; }, setXS, hitsIn, midiFor, exportMidi, exportWav, renderInto, get bin() { return bin; }, binauralOn, get ECL() { return ECL; }, GRAV, startGravity, sizeSemis, sizeWheel, get MOODCSS() { return MOODCSS; }, setTrailKind, trailOf, trailMix, chopPlanet, playSlice, startPractice, endPractice, pracTap, get prac() { return prac; }, get lastPractice() { return lastPractice; }, gravGesture, X, save, setWinTab, get WTAB() { return WTAB; }, setSec, secOpen, set SEC_ALL(v) { SEC_ALL = !!v; sheetDirty = true; }, set UI_ALL(v) { UI_ALL = !!v; sheetDirty = true; if (winId) renderWin(); }, get SHEET() { return SHEET; }, sheetCollapse, applySheet, moreOpen, get SECS() { return SECS; }, get SKIN() { return SKIN; }, setSkin, SKIN_IDS, SKINS, drawScene, SKC, SKSTAT, get fieldBuilds() { return fieldBuilds; }, get CLEAN() { return CLEAN; }, setClean, get CLEAN_LABELS() { return CLEAN_LABELS; }, get XFADE() { return XFADE; }, get GRAV_DONE() { return GRAV_DONE; }, releaseGravity, linked, get lastShare() { return lastShare; }, get PAD9() { return PAD9; }, pad9Init, pad9Toggle, pad9Open, pad9Commit, playPlanetSound, P9V, posAt, timeAtPos, get recCount() { return recCount; } };
-liveInit(); spInit(); modInit(); Object.defineProperties(window.SS, Object.getOwnPropertyDescriptors({ LIVE: true, get space() { return SP; }, get mods() { return MOD; }, decorate, hitEvent, modHum, modHumApply, modTilt, modAuto, modSongPlay, modSongExport, modSongTemplate, modDuoHost, modDuoTick, get LVP() { return LVP; }, lvCollapse, lvAddPlanet, lvDevToggle, lvDevOn: (dev, id) => { const e = E[id]; return !!e && lvDevOn(dev, e, ORB[e.orbit]); }, lvGet, lvSet, get LVOFF() { return LVOFF; }, lvPadSlot, get lvTemp() { return lvTemp; }, lvOverdub, get lvOd() { return lvOd; }, get master() { return master; }, get LVMASTER() { return LVMASTER; }, get LABELS_ON() { return LABELS_ON; }, get lvMenu() { return lvMenu; }, lvOpenMenu, get recBarsN() { return recBarsN; }, hitDotAt: (x, y) => !!(hitDot(x, y, 4) || hitLabel(x, y) || linkAt(x, y) || Math.hypot(x - CX, y - CY) < SUNR + 12), lvBoxes, lvCloseAll, recMsg: s => recMsg(s), lvSnd: () => lvSndDrag }));
+liveInit(); spInit(); modInit(); w3Init(); Object.defineProperties(window.SS, Object.getOwnPropertyDescriptors({ LIVE: true, get space() { return SP; }, get mods() { return MOD; }, get V3D() { return V3D; }, set3D, get K() { return K; }, get RMAX() { return RMAX; }, get CX() { return CX; }, get CY() { return CY; }, hitDot, wireSphere, decorate, hitEvent, modHum, modHumApply, modTilt, modAuto, modSongPlay, modSongExport, modSongTemplate, modDuoHost, modDuoTick, get LVP() { return LVP; }, lvCollapse, lvAddPlanet, lvDevToggle, lvDevOn: (dev, id) => { const e = E[id]; return !!e && lvDevOn(dev, e, ORB[e.orbit]); }, lvGet, lvSet, get LVOFF() { return LVOFF; }, lvPadSlot, get lvTemp() { return lvTemp; }, lvOverdub, get lvOd() { return lvOd; }, get master() { return master; }, get LVMASTER() { return LVMASTER; }, get LABELS_ON() { return LABELS_ON; }, get lvMenu() { return lvMenu; }, lvOpenMenu, get recBarsN() { return recBarsN; }, hitDotAt: (x, y) => !!(hitDot(x, y, 4) || hitLabel(x, y) || linkAt(x, y) || Math.hypot(x - CX, y - CY) < SUNR + 12), lvBoxes, lvCloseAll, recMsg: s => recMsg(s), lvSnd: () => lvSndDrag }));
 })();
 </script>
 </body>
