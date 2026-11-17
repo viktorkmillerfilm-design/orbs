@@ -7000,6 +7000,9 @@ let SA = { x: 0, y: 0, w: 0, h: 0 }, K = 0.62, RMAX = 120, SIDE = false, SUNR = 
 let VIEW = { z: 1, px: 0, py: 0 }, CX0 = 0, CY0 = 0, RMAX0 = 120, HOLE = { x: 0, y: 0, r: 15 }; // HOLE: the black hole drop target (bottom left of the system)
 const ZMIN = 0.35, ZMAX = 6;
 try { const v = JSON.parse(localStorage.getItem('orbs-solar-view') || 'null'); if (v && isFinite(v.z)) VIEW = { z: clamp(+v.z, ZMIN, ZMAX), px: +v.px || 0, py: +v.py || 0 }; } catch (x) {}
+let GEO = null, GEO_EASE = false; const GEO_MS = 200;
+function geoTween(now) { if (!GEO) return; const u = Math.min(1, ((now || performance.now()) - GEO.t0) / GEO_MS), q = 1 - Math.pow(1 - u, 3), F = GEO.f, T = GEO.t; // ease-out cubic, same feel as the panel slide
+  CX0 = F.cx + (T.cx - F.cx) * q; CY0 = F.cy + (T.cy - F.cy) * q; K = F.k + (T.k - F.k) * q; RMAX0 = F.r + (T.r - F.r) * q; if (u >= 1) GEO = null; applyView(); }
 function applyView() { CX = CX0 + VIEW.px; CY = CY0 + VIEW.py; RMAX = RMAX0 * VIEW.z; }
 function resize() {
   DPR = Math.min(2, window.devicePixelRatio || 1);
@@ -7010,10 +7013,12 @@ function resize() {
   SA = SIDE ? { x: 0, y: tb, w: sr.left, h: H - tb } : { x: 0, y: tb, w: W, h: Math.max(160, sr.top - tb) };
   { const ls = document.getElementById('lsys'); if (ls && !document.body.classList.contains('clean')) { const r = ls.getBoundingClientRect(); if (r.width > 40 && r.height > 40) { SIDE = r.width > r.height; SA = { x: r.left, y: r.top, w: r.width, h: r.height }; } } } /* live layout: the system lives in its panel */
   if (document.body.classList.contains('clean')) { SIDE = W > H; SA = { x: 0, y: 0, w: W, h: H }; } // clean view: the system gets the whole screen
-  CX0 = SA.x + SA.w / 2; CY0 = SA.y + SA.h / 2;
-  const hw = SA.w / 2 - (SIDE ? 50 : 20), hh = SA.h / 2 - 22;
-  K = clamp(hh / hw, 0.55, SIDE ? 0.8 : (document.body.classList.contains('lvPhone') ? 0.9 : 0.72)); // live on a phone (portrait): a rounder system uses the tall screen
-  RMAX0 = Math.max(50, Math.min(hw, hh / K)); applyView();
+  const lvPh = document.body.classList.contains('lvPhone') && !document.body.classList.contains('clean'), tall = lvPh && SA.h > SA.w * 1.3; // live on a portrait phone: a taller system fills the screen (room for the top / bottom edge boxes)
+  const hw = SA.w / 2 - (SIDE ? 50 : tall ? 10 : 20), hh = SA.h / 2 - (tall ? 56 : 22);
+  const tK = clamp(hh / hw, 0.55, SIDE ? 0.8 : tall ? 1.25 : lvPh ? 0.9 : 0.72), tg = { cx: SA.x + SA.w / 2, cy: SA.y + SA.h * (tall ? 0.47 : 0.5), k: tK, r: Math.max(50, Math.min(hw, hh / tK)) };
+  if (GEO_EASE && RMAX0 > 0 && !matchMedia('(prefers-reduced-motion: reduce)').matches) GEO = { f: { cx: CX0, cy: CY0, k: K, r: RMAX0 }, t: tg, t0: performance.now() }; // a panel opened / closed: ease the system to its new place
+  else { GEO = null; CX0 = tg.cx; CY0 = tg.cy; K = tg.k; RMAX0 = tg.r; }
+  applyView();
   DS = clamp(M / 700, 0.9, 1.3); SUNR = 5.5 * DS;
   ctlZone = document.getElementById('lsys') ? { x: SA.x + 16, y: SA.y + 16 } : { x: 0, y: tb + 16 };
   placeHole();
@@ -7113,10 +7118,10 @@ function updateMix() {
 
 /* ---------------- interaction ---------------- */
 let drag = null;
-const ripples = [];
+const ripples = []; let RIP_LIVE = false, ripLive = () => {}; // the live page swaps in its own ripple style (scaled to the system)
 const hitR = e => Math.max(e.r + 4 + (e.moons ? 3.2 * e.moons + 2 : 0), touchMode ? 22 : 12); // moon rings count as the planet (qa #5)
 function hitDot(x, y, extra = 0) { let best = null, bd = 1e9; for (const id of IDS) { const e = E[id], d = Math.hypot(x - e.x, y - e.y); if (d < hitR(e) + extra && d <= bd) { bd = d; best = { e, d }; } } return best; }
-const LABEL_FONT = '400 10.5px ui-rounded, "SF Pro Rounded", "Nunito", "Quicksand", "Varela Round", system-ui, sans-serif';
+let LABEL_FONT = '400 10.5px ui-rounded, "SF Pro Rounded", "Nunito", "Quicksand", "Varela Round", system-ui, sans-serif';
 // labels never overlap: each frame every name tries outward side, other side, above, below (keeping its last spot when free);
 // a name that has no free spot fades out until the planets pass each other
 const inter = (a, b) => Math.max(0, Math.min(a[2], b[2]) - Math.max(a[0], b[0])) * Math.max(0, Math.min(a[3], b[3]) - Math.max(a[1], b[1]));
@@ -7280,7 +7285,7 @@ function smoky(A, B, bright, T, seed) { // connection: a thin smoky white line (
 const hash = s => { let h = 7; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) % 9973; return h; };
 function frame(now) {
   const f0 = performance.now(), dt = Math.min(0.05, (now - last) / 1000); last = now; const T = now / 1000;
-  layout(); morphTick(); extrasTick(dt); updateMix();
+  geoTween(now); layout(); morphTick(); extrasTick(dt); updateMix();
   if (drag && drag.moved) drag.tgt = dragTarget(drag);
   if (ac && playing) while (visQ.length && visQ[0].t <= ac.currentTime) {
     const q = visQ.shift(), e = E[q.id]; if (!e) continue; e.pulse = Math.max(e.pulse, q.v); trigFlash = Math.max(trigFlash, 0.6 + 0.4 * q.v);
@@ -7361,6 +7366,7 @@ function frame(now) {
   for (let i = ripples.length - 1; i >= 0; i--) {
     const rp = ripples[i], life = rp.big ? 1400 : 1000, a = (now - rp.t0) / life;
     if (a > 1) { ripples.splice(i, 1); continue; } if (a < 0) continue; // scheduled ahead (lookahead): not yet
+    if (RIP_LIVE) { ripLive(rp, a * life, now); continue; }
     const reach = rp.big ? 60 : 16 + 22 * (rp.v || 0.5), ease = 1 - Math.pow(1 - a, 2.2);
     g.lineWidth = 0.7;
     for (let j = 0; j < (rp.big ? 1 : 2); j++) { g.globalAlpha = (rp.big ? 0.4 : 0.5 * (rp.v || 0.5)) * (1 - a) * (1 - j * 0.4); g.beginPath(); g.arc(rp.x, rp.y, rp.r0 + 2 + reach * ease * (1 - j * 0.45), 0, TAU); g.stroke(); }
