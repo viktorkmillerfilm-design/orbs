@@ -543,6 +543,19 @@ body.lvPhone #det .hd .nm,body.lvPhone #det .hd .x{flex-shrink:0}
 #lv .k{min-width:26px} #lv .dev .dk{justify-content:space-evenly;gap:0;padding:0}
 #lv .dev .dt{padding:0 5px;gap:5px}
 body:not(.lvPhone) #lv .chain>.dev,body:not(.lvPhone) #lv .chain>.rack,body:not(.lvPhone) #lv .rack>.dev{flex:1 0 auto} /* spare room: devices breathe; at 1280 with every panel open they sit at their 8 px grid widths */
+/* batch K · space */
+#lv .grid{height:30px}
+#lv .crow.sprow select{max-width:96px}
+body.sp-draw #c{cursor:crosshair}
+#lAuto.on{color:#000;background:#fff} #lAuto.on .dim{opacity:.6} #lAutoS:not(:empty){margin-left:5px}
+#mmenu .beta{border:1px solid rgba(255,255,255,.4);padding:0 4px;font-size:9px;letter-spacing:.1em;margin-left:4px}
+#mmenu .duocode{width:100%;background:#000;color:#fff;border:0;border-bottom:1px solid rgba(255,255,255,.3);font:inherit;font-size:10px;padding:3px 0}
+#mmenu textarea.duocode{height:54px;resize:none;word-break:break-all}
+#mmenu .srow select{background:#000;color:#fff;border:0;border-bottom:1px solid rgba(255,255,255,.25);font:inherit;max-width:64px}
+#mmenu .srow.on{background:rgba(255,255,255,.08)}
+body:not(.lvPhone) #ltop .zone.r{gap:8px}
+@media (max-width:1180px){body:not(.lvPhone) #ltop #lOut,body:not(.lvPhone) #ltop .zone.r .sepv{display:none} body:not(.lvPhone) #ltop .zone.r{gap:5px}}
+#mmenu.lmenu .mi > b{white-space:nowrap}
 
 </style>
 </head>
@@ -565,10 +578,13 @@ body:not(.lvPhone) #lv .chain>.dev,body:not(.lvPhone) #lv .chain>.rack,body:not(
    <span class="ico" id="lRec" title="rec: mic · count-in · new planet"><svg width="10" height="10"><circle cx="5" cy="5" r="3.5" fill="none" stroke="#fff"/></svg></span>
    <span class="tb" id="lBars" title="bars to record"><span class="ch" data-rb="1">1</span><span class="ch" data-rb="2">2</span><span class="ch" data-rb="4">4</span><span class="dim">bar</span></span>
    <span class="ico" id="lOd" title="overdub: pad hits on the selected planet's slot add to its pattern"><svg width="12" height="10"><circle cx="6" cy="5" r="4" fill="none" stroke="#fff"/><path d="M6 2.5v5M3.5 5h5" stroke="#fff"/></svg></span>
+   <span class="tb" id="lAuto" title="autopilot: a 5-minute dj arc over your planets · click again to hand back"><span class="dim">auto</span><span class="v" id="lAutoS"></span></span>
   </div>
   <div class="zone r">
    <span class="tb" data-menu="genre" title="genre presets">genre <span class="v" id="lGenre">—</span></span>
    <span class="tb" data-menu="view" title="skin, motion, zoom, labels, clean view, space">view <span class="v" id="lSkin">solar</span></span>
+   <span class="tb" data-menu="space" title="space: day and night · second sun · visitors · constellations">space</span>
+   <span class="tb" data-menu="song" title="song timeline: line up scenes · play · export wav">song</span>
    <span class="tb" data-menu="export" title="share link · export midi / wav">share</span>
    <span class="tb" data-menu="midi" title="midi out to ableton"><span class="dot" id="lMidiDot"></span>midi</span>
    <span class="tb" id="lKeys" title="jam keys: 1–9 play planets, ← → nudge"><svg width="14" height="10"><rect x=".5" y=".5" width="13" height="9" fill="none" stroke="#fff"/><path d="M3 3.5h1M6 3.5h1M9 3.5h1M4 6.5h6" stroke="#fff"/></svg>keys</span>
@@ -6796,6 +6812,1599 @@ body:not(.lvPhone) #lv .chain>.dev,body:not(.lvPhone) #lv .chain>.rack,body:not(
 
 </script>
 <script>
+/* ===== orbs extras: hum (inlined from fx/extras-hum.js) ===== */
+/* orbs extras — hum mode (#10): mic -> pitch (autocorrelation) -> 16-step key-snapped pattern
+   plain umd / cjs, no deps.
+   publishes onto window.OrbsExtras (creates it if missing, never overwrites keys).
+   laps are in beats, matching the solar / live app (LAPS [1,2,4,8,16]).
+   the app's planet pattern is e.pat = [{ o, v }] with o = fraction of the lap after the planet's
+   own crossing; humToPat() returns that shape plus an extra `n` (midi note) per hit.
+*/
+(function (root, factory) {
+  const api = factory();
+  function merge(dest) {
+    if (!dest || typeof dest !== 'object') return dest;
+    const keys = Object.keys(api);
+    for (let i = 0; i < keys.length; i++) {
+      if (dest[keys[i]] == null) dest[keys[i]] = api[keys[i]];
+    }
+    return dest;
+  }
+  if (typeof module === 'object' && module.exports) {
+    if (module.exports && typeof module.exports === 'object') merge(module.exports);
+    else module.exports = api;
+  }
+  if (root && typeof root === 'object') {
+    root.OrbsExtras = merge(root.OrbsExtras || (root.OrbsExtras = {}));
+  }
+}(typeof self !== 'undefined' ? self : this, function () {
+  'use strict';
+
+  const LAPS = [1, 2, 4, 8, 16];
+  const STEPS = 16;
+  const NOTE_NAMES = ['c', 'c#', 'd', 'd#', 'e', 'f', 'f#', 'g', 'g#', 'a', 'a#', 'b'];
+  const FLATS = { db: 1, eb: 3, gb: 6, ab: 8, bb: 10, cb: 11, fb: 4 };
+  const SCALES = {
+    major: [0, 2, 4, 5, 7, 9, 11],
+    minor: [0, 2, 3, 5, 7, 8, 10],
+    dorian: [0, 2, 3, 5, 7, 9, 10],
+    phrygian: [0, 1, 3, 5, 7, 8, 10],
+    lydian: [0, 2, 4, 6, 7, 9, 11],
+    mixolydian: [0, 2, 4, 5, 7, 9, 10],
+    harmonic: [0, 2, 3, 5, 7, 8, 11],
+    pentatonic: [0, 3, 5, 7, 10],      // minor pentatonic
+    majpent: [0, 2, 4, 7, 9],
+    blues: [0, 3, 5, 6, 7, 10],
+    chromatic: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+  };
+  const DEF = {
+    key: 'a', scale: 'minor',           // the live app's progression is in a minor (PROG root 57)
+    lapBeats: 4, bpm: 120,
+    minFreq: 70, maxFreq: 1000,
+    minRms: 0.01,                       // gate: below this a frame is unvoiced
+    minClarity: 0.8,                    // normalized autocorrelation peak needed to call a frame voiced
+    voicedFrac: 0.4,                    // share of voiced frames a step needs to hold a note
+    fftSize: 2048,
+    hopMs: 20,
+    lowNote: 36, highNote: 96
+  };
+  const SMOOTH_TC = 0.02;
+
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const freqToMidi = f => 69 + 12 * Math.log2(f / 440);
+  const midiToFreq = m => 440 * Math.pow(2, (m - 69) / 12);
+  const noteName = m => (m == null || !isFinite(m)) ? '' : NOTE_NAMES[((Math.round(m) % 12) + 12) % 12] + (Math.floor(Math.round(m) / 12) - 1);
+
+  /* key: 'a', 'f#', 'bb', 'a minor', a pitch class 0..11 or a midi note (>= 12) -> pitch class */
+  function keyPc(key) {
+    if (key == null) return 9;
+    if (typeof key === 'number' && isFinite(key)) return ((Math.round(key) % 12) + 12) % 12;
+    const s = String(key).trim().toLowerCase().split(/\s+/)[0];
+    if (FLATS[s] != null) return FLATS[s];
+    const i = NOTE_NAMES.indexOf(s);
+    return i >= 0 ? i : 9;
+  }
+  function scaleOf(scale, key) {
+    if (Array.isArray(scale) && scale.length) return scale.map(x => ((x % 12) + 12) % 12);
+    let s = scale;
+    if (s == null && typeof key === 'string' && /\s/.test(key.trim())) s = key.trim().split(/\s+/)[1];
+    s = String(s || 'minor').toLowerCase();
+    if (s === 'maj' || s === 'ionian') s = 'major';
+    if (s === 'min' || s === 'aeolian' || s === 'm') s = 'minor';
+    if (s === 'pent' || s === 'minpent' || s === 'pentatonic minor') s = 'pentatonic';
+    return SCALES[s] || SCALES.minor;
+  }
+  /* nearest in-scale midi note; ties go down (a hum sliding up reads as the lower note) */
+  function snapToScale(midi, key, scale) {
+    if (midi == null || !isFinite(midi)) return null;
+    const pc = keyPc(key), sc = scaleOf(scale, key);
+    const m = Math.round(midi * 1000) / 1000;
+    let best = null, bd = Infinity;
+    for (let o = Math.floor(m / 12) - 1; o <= Math.floor(m / 12) + 1; o++) {
+      for (let i = 0; i < sc.length; i++) {
+        const n = o * 12 + pc + sc[i];
+        const d = Math.abs(n - m);
+        if (d < bd - 1e-9 || (Math.abs(d - bd) < 1e-9 && n < best)) { bd = d; best = n; }
+      }
+    }
+    return best;
+  }
+
+  /* ---------- pitch: normalized autocorrelation (mcleod-style nsdf) ---------- */
+  function rmsOf(buf) {
+    let s = 0;
+    for (let i = 0; i < buf.length; i++) s += buf[i] * buf[i];
+    return Math.sqrt(s / (buf.length || 1));
+  }
+  /* returns { freq, clarity, rms } ; freq = 0 when unvoiced */
+  function detectPitch(buf, sampleRate, opts) {
+    const o = Object.assign({}, DEF, opts || {});
+    const N = buf.length, rms = rmsOf(buf);
+    if (!N || rms < o.minRms) return { freq: 0, clarity: 0, rms };
+    const tauMin = Math.max(2, Math.floor(sampleRate / o.maxFreq));
+    const tauMax = Math.min(Math.floor(N / 2), Math.ceil(sampleRate / o.minFreq));
+    const nsdf = new Float32Array(tauMax + 2);
+    for (let tau = 0; tau <= tauMax + 1; tau++) {
+      let acf = 0, m = 0;
+      for (let i = 0; i + tau < N; i++) { const a = buf[i], b = buf[i + tau]; acf += a * b; m += a * a + b * b; }
+      nsdf[tau] = m > 0 ? 2 * acf / m : 0;
+    }
+    // key maxima between positive-going zero crossings
+    let maxAll = 0; const peaks = [];
+    let tau = 1;
+    while (tau < tauMax && nsdf[tau] > 0) tau++;           // skip the zero-lag lobe
+    while (tau < tauMax) {
+      while (tau < tauMax && nsdf[tau] <= 0) tau++;
+      let bi = -1, bv = -Infinity;
+      while (tau < tauMax && nsdf[tau] > 0) { if (nsdf[tau] > bv) { bv = nsdf[tau]; bi = tau; } tau++; }
+      if (bi >= tauMin) { peaks.push(bi); if (bv > maxAll) maxAll = bv; }
+    }
+    if (!peaks.length) return { freq: 0, clarity: 0, rms };
+    const thr = 0.9 * maxAll;
+    let pick = peaks[0];
+    for (let i = 0; i < peaks.length; i++) if (nsdf[peaks[i]] >= thr) { pick = peaks[i]; break; }
+    const y0 = nsdf[pick - 1], y1 = nsdf[pick], y2 = nsdf[pick + 1];
+    const den = y0 - 2 * y1 + y2;
+    const shift = den !== 0 ? clamp(0.5 * (y0 - y2) / den, -1, 1) : 0;
+    const period = pick + shift;
+    const clarity = y1 - 0.25 * (y0 - y2) * shift;
+    const freq = sampleRate / period;
+    if (clarity < o.minClarity || freq < o.minFreq || freq > o.maxFreq) return { freq: 0, clarity, rms };
+    return { freq, clarity, rms };
+  }
+
+  /* ---------- quantize frames -> 16 steps ---------- */
+  /* frames: [{ t (sec from lap start), freq, rms }] ; returns { steps, notes } */
+  function quantize(frames, opts) {
+    const o = Object.assign({}, DEF, opts || {});
+    const lapBeats = LAPS.includes(+o.lapBeats) ? +o.lapBeats : (+o.lapBeats > 0 ? +o.lapBeats : 4);
+    const lapSec = lapBeats * 60 / (+o.bpm || 120);
+    const nSteps = o.steps || STEPS, stepSec = lapSec / nSteps;
+    const cells = Array.from({ length: nSteps }, () => ({ all: 0, voiced: [], rms: [] }));
+    for (const f of frames || []) {
+      if (!f || !(f.t >= 0) || f.t >= lapSec) continue;
+      const c = cells[Math.min(nSteps - 1, Math.floor(f.t / stepSec))];
+      c.all++;
+      if (f.freq > 0) {
+        const m = freqToMidi(f.freq);
+        if (m >= o.lowNote - 0.5 && m <= o.highNote + 0.5) { c.voiced.push(m); c.rms.push(f.rms || 0); }
+      }
+    }
+    let peak = 0;
+    for (const c of cells) for (const r of c.rms) if (r > peak) peak = r;
+    const rep = cells.map(c => {
+      if (!c.all || c.voiced.length / c.all < o.voicedFrac) return null;
+      const s = c.voiced.slice().sort((a, b) => a - b);
+      const med = s[s.length >> 1];
+      const r = c.rms.reduce((a, b) => a + b, 0) / c.rms.length;
+      return { raw: med, n: snapToScale(med, o.key, o.scale), r, rmax: Math.max.apply(null, c.rms) };
+    });
+    const steps = new Array(nSteps).fill(null), notes = [];
+    let cur = null;
+    for (let i = 0; i < nSteps; i++) {
+      const c = rep[i];
+      if (!c) { cur = null; continue; }
+      const prev = i ? rep[i - 1] : null;
+      // a step continues the note before it unless the pitch changed or the level jumped (re-attack)
+      const onset = !cur || !prev || prev.n !== c.n || (o.reattack !== false && c.rmax > prev.r * 1.8 && c.r > prev.r * 1.4);
+      if (onset) {
+        const v = +clamp(peak > 0 ? 0.35 + 0.65 * (c.rmax / peak) : 0.8, 0.05, 1).toFixed(3);
+        cur = { step: i, n: c.n, raw: +c.raw.toFixed(2), v, len: 1, o: i / nSteps, name: noteName(c.n) };
+        notes.push(cur);
+        steps[i] = { n: c.n, v, len: 1 };
+      } else {
+        cur.len++;
+        steps[cur.step].len = cur.len;
+      }
+    }
+    return { steps, notes, lapBeats, bpm: +o.bpm || 120, key: NOTE_NAMES[keyPc(o.key)], scale: Array.isArray(o.scale) ? o.scale.slice() : (o.scale || 'minor') };
+  }
+
+  /* the app's pat format: [{ o, v, n }] — o = fraction of the lap after the planet's crossing.
+     `n` (midi) and `len` (steps) are extras the app ignores today (see batchK-api-a.md). */
+  function humToPat(res, opts) {
+    const o = opts || {};
+    const notes = res && res.notes ? res.notes : [];
+    const nSteps = res && res.steps ? res.steps.length : STEPS;
+    return notes.map(x => {
+      const h = { o: +(x.step / nSteps).toFixed(6), v: x.v };
+      if (o.notes !== false) { h.n = x.n; h.len = x.len; }
+      return h;
+    });
+  }
+
+  /* offline: analyse a buffer (AudioBuffer, Float32Array, or {getChannelData, sampleRate}) */
+  function humFromBuffer(buf, opts) {
+    const o = Object.assign({}, DEF, opts || {});
+    const data = buf instanceof Float32Array ? buf : buf.getChannelData(0);
+    const sr = buf instanceof Float32Array ? (o.sampleRate || 44100) : buf.sampleRate;
+    const win = Math.min(o.fftSize, 2048), hop = Math.max(64, Math.round(sr * o.hopMs / 1000));
+    const offset = +o.offset || 0, frames = [];
+    for (let i = 0; i + win <= data.length; i += hop) {
+      const p = detectPitch(data.subarray(i, i + win), sr, o);
+      frames.push({ t: (i + win / 2) / sr - offset, freq: p.freq, rms: p.rms, clarity: p.clarity });
+    }
+    const r = quantize(frames, o);
+    r.frames = frames;
+    return r;
+  }
+
+  /* ---------- live: humStart / humStop (single session) ---------- */
+  let S = null;
+  function humStart(opts) {
+    const o = Object.assign({}, DEF, opts || {});
+    if (S) humStop();
+    const AC = typeof window !== 'undefined' ? (window.AudioContext || window.webkitAudioContext) : null;
+    const ctx = o.ctx || (AC ? new AC() : null);
+    if (!ctx) return Promise.resolve({ ok: false, reason: 'no-audio' });
+    const sess = S = { o, ctx, ownCtx: !o.ctx, frames: [], timer: null, stream: null, src: null, an: null, sink: null, startAt: 0, done: false };
+    function wire(src, kind) {
+      if (S !== sess) return { ok: false, reason: 'stopped' };
+      const an = ctx.createAnalyser();
+      an.fftSize = o.fftSize; an.smoothingTimeConstant = 0;
+      // the analyser needs a pull: route through a silent gain to the destination (smoothed, never audible)
+      const sink = ctx.createGain(); sink.gain.value = 0;
+      try { sink.gain.setTargetAtTime(0, ctx.currentTime, SMOOTH_TC); } catch (e) {}
+      src.connect(an); an.connect(sink); sink.connect(ctx.destination);
+      sess.src = src; sess.an = an; sess.sink = sink; sess.kind = kind;
+      sess.startAt = o.startAt != null ? +o.startAt : ctx.currentTime;
+      const buf = new Float32Array(an.fftSize);
+      const lapSec = o.lapBeats * 60 / o.bpm, nSteps = o.steps || STEPS;
+      const latency = an.fftSize / 2 / ctx.sampleRate;   // analyser window centre lags the clock
+      sess.timer = setInterval(() => {
+        if (S !== sess) return;
+        an.getFloatTimeDomainData(buf);
+        const p = detectPitch(buf, ctx.sampleRate, o);
+        const t = ctx.currentTime - sess.startAt - latency;
+        if (t < 0) return;
+        const midi = p.freq > 0 ? freqToMidi(p.freq) : null;
+        const fr = { t, freq: p.freq, rms: p.rms, clarity: p.clarity };
+        if (t < lapSec) sess.frames.push(fr);
+        if (typeof o.onPitch === 'function') {
+          try {
+            o.onPitch({ t, freq: p.freq, midi, snapped: snapToScale(midi, o.key, o.scale), name: noteName(snapToScale(midi, o.key, o.scale)), rms: p.rms, clarity: p.clarity, step: Math.min(nSteps - 1, Math.floor(t / lapSec * nSteps)), lapDone: t >= lapSec });
+          } catch (e) {}
+        }
+        if (t >= lapSec && o.autoStop !== false && !sess.done) {
+          sess.done = true;
+          const r = humStop();
+          if (typeof o.onDone === 'function') { try { o.onDone(r); } catch (e) {} }
+        }
+      }, o.hopMs);
+      return { ok: true, source: kind, sampleRate: ctx.sampleRate, startAt: sess.startAt, lapSec };
+    }
+    if (o.source) return Promise.resolve(wire(o.source, 'node'));
+    const md = typeof navigator !== 'undefined' && navigator.mediaDevices;
+    if (!md || !md.getUserMedia) return Promise.resolve({ ok: false, reason: 'no-mic' });
+    const resume = ctx.state === 'suspended' && ctx.resume ? ctx.resume().catch(() => {}) : null;
+    return md.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } })
+      .then(stream => {
+        if (S !== sess) { stream.getTracks().forEach(t => t.stop()); return { ok: false, reason: 'stopped' }; }
+        sess.stream = stream;
+        return Promise.resolve(resume).then(() => wire(ctx.createMediaStreamSource(stream), 'mic'));
+      })
+      .catch(err => { if (S === sess) S = null; return { ok: false, reason: 'denied', error: String(err && err.name || err) }; });
+  }
+
+  function humStop() {
+    const sess = S;
+    if (!sess) return { notes: [], steps: new Array(STEPS).fill(null), frames: 0 };
+    S = null;
+    if (sess.timer) clearInterval(sess.timer);
+    try { if (sess.src && sess.an) sess.src.disconnect(sess.an); } catch (e) {}
+    try { if (sess.an) sess.an.disconnect(); } catch (e) {}
+    try { if (sess.sink) sess.sink.disconnect(); } catch (e) {}
+    if (sess.stream) sess.stream.getTracks().forEach(t => { try { t.stop(); } catch (e) {} });
+    if (sess.ownCtx && sess.ctx.close) { try { sess.ctx.close(); } catch (e) {} }
+    const r = quantize(sess.frames, sess.o);
+    r.frames = sess.frames.length;
+    r.source = sess.kind || null;
+    return r;
+  }
+  const humActive = () => !!S;
+
+  return {
+    humStart, humStop, humActive, humFromBuffer, humToPat, humDetect: detectPitch, humQuantize: quantize,
+    snapToScale, freqToMidi, midiToFreq, noteName, HUM_SCALES: SCALES, HUM_STEPS: STEPS
+  };
+}));
+
+</script>
+<script>
+/* ===== orbs extras: tilt (inlined from fx/extras-tilt.js) ===== */
+/* orbs extras — tilt (#12): phone tilt -> smoothed { filter 0..1, pan -1..1 }
+   plain umd / cjs, no deps.
+   publishes onto window.OrbsExtras (creates it if missing, never overwrites keys).
+   - tiltEnable() must be called from a user gesture (tap / click): on ios it calls
+     DeviceOrientationEvent.requestPermission() synchronously inside that gesture.
+   - desktop / no sensor: resolves { supported: false } and does nothing.
+   - left/right roll (gamma) -> pan, forward/back pitch (beta, around a neutral angle) -> filter.
+     screen rotation (landscape) is compensated.
+*/
+(function (root, factory) {
+  const api = factory();
+  function merge(dest) {
+    if (!dest || typeof dest !== 'object') return dest;
+    const keys = Object.keys(api);
+    for (let i = 0; i < keys.length; i++) {
+      if (dest[keys[i]] == null) dest[keys[i]] = api[keys[i]];
+    }
+    return dest;
+  }
+  if (typeof module === 'object' && module.exports) {
+    if (module.exports && typeof module.exports === 'object') merge(module.exports);
+    else module.exports = api;
+  }
+  if (root && typeof root === 'object') {
+    root.OrbsExtras = merge(root.OrbsExtras || (root.OrbsExtras = {}));
+  }
+}(typeof self !== 'undefined' ? self : this, function () {
+  'use strict';
+
+  const DEF = {
+    neutralBeta: 40,     // degrees: how a phone is usually held; tilting away opens the filter
+    rangeBeta: 35,       // ± degrees around neutral -> filter 0..1
+    rangeGamma: 40,      // ± degrees roll -> pan -1..1
+    deadzone: 3,         // degrees around neutral that read as centre
+    smooth: 0.12,        // seconds: one-pole time constant on the readings
+    invertFilter: false, invertPan: false,
+    probeMs: 900,        // wait this long for a real reading before calling it "no sensor"
+    minHz: 120, maxHz: 16000,
+    paramTc: 0.02        // setTargetAtTime constant on applied audio params
+  };
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const W = typeof window !== 'undefined' ? window : null;
+
+  /* pure mapping: raw angles -> target { filter, pan } (no smoothing) */
+  function tiltMap(beta, gamma, opts, screenAngle) {
+    const o = Object.assign({}, DEF, opts || {});
+    let b = +beta || 0, g = +gamma || 0;
+    const ang = ((Math.round((+screenAngle || 0) / 90) * 90) % 360 + 360) % 360;
+    // landscape: the device's beta/gamma swap roles relative to the screen
+    // (screen-relative forward pitch / roll; verify signs on a device, invert* flags exist)
+    if (ang === 90) { const t = b; b = -g; g = t; }
+    else if (ang === 270) { const t = b; b = g; g = -t; }
+    else if (ang === 180) { b = -b; g = -g; }
+    const neutral = o.neutralBeta;
+    const dz = v => Math.abs(v) <= o.deadzone ? 0 : (v - Math.sign(v) * o.deadzone);
+    let db = dz(b - (o._neutral != null ? o._neutral : neutral));
+    let dg = dz(g);
+    let filter = clamp(0.5 + db / (2 * (o.rangeBeta - o.deadzone)), 0, 1);
+    let pan = clamp(dg / (o.rangeGamma - o.deadzone), -1, 1);
+    if (o.invertFilter) filter = 1 - filter;
+    if (o.invertPan) pan = -pan;
+    return { filter, pan };
+  }
+  const filterHz = (v, o) => { const a = (o && o.minHz) || DEF.minHz, b = (o && o.maxHz) || DEF.maxHz; return a * Math.pow(b / a, clamp(v, 0, 1)); };
+
+  let T = null; // session
+  const TARGETS = []; // { filter, panner, ctx } driven by tiltApplyTo
+  const state = () => T ? { enabled: true, filter: T.filter, pan: T.pan, raw: T.raw ? Object.assign({}, T.raw) : null, events: T.events } : { enabled: false, filter: 0.5, pan: 0, raw: null, events: 0 };
+
+  function nowSec() { return (W && W.performance ? W.performance.now() : Date.now()) / 1000; }
+  function screenAngle() {
+    try {
+      if (W && W.screen && W.screen.orientation && typeof W.screen.orientation.angle === 'number') return W.screen.orientation.angle;
+      if (W && typeof W.orientation === 'number') return W.orientation;
+    } catch (e) {}
+    return 0;
+  }
+
+  function onEvent(ev) {
+    const s = T; if (!s) return;
+    if (ev.beta == null && ev.gamma == null) return; // desktop chrome fires one empty event
+    s.events++;
+    s.raw = { alpha: ev.alpha, beta: ev.beta, gamma: ev.gamma };
+    if (s.calibrateNext) { s.o._neutral = +ev.beta || 0; s.calibrateNext = false; }
+    const tg = tiltMap(ev.beta, ev.gamma, s.o, screenAngle());
+    const t = nowSec(), dt = s.last == null ? 1 : Math.max(0, t - s.last);
+    s.last = t;
+    const k = s.o.smooth > 0 ? 1 - Math.exp(-dt / s.o.smooth) : 1;
+    if (s.events === 1 && s.o.startCentered === false) { s.filter = tg.filter; s.pan = tg.pan; }
+    else { s.filter += (tg.filter - s.filter) * k; s.pan += (tg.pan - s.pan) * k; }
+    s.filter = clamp(s.filter, 0, 1); s.pan = clamp(s.pan, -1, 1);
+    if (s.resolveProbe) s.resolveProbe(true);
+    const out = { filter: s.filter, pan: s.pan, target: tg, raw: s.raw };
+    applyNow(s, out);
+    if (typeof s.o.onTilt === 'function') { try { s.o.onTilt(out); } catch (e) {} }
+  }
+
+  function applyNow(s, v, list) {
+    const L = list || TARGETS;
+    for (const a of L) {
+      const ctx = a.ctx, t = ctx ? ctx.currentTime : 0, tc = s.o.paramTc;
+      try {
+        if (a.filter && a.filter.frequency) a.filter.frequency.setTargetAtTime(filterHz(v.filter, s.o), t, tc);
+        if (a.panner) {
+          if (a.panner.pan) a.panner.pan.setTargetAtTime(v.pan, t, tc);
+          else if (a.panner.positionX) { a.panner.positionX.setTargetAtTime(v.pan, t, tc); a.panner.positionZ.setTargetAtTime(-Math.sqrt(Math.max(0, 1 - v.pan * v.pan)), t, tc); }
+        }
+      } catch (e) {}
+    }
+  }
+
+  /* call from a click / touchend handler. resolves { supported, granted, reason } */
+  function tiltEnable(opts) {
+    const o = Object.assign({}, DEF, opts || {});
+    if (T) tiltDisable();
+    const DOE = W && W.DeviceOrientationEvent;
+    if (!W || typeof DOE === 'undefined' || !('ondeviceorientation' in W || DOE)) return Promise.resolve({ supported: false, granted: false, reason: 'no-api' });
+    let perm;
+    if (typeof DOE.requestPermission === 'function') {
+      // ios 13+: must be the first thing the gesture handler does (no await before it)
+      try { perm = Promise.resolve(DOE.requestPermission()); } catch (e) { perm = Promise.resolve('denied'); }
+    } else perm = Promise.resolve('granted');
+    const sess = T = { o, filter: 0.5, pan: 0, raw: null, events: 0, last: null, calibrateNext: !!o.calibrate, resolveProbe: null };
+    return perm.then(p => {
+      if (T !== sess) return { supported: true, granted: false, reason: 'disabled' };
+      if (p !== 'granted') { T = null; return { supported: true, granted: false, reason: 'denied' }; }
+      sess.handler = onEvent;
+      W.addEventListener('deviceorientation', sess.handler);
+      if (!(o.probeMs > 0)) return { supported: true, granted: true };
+      return new Promise(res => {
+        let done = false;
+        const fin = got => {
+          if (done) return; done = true; sess.resolveProbe = null; clearTimeout(sess.probeTimer);
+          if (!got && T === sess) { tiltDisable(); res({ supported: false, granted: true, reason: 'no-sensor' }); }
+          else res({ supported: true, granted: true });
+        };
+        sess.resolveProbe = fin;
+        if (sess.events > 0) fin(true);
+        sess.probeTimer = setTimeout(() => fin(sess.events > 0), o.probeMs);
+      });
+    }, () => { if (T === sess) T = null; return { supported: true, granted: false, reason: 'denied' }; });
+  }
+
+  function tiltDisable() {
+    const s = T; if (!s) return false;
+    T = null;
+    if (s.handler && W) W.removeEventListener('deviceorientation', s.handler);
+    if (s.resolveProbe) { const r = s.resolveProbe; s.resolveProbe = null; r(true); }
+    clearTimeout(s.probeTimer);
+    // ease applied params back to neutral (filter open, pan centre)
+    if (s.o.resetOnDisable !== false && s.events) applyNow(s, { filter: s.o.restFilter != null ? s.o.restFilter : 1, pan: 0 });
+    return true;
+  }
+
+  /* drive a BiquadFilter (frequency) and a StereoPanner/PannerNode from the tilt. returns detach() */
+  function tiltApplyTo(filterNode, pannerNode, ctx) {
+    const c = ctx || (filterNode && filterNode.context) || (pannerNode && pannerNode.context) || null;
+    const a = { filter: filterNode || null, panner: pannerNode || null, ctx: c };
+    TARGETS.push(a);
+    if (T && T.events) applyNow(T, { filter: T.filter, pan: T.pan }, [a]);
+    return function detach() { const i = TARGETS.indexOf(a); if (i >= 0) TARGETS.splice(i, 1); };
+  }
+  function tiltOnTilt(cb) { if (T) T.o.onTilt = cb; return !!T; }
+  function tiltCalibrate() { if (!T) return false; T.calibrateNext = true; return true; }
+  const tiltSupported = () => !!(W && typeof W.DeviceOrientationEvent !== 'undefined');
+  const tiltNeedsPermission = () => !!(W && W.DeviceOrientationEvent && typeof W.DeviceOrientationEvent.requestPermission === 'function');
+
+  return {
+    tiltEnable, tiltDisable, tiltApplyTo, tiltOnTilt, tiltCalibrate, tiltState: state,
+    tiltMap, tiltFilterHz: filterHz, tiltSupported, tiltNeedsPermission, TILT_DEFAULTS: DEF
+  };
+}));
+
+</script>
+<script>
+/* ===== orbs extras: autopilot (inlined from fx/extras-autopilot.js) ===== */
+/* orbs extras — autopilot (#13): a dj-style arc over ~5 minutes
+   plain umd / cjs, no deps.
+   publishes onto window.OrbsExtras (creates it if missing, never overwrites keys).
+   autopilotPlan(planets, opts) -> { sections, actions, bars, duration } (deterministic per seed)
+   action: { t, bar, type: 'mute'|'unmute'|'filter'|'energy', target, value, ramp, section }
+     t      seconds from start (or bars when opts.unit === 'bars'); `bar` and `sec` are always both present
+     filter value is the batch-1 filter amount -1..1 (negative = lowpass closing, positive = highpass rising, 0 = open);
+            target 'all' (every group) unless opts.filterTarget is set
+     energy value 0..1 (host decides: sends, drive, moons, density…), target 'master'
+     ramp   seconds (or bars) to glide to value; 0 = jump
+*/
+(function (root, factory) {
+  const api = factory();
+  function merge(dest) {
+    if (!dest || typeof dest !== 'object') return dest;
+    const keys = Object.keys(api);
+    for (let i = 0; i < keys.length; i++) {
+      if (dest[keys[i]] == null) dest[keys[i]] = api[keys[i]];
+    }
+    return dest;
+  }
+  if (typeof module === 'object' && module.exports) {
+    if (module.exports && typeof module.exports === 'object') merge(module.exports);
+    else module.exports = api;
+  }
+  if (root && typeof root === 'object') {
+    root.OrbsExtras = merge(root.OrbsExtras || (root.OrbsExtras = {}));
+  }
+}(typeof self !== 'undefined' ? self : this, function () {
+  'use strict';
+
+  const ROLES = ['kick', 'hats', 'snare', 'perc', 'bass', 'lead', 'chords', 'pad', 'texture'];
+  const ARC = [ // name, share of the length, energy at start -> end
+    { name: 'intro', share: 0.12, e0: 0.25, e1: 0.4 },
+    { name: 'build', share: 0.11, e0: 0.45, e1: 0.9 },
+    { name: 'drop', share: 0.2, e0: 1, e1: 0.92 },
+    { name: 'breakdown', share: 0.15, e0: 0.35, e1: 0.4 },
+    { name: 'build', share: 0.1, e0: 0.5, e1: 0.95 },
+    { name: 'drop', share: 0.21, e0: 1, e1: 0.95 },
+    { name: 'outro', share: 0.11, e0: 0.5, e1: 0.1 }
+  ];
+  // which roles play in each section ('in' = enters partway, seeded)
+  const LAYERS = {
+    intro: { on: ['pad', 'hats'], in: ['perc', 'chords', 'texture'], off: ['kick', 'snare', 'bass', 'lead'] },
+    build: { on: ['pad', 'hats', 'perc', 'chords', 'kick', 'snare', 'texture'], in: ['lead'], off: ['bass'] },
+    drop: { on: ['kick', 'bass', 'snare', 'hats', 'perc', 'lead', 'chords', 'texture'], in: [], off: ['pad'] },
+    breakdown: { on: ['pad', 'chords', 'lead'], in: ['texture'], off: ['kick', 'bass', 'snare', 'hats', 'perc'] },
+    outro: { on: ['kick', 'hats', 'pad'], in: [], off: ['lead', 'snare', 'bass', 'chords', 'perc', 'texture'] }
+  };
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  function rng(seed) { let s = (seed >>> 0) || 1; return () => { s ^= s << 13; s >>>= 0; s ^= s >>> 17; s ^= s << 5; s >>>= 0; return s / 4294967296; }; }
+
+  function roleOf(p) {
+    if (p == null) return 'texture';
+    const r = typeof p === 'string' ? p : (p.role || p.base || String(p.id || '').split('~')[0]);
+    const k = String(r).toLowerCase();
+    if (ROLES.includes(k)) return k;
+    if (/kick|bd|808/.test(k)) return 'kick';
+    if (/hat|hh|shaker|ride/.test(k)) return 'hats';
+    if (/snare|clap|sd/.test(k)) return 'snare';
+    if (/bass|sub/.test(k)) return 'bass';
+    if (/lead|vox|vocal|melody|arp/.test(k)) return 'lead';
+    if (/chord|stab|keys|rhodes/.test(k)) return 'chords';
+    if (/pad|drone|string|atmo/.test(k)) return 'pad';
+    if (/perc|tom|conga|wood|bongo/.test(k)) return 'perc';
+    return 'texture';
+  }
+  const idOf = p => typeof p === 'string' ? p : String(p.id);
+
+  function autopilotPlan(planets, opts) {
+    const o = Object.assign({ bpm: 120, minutes: 5, seed: 1, beatsPerBar: 4, phrase: 8, unit: 'sec', filterTarget: 'all' }, opts || {});
+    const bpm = clamp(+o.bpm || 120, 20, 300), bpb = +o.beatsPerBar || 4;
+    const barSec = bpb * 60 / bpm;
+    const dur = o.duration != null ? +o.duration : (+o.minutes || 5) * 60;
+    const phrase = Math.max(1, +o.phrase | 0);
+    const R = rng((+o.seed | 0) * 2654435761 + 7);
+    const list = (planets || []).filter(p => p != null).map(p => ({ id: idOf(p), role: roleOf(p) }));
+    // ---- sections, snapped to phrases (at least 1 phrase or 2 bars each) ----
+    let totalBars = Math.max(ARC.length * 2, Math.round(dur / barSec));
+    const unit = totalBars >= ARC.length * phrase * 1.5 ? phrase : (totalBars >= ARC.length * 4 ? 4 : 2);
+    let lens = ARC.map(a => Math.max(unit, Math.round(a.share * totalBars / unit) * unit));
+    let diff = Math.round(totalBars / unit) * unit - lens.reduce((a, b) => a + b, 0);
+    const order = [5, 2, 3, 0, 6, 1, 4];
+    for (let g = 0; diff !== 0 && g < 200; g++) { const i = order[g % order.length]; if (diff > 0) { lens[i] += unit; diff -= unit; } else if (lens[i] > unit) { lens[i] -= unit; diff += unit; } }
+    totalBars = lens.reduce((a, b) => a + b, 0);
+    let bar = 0;
+    const sections = ARC.map((a, i) => { const s = { name: a.name, index: i, startBar: bar, bars: lens[i], energy: [a.e0, a.e1] }; bar += lens[i]; return s; });
+
+    const acts = [];
+    const add = (b, type, target, value, rampBars, sec) => acts.push({ bar: +b.toFixed(4), type, target, value: +(+value).toFixed(4), rampBars: +(rampBars || 0).toFixed(4), section: sec.name, si: sec.index });
+    const muted = {}; // current mute per planet id (to only emit changes)
+    const setMute = (b, p, m, sec) => { if (muted[p.id] === m) return; muted[p.id] = m; add(b, m ? 'mute' : 'unmute', p.id, m ? 1 : 0, 0, sec); };
+    const roleSet = r => list.filter(p => p.role === r);
+    const hasRole = r => list.some(p => p.role === r);
+
+    // baseline at t = 0: everything into a known state
+    sections.forEach((sec, si) => {
+      const L = LAYERS[sec.name], b0 = sec.startBar, b1 = sec.startBar + sec.bars;
+      const isDrop = sec.name === 'drop', second = sections.slice(0, si).some(x => x.name === sec.name);
+      // --- mutes ---
+      for (const p of list) {
+        if (L.off.includes(p.role)) setMute(b0, p, true, sec);
+        else if (L.on.includes(p.role)) setMute(b0, p, false, sec);
+        else if (L.in.includes(p.role)) {
+          // enters on a seeded phrase boundary inside the section (or half way)
+          const slots = Math.max(1, Math.floor(sec.bars / unit));
+          const k = slots > 1 ? 1 + Math.floor(R() * (slots - 1)) : 0;
+          setMute(b0, p, true, sec);
+          setMute(b0 + (slots > 1 ? k * unit : Math.floor(sec.bars / 2)), p, false, sec);
+        } else setMute(b0, p, false, sec);
+      }
+      // second drop: the pad comes back for width (seeded) and perc fills in
+      if (isDrop && second && R() < 0.5) for (const p of roleSet('pad')) setMute(b0, p, false, sec);
+      // builds: drop kick + bass out for the last bar (or half bar) before the drop — the classic gap
+      if (sec.name === 'build') {
+        const gap = sec.bars >= 8 ? 1 : 0.5;
+        for (const p of list) if (p.role === 'kick' || p.role === 'bass') setMute(b1 - gap, p, true, sec);
+        // seeded: hats drop out one bar (or half) before the gap too
+        if (R() < 0.5) for (const p of roleSet('hats')) { setMute(b1 - gap - 0.5 * (sec.bars >= 8 ? 2 : 1) , p, true, sec); }
+      }
+      // drops: a seeded one-bar break in the middle of a long drop (kick out, then back)
+      if (isDrop && sec.bars >= 16 && hasRole('kick')) {
+        const at = b0 + (Math.floor(sec.bars / unit / 2) || 1) * unit - 1;
+        if (R() < 0.7) { for (const p of roleSet('kick')) { setMute(at, p, true, sec); setMute(at + 1, p, false, sec); } }
+      }
+      // outro: thin out one phrase at a time, kick + hats last, pad rings out
+      if (sec.name === 'outro') {
+        const slots = Math.max(1, Math.floor(sec.bars / unit));
+        const late = ['kick', 'hats'];
+        late.forEach((r, j) => { const b = b0 + Math.min(sec.bars - 1, Math.max(1, Math.round((j + 1) * sec.bars / (late.length + 1)))); if (slots >= 1) for (const p of roleSet(r)) setMute(b, p, true, sec); });
+      }
+      // --- filter ---
+      const ft = o.filterTarget;
+      if (sec.name === 'intro') { add(b0, 'filter', ft, -0.65, 0, sec); add(b0, 'filter', ft, -0.2, sec.bars, sec); }
+      else if (sec.name === 'build') { const top = second ? 0.6 : 0.45 + 0.1 * R(); add(b0, 'filter', ft, 0, 0, sec); add(b0, 'filter', ft, +top.toFixed(3), sec.bars - (sec.bars >= 8 ? 1 : 0.5), sec); }
+      else if (isDrop) add(b0, 'filter', ft, 0, 0, sec);
+      else if (sec.name === 'breakdown') { add(b0, 'filter', ft, -0.5, Math.min(2, sec.bars / 4), sec); add(b0 + sec.bars / 2, 'filter', ft, -0.25, sec.bars / 2, sec); }
+      else if (sec.name === 'outro') { add(b0, 'filter', ft, 0, 0, sec); add(b0 + sec.bars / 2, 'filter', ft, -0.8, sec.bars / 2, sec); }
+      // --- energy ---
+      const er = isDrop || si === 0 ? 0 : Math.min(1, sec.bars / 8);           // short glide into the section's level…
+      add(b0, 'energy', 'master', sec.energy[0], er, sec);
+      const e2 = isDrop ? b0 + sec.bars / 2 : b0 + er;              // …then the long arc to its end level
+      add(e2, 'energy', 'master', sec.energy[1], b1 - e2, sec);
+    });
+    // stable order: time, then mutes before unmutes before filter/energy
+    const pri = { mute: 0, unmute: 1, filter: 2, energy: 3 };
+    acts.forEach((a, i) => { a._i = i; });
+    acts.sort((a, b) => (a.bar - b.bar) || (pri[a.type] - pri[b.type]) || (a._i - b._i));
+    const actions = acts.map(a => {
+      const sec = +(a.bar * barSec).toFixed(4), rampSec = +(a.rampBars * barSec).toFixed(4);
+      return { t: o.unit === 'bars' ? a.bar : sec, bar: a.bar, sec, type: a.type, target: a.target, value: a.value, ramp: o.unit === 'bars' ? a.rampBars : rampSec, rampBars: a.rampBars, rampSec, section: a.section, si: a.si };
+    });
+    sections.forEach(s => { s.t = +(s.startBar * barSec).toFixed(4); s.dur = +(s.bars * barSec).toFixed(4); });
+    return { sections, actions, bars: totalBars, duration: +(totalBars * barSec).toFixed(4), bpm, barSec, unit: o.unit, seed: +o.seed | 0, planets: list };
+  }
+
+  /* state of the mix at a time (sec, or bars if plan.unit === 'bars'): { muted:{id:bool}, filter, energy, section } */
+  function autopilotStateAt(plan, t) {
+    const muted = {}; let filter = 0, energy = 0, section = null;
+    const key = plan.unit === 'bars' ? 'bar' : 'sec';
+    const tt = t + 1e-9;
+    for (const s of plan.sections) if ((plan.unit === 'bars' ? s.startBar : s.t) <= tt) section = s.name;
+    for (const a of plan.actions) {
+      if (a[key] > tt) break;
+      if (a.type === 'mute') muted[a.target] = true;
+      else if (a.type === 'unmute') muted[a.target] = false;
+      else {
+        const r = plan.unit === 'bars' ? a.rampBars : a.rampSec, start = a[key];
+        const prev = a.type === 'filter' ? filter : energy;
+        const v = r > 0 && tt < start + r ? prev + (a.value - prev) * ((tt - start) / r) : a.value;
+        if (a.type === 'filter') filter = v; else energy = v;
+      }
+    }
+    return { muted, filter: +filter.toFixed(4), energy: +energy.toFixed(4), section };
+  }
+
+  /* ---------- live scheduler ---------- */
+  let RUN = null;
+  const nowMs = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
+  /* opts: bpm, seed, minutes|duration, onAction(action, when), onSection(section, when), onEnd(),
+           timeScale (1 = real time; 60 = a minute per second, for tests/preview),
+           ctx (AudioContext: `when` is ctx time so params can be scheduled exactly), startAt (ctx time),
+           lookahead (sec, default 0.1), tick (ms, default 25), plan (use a precomputed plan) */
+  function autopilotStart(planets, opts) {
+    const o = Object.assign({ lookahead: 0.1, tick: 25, timeScale: 1 }, opts || {});
+    autopilotStop();
+    const plan = o.plan || autopilotPlan(planets, Object.assign({}, o, { unit: 'sec' }));
+    const ts = Math.max(1e-6, +o.timeScale || 1);
+    const ctx = o.ctx || null;
+    const t0 = nowMs(), c0 = ctx ? (o.startAt != null ? +o.startAt : ctx.currentTime) : 0;
+    const run = RUN = { plan, o, idx: 0, sIdx: 0, fired: 0, timer: null, t0, c0, ts, ctx, done: false };
+    const elapsed = () => ctx ? (ctx.currentTime - c0) * ts : (nowMs() - t0) / 1000 * ts; // plan seconds
+    const whenOf = sec => ctx ? c0 + sec / ts : t0 / 1000 + sec / ts;
+    function tick() {
+      if (RUN !== run) return;
+      const horizon = elapsed() + o.lookahead * ts;
+      while (run.sIdx < plan.sections.length && plan.sections[run.sIdx].t <= horizon) {
+        const s = plan.sections[run.sIdx++];
+        if (typeof o.onSection === 'function') { try { o.onSection(s, whenOf(s.t)); } catch (e) {} }
+      }
+      while (run.idx < plan.actions.length && plan.actions[run.idx].sec <= horizon) {
+        const a = plan.actions[run.idx++]; run.fired++;
+        const out = Object.assign({}, a, { rampReal: a.rampSec / ts });
+        if (typeof o.onAction === 'function') { try { o.onAction(out, whenOf(a.sec)); } catch (e) {} }
+      }
+      if (elapsed() >= plan.duration) {
+        run.done = true; clearInterval(run.timer); RUN = null;
+        if (typeof o.onEnd === 'function') { try { o.onEnd({ fired: run.fired }); } catch (e) {} }
+      }
+    }
+    run.timer = setInterval(tick, o.tick);
+    tick();
+    return plan;
+  }
+  function autopilotStop() {
+    const r = RUN; if (!r) return null;
+    RUN = null; clearInterval(r.timer);
+    return { fired: r.fired, pending: r.plan.actions.length - r.idx };
+  }
+  function autopilotStatus() {
+    const r = RUN; if (!r) return { running: false };
+    const el = r.ctx ? (r.ctx.currentTime - r.c0) * r.ts : (nowMs() - r.t0) / 1000 * r.ts;
+    let sec = null; for (const s of r.plan.sections) if (s.t <= el) sec = s.name;
+    return { running: true, t: el, progress: clamp(el / r.plan.duration, 0, 1), section: sec, fired: r.fired };
+  }
+
+  return { autopilotPlan, autopilotStart, autopilotStop, autopilotStatus, autopilotStateAt, autopilotRole: roleOf, AUTOPILOT_ARC: ARC, AUTOPILOT_ROLES: ROLES };
+}));
+
+</script>
+<script>
+/* ===== orbs extras: timeline (inlined from fx/extras-timeline.js) ===== */
+/* orbs extras: song timeline (#14)
+   chain scenes into sections [{ name, scene, bars }], validate, measure,
+   play through with a lookahead scheduler (callbacks only, no audio of its own),
+   and export the whole arrangement offline as one wav (per-section renders,
+   overlap-added so each section's reverb / delay tail rings into the next).
+   merge-safe on window.OrbsExtras (never overwrites existing keys). also CJS.
+   no deps. export reuses OrbsExtras.renderWav / encodeWav (fx/extras-io.js) when present.
+*/
+(function (root, factory) {
+  const api = factory();
+  const scope = (typeof globalThis !== 'undefined') ? globalThis
+    : (root && typeof root === 'object') ? root
+    : (typeof self !== 'undefined' ? self : this);
+  const extras = (scope.OrbsExtras && typeof scope.OrbsExtras === 'object')
+    ? scope.OrbsExtras
+    : (scope.OrbsExtras = {});
+  Object.keys(api).forEach(k => {
+    if (!Object.prototype.hasOwnProperty.call(extras, k)) extras[k] = api[k];
+  });
+  if (typeof module === 'object' && module.exports) module.exports = extras;
+}(typeof self !== 'undefined' ? self : this, function () {
+  'use strict';
+
+  const SECTION_NAMES = ['intro', 'build', 'drop', 'break', 'outro'];
+  const MAX_BARS = 512;
+  const isNum = v => typeof v === 'number' && isFinite(v);
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const G = () => (typeof globalThis !== 'undefined' ? globalThis : (typeof self !== 'undefined' ? self : {}));
+
+  /* ---------------- validation / measuring ---------------- */
+
+  function normSection(s) {
+    return {
+      name: String(s && s.name != null ? s.name : '').toLowerCase(),
+      scene: s ? s.scene : undefined,
+      bars: s ? +s.bars : NaN,
+      morph: s && isNum(+s.morph) && +s.morph >= 0 ? +s.morph : 0,
+      label: s && s.label != null ? String(s.label) : undefined
+    };
+  }
+
+  // opts: { scenes: { slot: snapshot } | [slot names], allowCustom: false, requireScene: true }
+  function timelineValidate(sections, opts) {
+    opts = opts || {};
+    const errors = [], warnings = [];
+    if (!Array.isArray(sections)) return { ok: false, errors: ['sections must be an array'], warnings, sections: [] };
+    if (!sections.length) errors.push('timeline is empty');
+    const sceneSet = opts.scenes == null ? null
+      : Array.isArray(opts.scenes) ? new Set(opts.scenes.map(String))
+      : new Set(Object.keys(opts.scenes).filter(k => opts.scenes[k]));
+    const out = sections.map((raw, i) => {
+      const s = normSection(raw);
+      const at = '#' + (i + 1) + ' ' + (s.name || '?');
+      if (!raw || typeof raw !== 'object') errors.push(at + ': not an object');
+      if (!SECTION_NAMES.includes(s.name)) {
+        if (opts.allowCustom && s.name) warnings.push(at + ': custom section name');
+        else errors.push(at + ': name must be one of ' + SECTION_NAMES.join(' / '));
+      }
+      if (!isNum(s.bars) || s.bars < 1 || Math.round(s.bars) !== s.bars) errors.push(at + ': bars must be a whole number ≥ 1');
+      else if (s.bars > MAX_BARS) errors.push(at + ': bars > ' + MAX_BARS);
+      const hasScene = s.scene != null && s.scene !== '';
+      if (!hasScene) { if (opts.requireScene !== false) errors.push(at + ': no scene'); }
+      else if (sceneSet && typeof s.scene !== 'object' && !sceneSet.has(String(s.scene))) errors.push(at + ': scene "' + s.scene + '" is not saved');
+      if (s.morph && isNum(s.bars) && s.morph > s.bars) warnings.push(at + ': morph longer than section, clamped');
+      if (s.morph && isNum(s.bars)) s.morph = Math.min(s.morph, s.bars);
+      return s;
+    });
+    for (let i = 1; i < out.length; i++) {
+      if (out[i].name === out[i - 1].name && out[i].scene === out[i - 1].scene) warnings.push('#' + (i + 1) + ': same as previous section');
+    }
+    if (out.length && out[0].name !== 'intro') warnings.push('does not start with an intro');
+    if (out.length && out[out.length - 1].name !== 'outro') warnings.push('does not end with an outro');
+    return { ok: errors.length === 0, errors, warnings, sections: out };
+  }
+
+  // -> { bars, beats, seconds, sections: [{ index, name, scene, bars, startBar, endBar, startBeat, startSec, durSec }] }
+  function timelineLength(sections, opts) {
+    opts = opts || {};
+    const bpm = isNum(+opts.bpm) && +opts.bpm > 0 ? +opts.bpm : 120;
+    const bpb = isNum(+opts.beatsPerBar) && +opts.beatsPerBar > 0 ? +opts.beatsPerBar : 4;
+    const spb = 60 / bpm;
+    let bar = 0;
+    const list = (sections || []).map((raw, i) => {
+      const s = normSection(raw);
+      const b = isNum(s.bars) && s.bars > 0 ? Math.round(s.bars) : 0;
+      const o = { index: i, name: s.name, scene: s.scene, bars: b, morph: s.morph,
+        startBar: bar, endBar: bar + b, startBeat: bar * bpb, startSec: bar * bpb * spb, durSec: b * bpb * spb };
+      bar += b;
+      return o;
+    });
+    return { bars: bar, beats: bar * bpb, seconds: bar * bpb * spb, bpm, beatsPerBar: bpb, sections: list };
+  }
+
+  // where is bar (float ok) → { index, section, barInSection, beatInBar } or null when past the end
+  function timelineAt(sections, bar, opts) {
+    const L = sections && sections.sections && isNum(sections.bars) ? sections : timelineLength(sections, opts);
+    if (!isNum(bar) || bar < 0 || bar >= L.bars) return null;
+    for (const s of L.sections) {
+      if (bar < s.endBar) {
+        const inB = bar - s.startBar;
+        return { index: s.index, section: s, barInSection: Math.floor(inB), beatInBar: (inB - Math.floor(inB)) * L.beatsPerBar };
+      }
+    }
+    return null;
+  }
+
+  /* ---------------- play-through scheduler ---------------- */
+  // events are fired in strict order: section (when a section starts) → bar, for every bar.
+  // the scheduler ticks every tickMs (25) and fires events up to `lookahead` s early,
+  // passing info.time (exact clock time of the boundary) so audio can be scheduled sample-exact.
+
+  let RUN = null;
+
+  function defaultNow(opts) {
+    if (opts.ctx && isNum(opts.ctx.currentTime)) return () => opts.ctx.currentTime;
+    const p = G().performance;
+    if (p && typeof p.now === 'function') return () => p.now() / 1000;
+    return () => Date.now() / 1000;
+  }
+
+  // opts: { bpm, beatsPerBar, onSection(section, index, info), onBar(bar, info), onEnd(info),
+  //         applyScene(scene, section, index, info), loop, startBar, now() (seconds), ctx (AudioContext),
+  //         tickMs (25), lookahead (s, 0.1), scenes (for validation), validate (true) }
+  function timelineStart(sections, opts) {
+    opts = opts || {};
+    timelineStop();
+    if (opts.validate !== false) {
+      const v = timelineValidate(sections, { scenes: opts.scenes, allowCustom: opts.allowCustom, requireScene: opts.requireScene });
+      if (!v.ok) throw new Error('timeline invalid: ' + v.errors.join('; '));
+    }
+    const L = timelineLength(sections, opts);
+    if (!L.bars) throw new Error('timeline has no bars');
+    const now = typeof opts.now === 'function' ? opts.now : defaultNow(opts);
+    const barSec = L.beatsPerBar * 60 / L.bpm;
+    const startBar = isNum(+opts.startBar) ? clamp(Math.floor(+opts.startBar), 0, L.bars - 1) : 0;
+    const t0 = (isNum(+opts.when) ? +opts.when : now()) - startBar * barSec;
+    const tickMs = isNum(+opts.tickMs) && +opts.tickMs > 0 ? +opts.tickMs : 25;
+    const look = isNum(+opts.lookahead) && +opts.lookahead >= 0 ? +opts.lookahead : 0.1;
+    const run = {
+      L, sections, opts, now, t0, barSec, tickMs, look,
+      nextBar: startBar, lastSection: -1, loops: 0, timer: null, playing: true, events: 0
+    };
+    // starting mid-section: that section still fires (and its scene still applies)
+    const call = (fn, args) => { if (typeof fn !== 'function') return; try { fn.apply(null, args); } catch (e) { (G().console || { error() {} }).error(e); } };
+    run.tick = () => {
+      if (!run.playing) return;
+      const horizon = run.now() + run.look;
+      let guard = 0;
+      while (run.playing && run.t0 + run.nextBar * run.barSec <= horizon && guard++ < 4096) {
+        const bar = run.nextBar;
+        if (bar >= run.L.bars) {
+          if (opts.loop) { run.t0 += run.L.bars * run.barSec; run.nextBar = 0; run.lastSection = -1; run.loops++; continue; }
+          run.playing = false;
+          call(opts.onEnd, [{ time: run.t0 + bar * run.barSec, bars: run.L.bars, loops: run.loops }]);
+          clear(run);
+          if (RUN === run) RUN = null;
+          return;
+        }
+        const at = timelineAt(run.L, bar);
+        const time = run.t0 + bar * run.barSec;
+        const info = { time, bar, barInSection: at.barInSection, index: at.index, section: at.section,
+          total: run.L.bars, loop: run.loops, bpm: run.L.bpm };
+        if (at.index !== run.lastSection) {
+          run.lastSection = at.index;
+          const src = normSection(run.sections[at.index]);
+          if (src.scene != null) call(opts.applyScene, [src.scene, at.section, at.index, { time, morph: src.morph, bar }]);
+          call(opts.onSection, [at.section, at.index, info]);
+          run.events++;
+        }
+        call(opts.onBar, [bar, info]);
+        run.events++;
+        run.nextBar = bar + 1;
+      }
+    };
+    run.timer = setInterval(run.tick, tickMs);
+    RUN = run;
+    run.tick();
+    return timelinePosition();
+  }
+
+  function clear(run) { if (run && run.timer) { clearInterval(run.timer); run.timer = null; } }
+
+  function timelineStop() {
+    const run = RUN;
+    if (!run) return false;
+    run.playing = false; clear(run); RUN = null;
+    if (typeof run.opts.onStop === 'function') { try { run.opts.onStop(); } catch (e) {} }
+    return true;
+  }
+
+  // live position from the clock (not from the lookahead cursor)
+  function timelinePosition() {
+    const run = RUN;
+    if (!run) return { playing: false, bar: 0, beat: 0, index: -1, section: null, barInSection: 0, elapsed: 0, total: 0, progress: 0 };
+    const t = run.now() - run.t0;
+    const barF = clamp(t / run.barSec, 0, run.L.bars - 1e-9);
+    const at = timelineAt(run.L, barF);
+    return {
+      playing: run.playing,
+      bar: Math.floor(barF), beat: at ? at.beatInBar : 0, barFloat: barF,
+      index: at ? at.index : -1, section: at ? at.section : null, barInSection: at ? at.barInSection : 0,
+      elapsed: Math.max(0, t), total: run.L.seconds, progress: run.L.seconds ? clamp(t / run.L.seconds, 0, 1) : 0,
+      loop: run.loops
+    };
+  }
+
+  /* ---------------- offline export ---------------- */
+  // opts: { bpm, beatsPerBar, sampleRate (44100), channels (2), bitDepth (16), tail (s, 2),
+  //         renderSection(ctx, dest, section, index, { beats, bars, bpm, seconds }) — draws that section's audio from t = 0,
+  //         applyScene(scene, section, index) — called before each section's render (app: applyDiscrete(SCENES[slot])),
+  //         restore() — called once at the end (app: applyDiscrete(snapshot taken before)),
+  //         renderWav (default OrbsExtras.renderWav), encodeWav (default OrbsExtras.encodeWav),
+  //         onProgress(done, total), scenes (validation) }
+  // -> { wav: Blob, bytes: ArrayBuffer, buffer: { sampleRate, length, numberOfChannels, duration, getChannelData }, sections: [{ index, name, startFrame, frames }], seconds }
+  async function timelineExport(sections, opts) {
+    opts = opts || {};
+    const X = G().OrbsExtras || {};
+    const v = timelineValidate(sections, { scenes: opts.scenes, allowCustom: opts.allowCustom, requireScene: opts.requireScene });
+    if (!v.ok) throw new Error('timeline invalid: ' + v.errors.join('; '));
+    const render = opts.renderWav || X.renderWav;
+    const encode = opts.encodeWav || X.encodeWav || encodeWav16;
+    if (typeof render !== 'function') throw new Error('timelineExport needs renderWav (load fx/extras-io.js) or opts.renderWav');
+    if (typeof opts.renderSection !== 'function') throw new Error('timelineExport needs opts.renderSection');
+    const L = timelineLength(sections, opts);
+    const sr = isNum(+opts.sampleRate) && +opts.sampleRate > 0 ? (+opts.sampleRate | 0) : 44100;
+    const nCh = isNum(+opts.channels) && +opts.channels > 0 ? (+opts.channels | 0) : 2;
+    const tail = isNum(+opts.tail) && +opts.tail >= 0 ? +opts.tail : 2;
+    const total = Math.max(1, Math.round((L.seconds + tail) * sr));
+    const planes = []; for (let c = 0; c < nCh; c++) planes.push(new Float32Array(total));
+    const placed = [];
+    try {
+      for (const s of L.sections) {
+        const src = normSection(sections[s.index]);
+        if (typeof opts.applyScene === 'function' && src.scene != null) await opts.applyScene(src.scene, s, s.index);
+        const startFrame = Math.round(s.startSec * sr);
+        const r = await render({
+          duration: s.durSec + tail, sampleRate: sr, channels: nCh,
+          render: (ctx, dest) => opts.renderSection(ctx, dest, s, s.index, { beats: s.bars * L.beatsPerBar, bars: s.bars, bpm: L.bpm, seconds: s.durSec })
+        });
+        const b = r && r.buffer ? r.buffer : r;
+        const bCh = b.numberOfChannels || 1;
+        for (let c = 0; c < nCh; c++) {
+          const d = b.getChannelData(Math.min(c, bCh - 1)), o = planes[c];
+          const n = Math.min(d.length, total - startFrame);
+          for (let i = 0; i < n; i++) o[startFrame + i] += d[i];
+        }
+        placed.push({ index: s.index, name: s.name, scene: src.scene, startFrame, frames: Math.round(s.durSec * sr) });
+        if (typeof opts.onProgress === 'function') { try { opts.onProgress(placed.length, L.sections.length); } catch (e) {} }
+      }
+    } finally {
+      if (typeof opts.restore === 'function') { try { await opts.restore(); } catch (e) {} }
+    }
+    // overlap-add can exceed 0 dBFS at boundaries: soft-limit only the samples that do
+    if (opts.limit !== false) for (const p of planes) for (let i = 0; i < p.length; i++) { const x = p[i]; if (x > 0.98 || x < -0.98) p[i] = Math.tanh(x); }
+    const buffer = {
+      sampleRate: sr, length: total, numberOfChannels: nCh, duration: total / sr,
+      getChannelData: c => planes[c]
+    };
+    const bytes = encode(buffer, { bitDepth: opts.bitDepth || 16 });
+    const wav = typeof Blob !== 'undefined' ? new Blob([bytes], { type: 'audio/wav' }) : bytes;
+    return { wav, bytes, buffer, sections: placed, seconds: total / sr, bars: L.bars };
+  }
+
+  // fallback 16-bit pcm encoder (used only if extras-io is not loaded)
+  function encodeWav16(buf) {
+    const nCh = buf.numberOfChannels, n = buf.length, sr = buf.sampleRate, size = n * nCh * 2;
+    const ab = new ArrayBuffer(44 + size), v = new DataView(ab);
+    const w = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+    w(0, 'RIFF'); v.setUint32(4, 36 + size, true); w(8, 'WAVE'); w(12, 'fmt '); v.setUint32(16, 16, true);
+    v.setUint16(20, 1, true); v.setUint16(22, nCh, true); v.setUint32(24, sr, true); v.setUint32(28, sr * nCh * 2, true);
+    v.setUint16(32, nCh * 2, true); v.setUint16(34, 16, true); w(36, 'data'); v.setUint32(40, size, true);
+    const P = []; for (let c = 0; c < nCh; c++) P.push(buf.getChannelData(c));
+    let o = 44;
+    for (let i = 0; i < n; i++) for (let c = 0; c < nCh; c++) { v.setInt16(o, Math.round(clamp(P[c][i], -1, 1) * 32767), true); o += 2; }
+    return ab;
+  }
+
+  // a ready-made 5-part arc from saved scene slots (app has intro / drop / break)
+  function timelineTemplate(slots, opts) {
+    opts = opts || {};
+    const has = n => Array.isArray(slots) ? slots.includes(n) : !!(slots && slots[n]);
+    const pick = (...c) => c.find(has) || (Array.isArray(slots) ? slots[0] : Object.keys(slots || {})[0]);
+    const k = isNum(+opts.scale) && +opts.scale > 0 ? +opts.scale : 1;
+    const B = n => Math.max(1, Math.round(n * k));
+    return [
+      { name: 'intro', scene: pick('intro', 'break'), bars: B(8) },
+      { name: 'build', scene: pick('build', 'intro'), bars: B(8), morph: B(4) },
+      { name: 'drop', scene: pick('drop'), bars: B(16) },
+      { name: 'break', scene: pick('break', 'intro'), bars: B(8), morph: B(2) },
+      { name: 'drop', scene: pick('drop'), bars: B(16) },
+      { name: 'outro', scene: pick('outro', 'intro', 'break'), bars: B(8), morph: B(4) }
+    ];
+  }
+
+  return {
+    TIMELINE_SECTIONS: SECTION_NAMES,
+    timelineValidate: timelineValidate,
+    timelineLength: timelineLength,
+    timelineAt: timelineAt,
+    timelineStart: timelineStart,
+    timelineStop: timelineStop,
+    timelinePosition: timelinePosition,
+    timelineExport: timelineExport,
+    timelineTemplate: timelineTemplate
+  };
+}));
+
+</script>
+<script>
+/* ===== orbs extras: duo (inlined from fx/extras-duo.js) ===== */
+/* orbs extras: duo (#17) — a second phone plays half the planets live.
+   serverless: WebRTC RTCPeerConnection + one data channel. signaling is a manual
+   copy-paste (or QR / link) exchange of two codes: host offer → guest answer.
+   non-trickle ICE (wait for gathering complete), sdp deflate-raw compressed + base64url.
+   public STUN only (stun:stun.l.google.com:19302). no own server, no deps.
+   host is the authority: it owns planet assignment + state; a guest may only
+   control its assigned planets (enforced on the host, pre-checked on the guest).
+   includes a tiny self-contained QR encoder (byte mode, versions 1–40, ecc L/M/Q/H).
+   merge-safe on window.OrbsExtras (never overwrites existing keys). also CJS.
+*/
+(function (root, factory) {
+  const api = factory();
+  const scope = (typeof globalThis !== 'undefined') ? globalThis
+    : (root && typeof root === 'object') ? root
+    : (typeof self !== 'undefined' ? self : this);
+  const extras = (scope.OrbsExtras && typeof scope.OrbsExtras === 'object')
+    ? scope.OrbsExtras
+    : (scope.OrbsExtras = {});
+  Object.keys(api).forEach(k => {
+    if (!Object.prototype.hasOwnProperty.call(extras, k)) extras[k] = api[k];
+  });
+  if (typeof module === 'object' && module.exports) module.exports = extras;
+}(typeof self !== 'undefined' ? self : this, function () {
+  'use strict';
+
+  const PROTO = 1;
+  const CODE_PREFIX = 'orbs1';
+  const DEFAULT_ICE = [{ urls: 'stun:stun.l.google.com:19302' }];
+  const MAX_MSG = 64 * 1024;
+  const TYPES = ['hello', 'assign', 'mute', 'vol', 'fx', 'trigger', 'sync', 'ping', 'pong', 'deny', 'bye'];
+  const CONTROL = ['mute', 'vol', 'fx', 'trigger'];        // planet-scoped, authority-checked
+  const HOST_ONLY = ['assign'];                             // and sync full / delta
+  const FX_PARAMS = ['cut', 'pn', 'verb', 'echo', 'prob', 'drift', 'res', 'drive', 'send', 'pitch'];
+  const isNum = v => typeof v === 'number' && isFinite(v);
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const G = () => (typeof globalThis !== 'undefined' ? globalThis : (typeof self !== 'undefined' ? self : {}));
+  const nowMs = () => { const p = G().performance; return p && p.now ? p.now() : Date.now(); };
+
+  /* ---------------- codes: sdp ⇄ short text ---------------- */
+
+  function b64urlEncode(bytes) {
+    let s = '';
+    for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    const b = typeof btoa === 'function' ? btoa(s) : Buffer.from(s, 'binary').toString('base64');
+    return b.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+  function b64urlDecode(str) {
+    let b = str.replace(/-/g, '+').replace(/_/g, '/');
+    while (b.length % 4) b += '=';
+    const s = typeof atob === 'function' ? atob(b) : Buffer.from(b, 'base64').toString('binary');
+    const out = new Uint8Array(s.length);
+    for (let i = 0; i < s.length; i++) out[i] = s.charCodeAt(i);
+    return out;
+  }
+  async function pipeBytes(bytes, stream) {
+    const res = new Response(new Blob([bytes]).stream().pipeThrough(stream));
+    return new Uint8Array(await res.arrayBuffer());
+  }
+  const canZip = () => typeof CompressionStream !== 'undefined' && typeof DecompressionStream !== 'undefined' && typeof Response !== 'undefined';
+
+  // kind: 'o' (offer) | 'a' (answer). format: orbs1<kind>z.<b64url deflate-raw> or orbs1<kind>p.<b64url plain>
+  async function encodeCode(kind, sdp, opts) {
+    const raw = new TextEncoder().encode(String(sdp));
+    if (canZip() && !(opts && opts.plain)) return CODE_PREFIX + kind + 'z.' + b64urlEncode(await pipeBytes(raw, new CompressionStream('deflate-raw')));
+    return CODE_PREFIX + kind + 'p.' + b64urlEncode(raw);
+  }
+  // accepts a bare code, a code with whitespace / line breaks, or a link with #duo=<code>
+  async function decodeCode(text) {
+    let s = String(text == null ? '' : text).trim();
+    const m = s.match(/[#?&]duo=([A-Za-z0-9._\-\s]+)/);
+    if (m) s = m[1];
+    s = s.replace(/\s+/g, '');
+    const h = s.match(/^orbs(\d+)([oa])([zp])\.([A-Za-z0-9_\-]+)$/);
+    if (!h) throw new Error('not an orbs duo code');
+    if (+h[1] !== PROTO) throw new Error('duo code version ' + h[1] + ' (this build speaks ' + PROTO + ')');
+    let bytes = b64urlDecode(h[4]);
+    if (h[3] === 'z') {
+      if (!canZip()) throw new Error('this browser cannot read compressed codes');
+      bytes = await pipeBytes(bytes, new DecompressionStream('deflate-raw'));
+    }
+    const sdp = new TextDecoder().decode(bytes);
+    if (!/^v=0/.test(sdp)) throw new Error('code does not hold an sdp');
+    return { kind: h[2] === 'o' ? 'offer' : 'answer', sdp };
+  }
+  function duoLink(code, base) {
+    const b = base || (G().location ? String(G().location.href).split('#')[0] : '');
+    return b + '#duo=' + code;
+  }
+  function duoCodeFromUrl(url) {
+    const m = String(url || (G().location ? G().location.href : '')).match(/#.*duo=([A-Za-z0-9._\-]+)/);
+    return m ? m[1] : null;
+  }
+
+  /* ---------------- planet split ---------------- */
+  // mode 'halves' (default): first half host, second half guest — with the app's order
+  // (kick hats snare perc | bass lead chords pad) that is drums vs. melody. 'alternate': every other.
+  function duoSplit(ids, opts) {
+    const list = (ids || []).map(String);
+    const mode = (opts && opts.mode) || 'halves';
+    const guestFirst = !!(opts && opts.guestFirst);
+    let a = [], b = [];
+    if (mode === 'alternate') list.forEach((id, i) => (i % 2 ? b : a).push(id));
+    else { const h = Math.ceil(list.length / 2); a = list.slice(0, h); b = list.slice(h); }
+    return guestFirst ? { host: b, guest: a } : { host: a, guest: b };
+  }
+
+  /* ---------------- message protocol ---------------- */
+  // envelope { v: 1, t, seq, ts, from: 'host' | 'guest', ...fields }
+  function duoValidate(m) {
+    if (!m || typeof m !== 'object' || Array.isArray(m)) return { ok: false, error: 'not an object' };
+    if (m.v !== PROTO) return { ok: false, error: 'protocol v' + m.v };
+    if (!TYPES.includes(m.t)) return { ok: false, error: 'unknown type ' + m.t };
+    const planet = () => typeof m.planet === 'string' && m.planet.length > 0 && m.planet.length < 64;
+    switch (m.t) {
+      case 'hello': return typeof m.role === 'string' ? { ok: true } : { ok: false, error: 'hello needs role' };
+      case 'assign': return Array.isArray(m.host) && Array.isArray(m.guest) && !m.host.some(x => m.guest.includes(x)) ? { ok: true } : { ok: false, error: 'assign needs disjoint host / guest lists' };
+      case 'mute': return planet() && typeof m.muted === 'boolean' ? { ok: true } : { ok: false, error: 'mute needs planet + muted' };
+      case 'vol': return planet() && isNum(m.value) && m.value >= 0 && m.value <= 1 ? { ok: true } : { ok: false, error: 'vol needs planet + value 0..1' };
+      case 'fx': return planet() && FX_PARAMS.includes(m.param) && isNum(m.value) ? { ok: true } : { ok: false, error: 'fx needs planet + known param + value' };
+      case 'trigger': return planet() && (m.vel == null || (isNum(m.vel) && m.vel >= 0 && m.vel <= 1)) && (m.note == null || (isNum(m.note) && m.note >= 0 && m.note <= 127)) ? { ok: true } : { ok: false, error: 'trigger needs planet (+ vel 0..1, note 0..127)' };
+      case 'sync':
+        if (m.mode === 'full') return m.state && typeof m.state === 'object' && isNum(m.rev) ? { ok: true } : { ok: false, error: 'full sync needs state + rev' };
+        if (m.mode === 'delta') return m.delta && typeof m.delta === 'object' && isNum(m.rev) && isNum(m.base) ? { ok: true } : { ok: false, error: 'delta sync needs delta + rev + base' };
+        if (m.mode === 'request') return { ok: true };
+        return { ok: false, error: 'sync mode full / delta / request' };
+      case 'ping': case 'pong': return isNum(m.n) ? { ok: true } : { ok: false, error: m.t + ' needs n' };
+      case 'deny': return { ok: true };
+      case 'bye': return { ok: true };
+    }
+    return { ok: false, error: '?' };
+  }
+
+  // deep merge for state deltas; null deletes a key
+  function merge(dst, src) {
+    for (const k in src) {
+      const v = src[k];
+      if (v === null) delete dst[k];
+      else if (v && typeof v === 'object' && !Array.isArray(v)) { if (!dst[k] || typeof dst[k] !== 'object' || Array.isArray(dst[k])) dst[k] = {}; merge(dst[k], v); }
+      else dst[k] = Array.isArray(v) ? v.slice() : v;
+    }
+    return dst;
+  }
+  const clone = o => JSON.parse(JSON.stringify(o));
+
+  /* ---------------- session ---------------- */
+
+  function duoCreate(cfg) {
+    cfg = cfg || {};
+    const S = {
+      role: null, state: 'idle', pc: null, dc: null, seq: 0,
+      assign: { host: [], guest: [] }, snap: {}, rev: 0, rtt: null, peerName: null,
+      msgL: [], stateL: [], pingT: null, pings: {}, bucket: { t: 0, n: 0 }, stats: { sent: 0, recv: 0, denied: 0, dropped: 0 }
+    };
+    const iceServers = () => (cfg.iceServers !== undefined ? cfg.iceServers : DEFAULT_ICE);
+    const emitState = (st, extra) => {
+      S.state = st;
+      const info = Object.assign({ state: st, role: S.role, rtt: S.rtt }, extra || {});
+      S.stateL.slice().forEach(fn => { try { fn(info); } catch (e) {} });
+    };
+    const emitMsg = (m, meta) => S.msgL.slice().forEach(fn => { try { fn(m, meta); } catch (e) {} });
+
+    function Peer() {
+      const PC = cfg.RTCPeerConnection || G().RTCPeerConnection || G().webkitRTCPeerConnection;
+      if (!PC) throw new Error('WebRTC is not available in this browser');
+      const pc = new PC({ iceServers: iceServers() });
+      pc.addEventListener('connectionstatechange', () => {
+        const c = pc.connectionState;
+        if (c === 'failed') emitState('failed', { reason: 'ice' });
+        else if (c === 'disconnected') emitState('disconnected');
+        else if (c === 'closed' && S.state !== 'closed') emitState('closed');
+      });
+      return pc;
+    }
+    function gather(pc) {
+      const ms = isNum(cfg.gatherMs) ? cfg.gatherMs : 4000;
+      return new Promise(res => {
+        if (pc.iceGatheringState === 'complete') return res();
+        const done = () => { pc.removeEventListener('icegatheringstatechange', chk); clearTimeout(to); res(); };
+        const chk = () => { if (pc.iceGatheringState === 'complete') done(); };
+        pc.addEventListener('icegatheringstatechange', chk);
+        const to = setTimeout(done, ms); // stun unreachable: send what we have (host candidates)
+      });
+    }
+    function wire(dc) {
+      S.dc = dc;
+      dc.addEventListener('open', () => {
+        emitState('open');
+        send({ t: 'hello', role: S.role, name: cfg.name || S.role, app: 'orbs', proto: PROTO }, true);
+        const pm = isNum(cfg.pingMs) ? cfg.pingMs : 2000;
+        if (pm > 0) S.pingT = setInterval(() => { duoPingS().catch(() => {}); }, pm);
+      });
+      dc.addEventListener('close', () => { stopPing(); if (S.state !== 'closed') emitState('closed'); });
+      dc.addEventListener('message', ev => receive(ev.data));
+    }
+    function stopPing() { if (S.pingT) { clearInterval(S.pingT); S.pingT = null; } }
+
+    async function host(opts) {
+      close(true);
+      S.role = 'host'; emitState('offering');
+      const pc = S.pc = Peer();
+      wire(pc.createDataChannel('orbs-duo', { ordered: true }));
+      await pc.setLocalDescription(await pc.createOffer());
+      await gather(pc);
+      const code = await encodeCode('o', pc.localDescription.sdp, opts);
+      emitState('waiting-answer', { code });
+      return code;
+    }
+    async function join(code, opts) {
+      const d = await decodeCode(code);
+      if (d.kind !== 'offer') throw new Error('that is an answer code — paste the host\'s offer');
+      close(true);
+      S.role = 'guest'; emitState('joining');
+      const pc = S.pc = Peer();
+      pc.addEventListener('datachannel', ev => wire(ev.channel));
+      await pc.setRemoteDescription({ type: 'offer', sdp: d.sdp });
+      await pc.setLocalDescription(await pc.createAnswer());
+      await gather(pc);
+      const ans = await encodeCode('a', pc.localDescription.sdp, opts);
+      emitState('connecting', { code: ans });
+      return ans;
+    }
+    async function accept(code) {
+      if (S.role !== 'host' || !S.pc) throw new Error('call duoHost() first');
+      const d = await decodeCode(code);
+      if (d.kind !== 'answer') throw new Error('that is an offer code — paste the guest\'s answer');
+      emitState('connecting');
+      await S.pc.setRemoteDescription({ type: 'answer', sdp: d.sdp });
+      return true;
+    }
+
+    function rawSend(m) {
+      if (!S.dc || S.dc.readyState !== 'open') return false;
+      const s = JSON.stringify(m);
+      if (s.length > MAX_MSG) return false;
+      S.dc.send(s); S.stats.sent++;
+      return true;
+    }
+    // public send. returns false when closed, invalid, or (guest) not your planet.
+    // opts.unchecked skips the guest-side pre-check (the host still enforces).
+    function send(msg, internal, opts) {
+      const m = Object.assign({}, msg, { v: PROTO, seq: ++S.seq, ts: Date.now(), from: S.role });
+      if (!duoValidate(m).ok) return false;
+      if (!internal && !(opts && opts.unchecked)) {
+        if (S.role === 'guest' && (HOST_ONLY.includes(m.t) || (m.t === 'sync' && m.mode !== 'request'))) return false;
+        if (S.role === 'guest' && CONTROL.includes(m.t) && !S.assign.guest.includes(m.planet)) return false;
+      }
+      if (S.role === 'host' && CONTROL.includes(m.t)) applyControl(m); // host's own moves land in its mirror too
+      return rawSend(m);
+    }
+
+    function applyControl(m) {
+      const p = (S.snap.planets = S.snap.planets || {});
+      const e = (p[m.planet] = p[m.planet] || {});
+      let d = null;
+      if (m.t === 'mute') { e.muted = m.muted; d = { muted: m.muted }; }
+      else if (m.t === 'vol') { e.vol = m.value; d = { vol: m.value }; }
+      else if (m.t === 'fx') { e[m.param] = m.value; d = { [m.param]: m.value }; }
+      return d;
+    }
+    function rate() {
+      const t = nowMs(), lim = isNum(cfg.maxPerSec) ? cfg.maxPerSec : 240;
+      if (t - S.bucket.t > 1000) { S.bucket.t = t; S.bucket.n = 0; }
+      return ++S.bucket.n <= lim;
+    }
+
+    function receive(data) {
+      let m;
+      try { m = JSON.parse(typeof data === 'string' ? data : new TextDecoder().decode(data)); } catch (e) { S.stats.dropped++; return; }
+      const v = duoValidate(m);
+      if (!v.ok) { S.stats.dropped++; if (S.role === 'host') rawSend({ v: PROTO, t: 'deny', seq: ++S.seq, ts: Date.now(), from: 'host', ref: m && m.seq, reason: v.error }); return; }
+      S.stats.recv++;
+      const meta = { from: m.from, role: S.role, accepted: true };
+      if (m.t === 'ping') { rawSend({ v: PROTO, t: 'pong', seq: ++S.seq, ts: Date.now(), from: S.role, n: m.n, echo: m.ts }); return emitMsg(m, meta); }
+      if (m.t === 'pong') { const p = S.pings[m.n]; if (p) { delete S.pings[m.n]; S.rtt = nowMs() - p.t; p.res(S.rtt); } return emitMsg(m, meta); }
+      if (m.t === 'hello') { S.peerName = m.name || null; if (S.role === 'host') greet(); return emitMsg(m, meta); }
+      if (m.t === 'bye') { emitMsg(m, meta); return close(true); }
+
+      if (S.role === 'host') {
+        // authority: guests may only move their own planets, never assign or push state
+        const deny = reason => { S.stats.denied++; rawSend({ v: PROTO, t: 'deny', seq: ++S.seq, ts: Date.now(), from: 'host', ref: m.seq, reason, planet: m.planet }); emitMsg(m, Object.assign(meta, { accepted: false, reason })); };
+        if (HOST_ONLY.includes(m.t) || (m.t === 'sync' && m.mode !== 'request')) return deny('host only');
+        if (m.t === 'sync' && m.mode === 'request') { sendFull(); return emitMsg(m, meta); }
+        if (CONTROL.includes(m.t)) {
+          if (!S.assign.guest.includes(m.planet)) return deny('not your planet');
+          if (!rate()) return deny('rate');
+          const d = applyControl(m);
+          emitMsg(m, meta);
+          if (d && cfg.autoSync !== false) sendDelta({ planets: { [m.planet]: d } }); // confirm to the guest
+          return;
+        }
+        return emitMsg(m, meta);
+      }
+      // guest side: trust the host
+      if (m.t === 'assign') { S.assign = { host: m.host.slice(), guest: m.guest.slice() }; emitMsg(m, meta); return emitState(S.state, { assign: S.assign }); }
+      if (m.t === 'sync') {
+        if (m.mode === 'full') { S.snap = clone(m.state); S.rev = m.rev; return emitMsg(m, meta); }
+        if (m.mode === 'delta') {
+          if (m.base !== S.rev) { rawSend({ v: PROTO, t: 'sync', mode: 'request', seq: ++S.seq, ts: Date.now(), from: 'guest', have: S.rev }); return emitMsg(m, Object.assign(meta, { accepted: false, reason: 'gap' })); }
+          merge(S.snap, m.delta); S.rev = m.rev; return emitMsg(m, meta);
+        }
+      }
+      if (m.t === 'deny') { S.stats.denied++; }
+      if (CONTROL.includes(m.t)) applyControl(m);
+      emitMsg(m, meta);
+    }
+    function greet() {
+      if (S.assign.host.length || S.assign.guest.length) rawSend({ v: PROTO, t: 'assign', seq: ++S.seq, ts: Date.now(), from: 'host', host: S.assign.host, guest: S.assign.guest });
+      sendFull();
+    }
+    function sendFull() { return rawSend({ v: PROTO, t: 'sync', mode: 'full', seq: ++S.seq, ts: Date.now(), from: 'host', rev: S.rev, state: S.snap }); }
+    function sendDelta(delta) { const base = S.rev; merge(S.snap, delta); S.rev++; return rawSend({ v: PROTO, t: 'sync', mode: 'delta', seq: ++S.seq, ts: Date.now(), from: 'host', rev: S.rev, base, delta }); }
+
+    // host: assign planets. ids array → split half/half (opts.mode), or { host, guest } explicit
+    function assign(ids, opts) {
+      if (S.role && S.role !== 'host') return null;
+      const a = Array.isArray(ids) ? duoSplit(ids, opts) : { host: (ids.host || []).slice(), guest: (ids.guest || []).slice() };
+      S.assign = a;
+      rawSend({ v: PROTO, t: 'assign', seq: ++S.seq, ts: Date.now(), from: 'host', host: a.host, guest: a.guest });
+      return a;
+    }
+    // host: state sync. full snapshot (replaces) or delta (merged, null deletes)
+    function sync(stateOrDelta, opts) {
+      if (S.role === 'guest') return false;
+      if (opts && opts.delta) return sendDelta(clone(stateOrDelta));
+      S.snap = clone(stateOrDelta || {}); S.rev++;
+      return sendFull();
+    }
+    function duoPingS(timeoutMs) {
+      return new Promise((res, rej) => {
+        const n = ++S.seq;
+        S.pings[n] = { t: nowMs(), res };
+        if (!rawSend({ v: PROTO, t: 'ping', seq: n, ts: Date.now(), from: S.role, n })) { delete S.pings[n]; return rej(new Error('not connected')); }
+        setTimeout(() => { if (S.pings[n]) { delete S.pings[n]; rej(new Error('ping timeout')); } }, timeoutMs || 3000);
+      });
+    }
+    function close(silent) {
+      stopPing();
+      if (S.dc && S.dc.readyState === 'open' && !silent) { try { rawSend({ v: PROTO, t: 'bye', seq: ++S.seq, ts: Date.now(), from: S.role }); } catch (e) {} }
+      try { S.dc && S.dc.close(); } catch (e) {}
+      try { S.pc && S.pc.close(); } catch (e) {}
+      const had = !!S.pc;
+      S.dc = null; S.pc = null;
+      if (had) emitState('closed');
+      return had;
+    }
+    const on = (L, fn) => { if (typeof fn !== 'function') return () => {}; L.push(fn); return () => { const i = L.indexOf(fn); if (i >= 0) L.splice(i, 1); }; };
+
+    return {
+      host, join, accept,
+      send: (msg, opts) => send(msg, false, opts),
+      onMessage: fn => on(S.msgL, fn),
+      onState: fn => on(S.stateL, fn),
+      close: () => close(false),
+      assign, sync, ping: duoPingS,
+      mine: () => (S.role === 'guest' ? S.assign.guest.slice() : S.assign.host.slice()),
+      canControl: id => (S.role === 'guest' ? S.assign.guest.includes(id) : true),
+      info: () => ({ role: S.role, state: S.state, rtt: S.rtt, assign: clone(S.assign), rev: S.rev, snapshot: clone(S.snap), peer: S.peerName, stats: Object.assign({}, S.stats),
+        channel: S.dc ? S.dc.readyState : null, ice: S.pc ? S.pc.iceConnectionState : null })
+    };
+  }
+
+  /* ---------------- tiny QR encoder (byte mode) ---------------- */
+  // port of the reference algorithm (iso 18004): rs ecc, interleave, masks 0–7 by penalty.
+  const ECC_PER_BLOCK = [
+    [-1, 7, 10, 15, 20, 26, 18, 20, 24, 30, 18, 20, 24, 26, 30, 22, 24, 28, 30, 28, 28, 28, 28, 30, 30, 26, 28, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30],
+    [-1, 10, 16, 26, 18, 24, 16, 18, 22, 22, 26, 30, 22, 22, 24, 24, 28, 28, 26, 26, 26, 26, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28],
+    [-1, 13, 22, 18, 26, 18, 24, 18, 22, 20, 24, 28, 26, 24, 20, 30, 24, 28, 28, 26, 30, 28, 30, 30, 30, 30, 28, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30],
+    [-1, 17, 28, 22, 16, 22, 28, 26, 26, 24, 28, 24, 28, 22, 24, 24, 30, 28, 28, 26, 28, 30, 24, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30]
+  ];
+  const NUM_BLOCKS = [
+    [-1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 4, 4, 4, 4, 4, 6, 6, 6, 6, 7, 8, 8, 9, 9, 10, 12, 12, 12, 13, 14, 15, 16, 17, 18, 19, 19, 20, 21, 22, 24, 25],
+    [-1, 1, 1, 1, 2, 2, 4, 4, 4, 5, 5, 5, 8, 9, 9, 10, 10, 11, 13, 14, 16, 17, 17, 18, 20, 21, 23, 25, 26, 28, 29, 31, 33, 35, 37, 38, 40, 43, 45, 47, 49],
+    [-1, 1, 1, 2, 2, 4, 4, 6, 6, 8, 8, 8, 10, 12, 16, 12, 17, 16, 18, 21, 20, 23, 23, 25, 27, 29, 34, 34, 35, 38, 40, 43, 45, 48, 51, 53, 56, 59, 62, 65, 68],
+    [-1, 1, 1, 2, 4, 4, 4, 5, 6, 8, 8, 11, 11, 16, 16, 18, 16, 19, 21, 25, 25, 25, 34, 30, 32, 35, 37, 40, 42, 45, 48, 51, 54, 57, 60, 63, 66, 70, 74, 77, 81]
+  ];
+  const ECL = { L: [0, 1], M: [1, 0], Q: [2, 3], H: [3, 2] }; // [table index, format bits]
+
+  function rawModules(ver) {
+    let r = (16 * ver + 128) * ver + 64;
+    if (ver >= 2) { const na = Math.floor(ver / 7) + 2; r -= (25 * na - 10) * na - 55; if (ver >= 7) r -= 36; }
+    return r;
+  }
+  const dataCodewords = (ver, e) => Math.floor(rawModules(ver) / 8) - ECC_PER_BLOCK[e][ver] * NUM_BLOCKS[e][ver];
+  function gfMul(x, y) { let z = 0; for (let i = 7; i >= 0; i--) { z = (z << 1) ^ ((z >>> 7) * 0x11d); z ^= ((y >>> i) & 1) * x; } return z & 0xff; }
+  function rsDivisor(deg) {
+    const r = new Array(deg).fill(0); r[deg - 1] = 1; let root = 1;
+    for (let i = 0; i < deg; i++) { for (let j = 0; j < r.length; j++) { r[j] = gfMul(r[j], root); if (j + 1 < r.length) r[j] ^= r[j + 1]; } root = gfMul(root, 2); }
+    return r;
+  }
+  function rsRemainder(data, div) {
+    const r = new Array(div.length).fill(0);
+    for (const b of data) { const f = b ^ r.shift(); r.push(0); div.forEach((c, i) => { r[i] ^= gfMul(c, f); }); }
+    return r;
+  }
+  function alignPos(ver, size) {
+    if (ver === 1) return [];
+    const na = Math.floor(ver / 7) + 2, step = Math.floor((ver * 8 + na * 3 + 5) / (na * 4 - 4)) * 2;
+    const r = [6]; for (let p = size - 7; r.length < na; p -= step) r.splice(1, 0, p);
+    return r;
+  }
+
+  // -> { version, size, ecl, mask, modules: boolean[size][size] (row-major, true = dark) }
+  function duoQr(text, opts) {
+    opts = opts || {};
+    const eclName = ECL[opts.ecl] ? opts.ecl : 'L';
+    let e = ECL[eclName][0];
+    const bytes = typeof text === 'string' ? new TextEncoder().encode(text) : Uint8Array.from(text);
+    let ver = 0;
+    for (let v = opts.minVersion || 1; v <= 40; v++) { const cc = v <= 9 ? 8 : 16; if (4 + cc + bytes.length * 8 <= dataCodewords(v, e) * 8) { ver = v; break; } }
+    if (!ver) throw new Error('too long for a qr code (' + bytes.length + ' bytes)');
+    if (opts.boost !== false) { const cc = ver <= 9 ? 8 : 16; for (const n of ['M', 'Q', 'H']) { const ee = ECL[n][0]; if (ee > e && 4 + cc + bytes.length * 8 <= dataCodewords(ver, ee) * 8) e = ee; } } // more ecc for free when it fits the same version
+    const fmtBits = [1, 0, 3, 2][e];
+    // bits
+    const bits = [];
+    const put = (val, len) => { for (let i = len - 1; i >= 0; i--) bits.push((val >>> i) & 1); };
+    put(4, 4); put(bytes.length, ver <= 9 ? 8 : 16); bytes.forEach(b => put(b, 8));
+    const cap = dataCodewords(ver, e) * 8;
+    put(0, Math.min(4, cap - bits.length));
+    put(0, (8 - bits.length % 8) % 8);
+    for (let pad = 0xec; bits.length < cap; pad ^= 0xec ^ 0x11) put(pad, 8);
+    const data = []; for (let i = 0; i < bits.length; i += 8) { let b = 0; for (let j = 0; j < 8; j++) b = (b << 1) | bits[i + j]; data.push(b); }
+    // ecc + interleave
+    const nb = NUM_BLOCKS[e][ver], el = ECC_PER_BLOCK[e][ver], raw = Math.floor(rawModules(ver) / 8);
+    const nShort = nb - raw % nb, shortLen = Math.floor(raw / nb), div = rsDivisor(el), blocks = [];
+    for (let i = 0, k = 0; i < nb; i++) {
+      const dat = data.slice(k, k + shortLen - el + (i < nShort ? 0 : 1)); k += dat.length;
+      const ecc = rsRemainder(dat, div); if (i < nShort) dat.push(0);
+      blocks.push(dat.concat(ecc));
+    }
+    const cw = [];
+    for (let i = 0; i < blocks[0].length; i++) blocks.forEach((b, j) => { if (i !== shortLen - el || j >= nShort) cw.push(b[i]); });
+    // matrix
+    const size = ver * 4 + 17;
+    const M = [], F = [];
+    for (let y = 0; y < size; y++) { M.push(new Array(size).fill(false)); F.push(new Array(size).fill(false)); }
+    const setF = (x, y, d) => { M[y][x] = d; F[y][x] = true; };
+    for (let i = 0; i < size; i++) { setF(6, i, i % 2 === 0); setF(i, 6, i % 2 === 0); }
+    const finder = (x, y) => { for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) { const d = Math.max(Math.abs(dx), Math.abs(dy)), xx = x + dx, yy = y + dy; if (xx >= 0 && xx < size && yy >= 0 && yy < size) setF(xx, yy, d !== 2 && d !== 4); } };
+    finder(3, 3); finder(size - 4, 3); finder(3, size - 4);
+    const ap = alignPos(ver, size), na = ap.length;
+    for (let i = 0; i < na; i++) for (let j = 0; j < na; j++) {
+      if ((i === 0 && j === 0) || (i === 0 && j === na - 1) || (i === na - 1 && j === 0)) continue;
+      for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) setF(ap[i] + dx, ap[j] + dy, Math.max(Math.abs(dx), Math.abs(dy)) !== 1);
+    }
+    const drawFormat = mask => {
+      const d = (fmtBits << 3) | mask; let r = d; for (let i = 0; i < 10; i++) r = (r << 1) ^ ((r >>> 9) * 0x537);
+      const b = ((d << 10) | r) ^ 0x5412, g = i => ((b >>> i) & 1) !== 0;
+      for (let i = 0; i <= 5; i++) setF(8, i, g(i));
+      setF(8, 7, g(6)); setF(8, 8, g(7)); setF(7, 8, g(8));
+      for (let i = 9; i < 15; i++) setF(14 - i, 8, g(i));
+      for (let i = 0; i < 8; i++) setF(size - 1 - i, 8, g(i));
+      for (let i = 8; i < 15; i++) setF(8, size - 15 + i, g(i));
+      setF(8, size - 8, true);
+    };
+    drawFormat(0);
+    if (ver >= 7) {
+      let r = ver; for (let i = 0; i < 12; i++) r = (r << 1) ^ ((r >>> 11) * 0x1f25);
+      const b = (ver << 12) | r;
+      for (let i = 0; i < 18; i++) { const bit = ((b >>> i) & 1) !== 0, a = size - 11 + i % 3, c = Math.floor(i / 3); setF(a, c, bit); setF(c, a, bit); }
+    }
+    let i = 0;
+    for (let right = size - 1; right >= 1; right -= 2) {
+      if (right === 6) right = 5;
+      for (let vert = 0; vert < size; vert++) for (let j = 0; j < 2; j++) {
+        const x = right - j, up = ((right + 1) & 2) === 0, y = up ? size - 1 - vert : vert;
+        if (!F[y][x] && i < cw.length * 8) { M[y][x] = ((cw[i >>> 3] >>> (7 - (i & 7))) & 1) !== 0; i++; }
+      }
+    }
+    const maskFn = [
+      (x, y) => (x + y) % 2 === 0, (x, y) => y % 2 === 0, (x, y) => x % 3 === 0, (x, y) => (x + y) % 3 === 0,
+      (x, y) => (Math.floor(x / 3) + Math.floor(y / 2)) % 2 === 0, (x, y) => (x * y) % 2 + (x * y) % 3 === 0,
+      (x, y) => ((x * y) % 2 + (x * y) % 3) % 2 === 0, (x, y) => ((x + y) % 2 + (x * y) % 3) % 2 === 0
+    ];
+    const applyMask = m => { for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) if (!F[y][x] && maskFn[m](x, y)) M[y][x] = !M[y][x]; };
+    let best = isNum(opts.mask) ? opts.mask : -1;
+    if (best < 0) {
+      let minP = Infinity;
+      for (let m = 0; m < 8; m++) { applyMask(m); drawFormat(m); const p = penalty(M, size); if (p < minP) { minP = p; best = m; } applyMask(m); }
+    }
+    applyMask(best); drawFormat(best);
+    return { version: ver, size, ecl: eclNameOf(e), mask: best, modules: M };
+  }
+  function eclNameOf(e) { return ['L', 'M', 'Q', 'H'][e]; }
+  function penalty(M, n) {
+    let p = 0;
+    const line = get => {
+      let run = 1, s = 0, prev = get(0);
+      for (let i = 1; i < n; i++) { const c = get(i); if (c === prev) { run++; if (run === 5) s += 3; else if (run > 5) s++; } else { run = 1; prev = c; } }
+      // finder-like 1:1:3:1:1 with 4 light on a side
+      for (let i = 0; i + 10 < n; i++) {
+        const a = [1, 0, 1, 1, 1, 0, 1].every((b, k) => get(i + k + 4) === !!b), l = [0, 1, 2, 3].every(k => !get(i + k)), r = [0, 1, 2, 3].every(k => !get(i + k + 11 < n ? i + k + 11 : -1));
+        if (a && (l || r)) s += 40;
+      }
+      return s;
+    };
+    for (let y = 0; y < n; y++) p += line(x => (x < 0 || x >= n) ? false : M[y][x]);
+    for (let x = 0; x < n; x++) p += line(y => (y < 0 || y >= n) ? false : M[y][x]);
+    let dark = 0;
+    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+      if (M[y][x]) dark++;
+      if (x < n - 1 && y < n - 1) { const c = M[y][x]; if (c === M[y][x + 1] && c === M[y + 1][x] && c === M[y + 1][x + 1]) p += 3; }
+    }
+    const k = Math.ceil(Math.abs(dark * 20 - n * n * 10) / (n * n)) - 1;
+    return p + Math.max(0, k) * 10;
+  }
+  // svg string: white-on-black by default to match orbs (scanners read inverted codes poorly → light:true for the scan view)
+  function duoQrSvg(text, opts) {
+    opts = opts || {};
+    const q = duoQr(text, opts), border = opts.border == null ? 4 : opts.border, s = q.size + border * 2;
+    const fg = opts.fg || '#000', bg = opts.bg || '#fff';
+    let d = '';
+    for (let y = 0; y < q.size; y++) for (let x = 0; x < q.size; x++) if (q.modules[y][x]) d += 'M' + (x + border) + ',' + (y + border) + 'h1v1h-1z';
+    return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + s + ' ' + s + '" shape-rendering="crispEdges"' + (opts.px ? ' width="' + opts.px + '" height="' + opts.px + '"' : '') + '><rect width="100%" height="100%" fill="' + bg + '"/><path d="' + d + '" fill="' + fg + '"/></svg>';
+  }
+  function duoQrCanvas(canvas, text, opts) {
+    opts = opts || {};
+    const q = duoQr(text, opts), border = opts.border == null ? 4 : opts.border, n = q.size + border * 2;
+    const px = opts.px || canvas.width || 256, sc = Math.max(1, Math.floor(px / n));
+    canvas.width = canvas.height = n * sc;
+    const g = canvas.getContext('2d');
+    g.fillStyle = opts.bg || '#fff'; g.fillRect(0, 0, n * sc, n * sc);
+    g.fillStyle = opts.fg || '#000';
+    for (let y = 0; y < q.size; y++) for (let x = 0; x < q.size; x++) if (q.modules[y][x]) g.fillRect((x + border) * sc, (y + border) * sc, sc, sc);
+    return q;
+  }
+  // optional camera scan where BarcodeDetector exists (chrome android / desktop chrome). resolves the first orbs code.
+  async function duoScan(video, opts) {
+    const BD = G().BarcodeDetector;
+    if (!BD) throw new Error('no BarcodeDetector here — paste the code instead');
+    const det = new BD({ formats: ['qr_code'] }), until = Date.now() + ((opts && opts.timeoutMs) || 60000);
+    while (Date.now() < until) {
+      const r = await det.detect(video).catch(() => []);
+      const hit = r.map(x => x.rawValue).find(v => /orbs\d+[oa][zp]\./.test(v));
+      if (hit) return hit.replace(/^.*duo=/, '');
+      await new Promise(res => setTimeout(res, 200));
+    }
+    throw new Error('scan timeout');
+  }
+
+  /* ---------------- default session (the app has one) ---------------- */
+  let DEF = null;
+  const d = () => (DEF = DEF || duoCreate());
+
+  return {
+    DUO_PROTO: PROTO,
+    DUO_TYPES: TYPES,
+    DUO_FX_PARAMS: FX_PARAMS,
+    duoCreate: duoCreate,
+    duoConfig: cfg => { if (DEF) DEF.close(); DEF = duoCreate(cfg); return DEF; },
+    duoHost: opts => d().host(opts),
+    duoJoin: (code, opts) => d().join(code, opts),
+    duoAccept: code => d().accept(code),
+    duoSend: (msg, opts) => d().send(msg, opts),
+    duoOnMessage: fn => d().onMessage(fn),
+    duoOnState: fn => d().onState(fn),
+    duoClose: () => d().close(),
+    duoAssign: (ids, opts) => d().assign(ids, opts),
+    duoSync: (s, opts) => d().sync(s, opts),
+    duoPing: ms => d().ping(ms),
+    duoInfo: () => d().info(),
+    duoSplit: duoSplit,
+    duoValidate: duoValidate,
+    duoEncodeCode: encodeCode,
+    duoDecodeCode: decodeCode,
+    duoLink: duoLink,
+    duoCodeFromUrl: duoCodeFromUrl,
+    duoQr: duoQr,
+    duoQrSvg: duoQrSvg,
+    duoQrCanvas: duoQrCanvas,
+    duoScan: duoScan
+  };
+}));
+
+</script>
+<script>
 (() => {
 'use strict';
 /* ---------------- setup ---------------- */
@@ -6868,7 +8477,7 @@ function applySaved(e, o) {
   if (isFinite(o.prob)) e.prob = clamp(+o.prob, 0, 1); if (isFinite(o.moons)) e.moons = clamp(o.moons | 0, 0, 3); if (isFinite(o.drift)) e.drift = clamp(+o.drift, 0, 1); e.inHole = !!o.inHole && !!o.muted;
   if (isFinite(o.size)) e.size = clamp(+o.size, 0, 1); if (o.trail && Array.isArray(o.trail.points) && (o.trail.kind === 'cut' || o.trail.kind === 'vol')) e.trail = { kind: o.trail.kind, points: o.trail.points.filter(p => p && isFinite(p.phase) && isFinite(p.value)).slice(0, 32).map(p => ({ phase: frac(+p.phase), value: clamp(+p.value, 0, 1), bend: clamp(+p.bend || 0, -1, 1) })) };
   if (Array.isArray(o.chops)) e.chops = o.chops.filter(c => c && isFinite(c.start) && isFinite(c.end)).slice(0, 32).map(c => ({ start: +c.start, end: +c.end, peak: +c.peak || 0 }));
-  e.pat = Array.isArray(o.pat) ? o.pat.filter(h => h && isFinite(h.o) && isFinite(h.v)).map(h => { const q = { o: frac(+h.o), v: clamp(+h.v, 0, 1) }; if (isFinite(h.c) && +h.c < 1) q.c = clamp(+h.c, 0, 1); if (Number.isInteger(h.s) && h.s >= 0) q.s = h.s; return q; }).slice(0, 128) : [];
+  e.pat = Array.isArray(o.pat) ? o.pat.filter(h => h && isFinite(h.o) && isFinite(h.v)).map(h => { const q = { o: frac(+h.o), v: clamp(+h.v, 0, 1) }; if (isFinite(h.c) && +h.c < 1) q.c = clamp(+h.c, 0, 1); if (Number.isInteger(h.s) && h.s >= 0) q.s = h.s; if (isFinite(h.n) && h.n != null) q.n = clamp(Math.round(+h.n), 0, 127); if (isFinite(h.len) && +h.len > 0) q.len = Math.min(16, +h.len); return q; }).slice(0, 128) : [];
   if (e.side === 'rec' && o.label) e.label = String(o.label).slice(0, 14);
 }
 function load() { try { const s = JSON.parse(localStorage.getItem(LS) || 'null'); if (!s) return;
@@ -7166,7 +8775,7 @@ function playStep(n, t) {
   stepTimes.push({ n, t, sd }); if (stepTimes.length > 48) stepTimes.shift();
   if (n % 16 === 0) { barTimes.push({ t, b: n / 16 }); if (barTimes.length > 8) barTimes.shift(); }
   for (const id of IDS) {
-    const e = E[id]; if (e.muted || (drag && drag.e === e && drag.moved && !drag.tether)) continue;
+    const e = E[id]; if (e.muted || e._own || (drag && drag.e === e && drag.moved && !drag.tether)) continue; // _own: the live page schedules this planet itself (second sun · tidal lock · supernova)
     const L = lapOf(e), a0 = aEff(e), hs = hitsOf(e);
     for (let j = 0; j < hs.length; j++) {
       const h = nextHitA(L, a0 - hs[j].o, pb);
@@ -7206,7 +8815,7 @@ function hitEvent(e, p, k) {
   ev.loop = B0.variant === 'file' && !!B0.loop && !!B0.buf;
   return ev;
 }
-function decorate(e, ev, j) { pitchEv(e, ev); if (j < 100 && e.chops) { const hh = hitsOf(e)[j]; if (hh && hh.s != null) ev.slice = hh.s; } return ev; }
+function decorate(e, ev, j) { if (j < 100) { const hh = hitsOf(e)[j]; if (hh && hh.n != null) { ev.n = hh.n; if (hh.len) ev.dur = hh.len * lapOf(e) * 60 / bpm / 16; } } /* hummed hits carry their own pitch */ pitchEv(e, ev); if (j < 100 && e.chops) { const hh = hitsOf(e)[j]; if (hh && hh.s != null) ev.slice = hh.s; } return ev; }
 function fireHit(e, t, p, k, v = 1, j = 0) {
   const ghost = j >= 100, ev = decorate(e, hitEvent(e, p, k + j * 101), j); ev.v *= v; if (ghost) { ev.dur = Math.min(ev.dur, 0.12); ev.roll = null; if (e.mflash) e.mflash[j - 100] = t; else e.mflash = { [j - 100]: t }; }
   const om = ORB[e.orbit] && ORB[e.orbit].st.muted;
@@ -7485,18 +9094,18 @@ function updateMix() {
     const mutedNow = e.muted || (drag && drag.e === e && drag.moved && drag.tgt && drag.tgt.mute);
     routePlanet(e); const os = ORB[e.orbit] ? ORB[e.orbit].st : null, og = os ? (os.muted ? 0 : OrbsFX.dbToGain(os.gainDb)) : 1, S = OrbsFX.SMOOTH;
     const tm = trailMix(e);
-    setP(e, 'v', e.vg.gain, mutedNow ? 0 : Math.pow(e.vol, 1.3) * e.lvl * (tm && tm.vol != null ? tm.vol : 1), S);
+    setP(e, 'v', e.vg.gain, mutedNow ? 0 : Math.pow(e.vol, 1.3) * e.lvl * (tm && tm.vol != null ? tm.vol : 1) * (e.dnG == null ? 1 : e.dnG), S); // dnG / dnCut: live day and night
     setP(e, 'p', e.pan.pan, clamp(e.pn, -1, 1) * 0.9, S);
     setP(e, 's', e.sg.gain, e.verb * og, S); // planet reverb send into the batch 3 room, follows the group's gain / mute
     setP(e, 'd', e.dg.gain, e.echo * 0.6 * og, S); // planet echo = its send into the group delay
-    setP(e, 'c', e.flt.frequency, Math.min(cutHz(tm && tm.cut != null ? Math.min(e.cut, tm.cut) : e.cut), e.eclCut || 1e5), S); // trail + eclipse close the filter further
+    setP(e, 'c', e.flt.frequency, Math.min(cutHz(tm && tm.cut != null ? Math.min(e.cut, tm.cut) : e.cut), e.eclCut || 1e5, e.dnCut || 1e5), S); // trail + eclipse close the filter further
     ccTick(e);
   }
 }
 
 /* ---------------- interaction ---------------- */
 let drag = null;
-const ripples = []; let RIP_LIVE = false, ripLive = () => {}; // the live page swaps in its own ripple style (scaled to the system)
+const ripples = []; let RIP_LIVE = false, ripLive = () => {}, HOLD_BAR = true, LABEL_AVOID = null, spaceDraw = null; // live hooks: hold = supernova there, labels avoid the edge boxes, space overlays // the live page swaps in its own ripple style (scaled to the system)
 const hitR = e => Math.max(e.r + 4 + (e.moons ? 3.2 * e.moons + 2 : 0), touchMode ? 22 : 12); // moon rings count as the planet (qa #5)
 function hitDot(x, y, extra = 0) { let best = null, bd = 1e9; for (const id of IDS) { const e = E[id], d = Math.hypot(x - e.x, y - e.y); if (d < hitR(e) + extra && d <= bd) { bd = d; best = { e, d }; } } return best; }
 let LABEL_FONT = '400 10.5px ui-rounded, "SF Pro Rounded", "Nunito", "Quicksand", "Varela Round", system-ui, sans-serif';
@@ -7514,7 +9123,7 @@ function labelCands(e, w) {
   return list;
 }
 function layoutLabels() {
-  g.font = LABEL_FONT; const placed = [];
+  g.font = LABEL_FONT; const placed = LABEL_AVOID ? LABEL_AVOID() : [];
   const dots = IDS.map(id => { const e = E[id]; return [e.x - e.r - 2, e.y - e.r - 2, e.x + e.r + 2, e.y + e.r + 2, id]; });
   const order = IDS.slice().sort((a, b) => ((b === selId) - (a === selId)) || ((drag && drag.e.id === b) - (drag && drag.e.id === a)) || (E[b].vol - E[a].vol) || (IDS.indexOf(a) - IDS.indexOf(b)));
   for (const id of order) {
@@ -7565,7 +9174,7 @@ cv.addEventListener('pointerdown', ev => {
   cv.setPointerCapture(ev.pointerId);
   const d0 = drag = { t0: performance.now(), e: h.e, sx: x, sy: y, px: x, py: y, ox: h.e.x - x, oy: h.e.y - y, moved: false, tgt: null, tether: !!ev.shiftKey, d0: {} };
   for (const p of partnersOf(h.e.id)) d0.d0[p] = Math.hypot(E[p].x - h.e.x, E[p].y - h.e.y);
-  if (!d0.tether) d0.lp = setTimeout(() => { if (drag === d0 && !d0.moved) { drag = null; select(d0.e.id); openBar(d0.e.id); } }, 550);
+  if (!d0.tether && HOLD_BAR) d0.lp = setTimeout(() => { if (drag === d0 && !d0.moved) { drag = null; select(d0.e.id); openBar(d0.e.id); } }, 550);
 });
 cv.addEventListener('dblclick', ev => { layout(); if (Math.hypot(ev.clientX - CX, ev.clientY - CY) < SUNR + (touchMode ? 20 : 12)) return; const lk = linkAt(ev.clientX, ev.clientY, true) || linkAt(ev.clientX, ev.clientY); if (lk && linked(lk[0], lk[1])) unlink(lk[0], lk[1]); });
 cv.addEventListener('pointermove', ev => {
@@ -7769,7 +9378,7 @@ function frame(now) {
   if (drag && drag.moved && drag.tgt && drag.tgt.mute) { g.textAlign = 'center'; g.globalAlpha = 0.5; g.fillText('mute', drag.px, drag.py - drag.e.r - 14); }
   g.globalAlpha = 1;
     } });
-  drawRecIndicator(); drawBar(); if (winId) drawWinRing(); drawXfade(now); if (PAD9) pad9Tick();
+  if (spaceDraw) spaceDraw(now); drawRecIndicator(); drawBar(); if (winId) drawWinRing(); drawXfade(now); if (PAD9) pad9Tick();
   SKSTAT.push(performance.now() - f0); if (SKSTAT.length > 240) SKSTAT.shift();
   requestAnimationFrame(frame);
 }
@@ -9122,7 +10731,7 @@ function lvOverdub(on) { // overdub: the pad recorder runs on the selected plane
 /* ---- menus: the only floating things (reuse #mmenu and its data-m / data-mk handlers, #gmenu for genres) ---- */
 const lvTog = on => '<span class="tog' + (on ? ' on' : '') + '"><i></i></span>';
 const lvMch = (k, v, on, label) => '<span class="ch' + (on ? ' on' : '') + '" data-mk="' + k + '" data-v="' + v + '">' + label + '</span>';
-const LV_HELP = 'drag a sound from the browser onto an orbit · distance from the sun sets the lap · drop a planet on another to link · drag away or double-click a line to cut · shift-drag planet → planet = duck · off the edge mutes · tap the sun to step chords, hold for auto · black hole bottom left silences · wheel / pinch zooms, space-drag pans · click a planet: its devices, clip and pad slot below · hold a planet for its bar · keys: space play · t tap · h hide · f full screen · [ ] skins · q w e a s d z x c pad · ctrl-alt-b / l / m panels';
+const LV_HELP = 'drag a sound from the browser onto an orbit · distance from the sun sets the lap · drop a planet on another to link · drag away or double-click a line to cut · shift-drag planet → planet = duck · off the edge mutes · tap the sun to step chords, hold for auto · black hole bottom left silences · wheel / pinch zooms, space-drag pans · click a planet: its devices, clip and pad slot below · hold a planet 1.2 s: supernova · space menu: day and night, second sun, visitors, constellations · keys: space play · t tap · h hide · f full screen · [ ] skins · q w e a s d z x c pad · ctrl-alt-b / l / m panels';
 renderMore = function () {
   const k = lvMenu; let h = '';
   if (k === 'view') {
@@ -9439,6 +11048,7 @@ LV('lHandle').addEventListener('pointerdown', ev => { ev.preventDefault(); const
 addEventListener('keydown', ev => {
   if (typingIn(ev.target)) return;
   if (ev.ctrlKey && ev.altKey && !ev.metaKey) { const k = { KeyB: 'B', KeyL: 'D', KeyM: 'M', KeyT: 'T' }[ev.code]; if (k) { ev.preventDefault(); ev.stopImmediatePropagation(); lvCollapse(k); } return; }
+  if (ev.code === 'Escape' && spEsc()) { ev.preventDefault(); ev.stopImmediatePropagation(); return; }
   if (ev.code === 'Escape' && lvSndDrag) { ev.preventDefault(); ev.stopImmediatePropagation(); lvSndDrag = null; lvGhost.style.display = 'none'; LV('lChain').classList.remove('drop'); return; }
   if (ev.code === 'Escape' && !CLEAN) { ev.preventDefault(); ev.stopImmediatePropagation(); // esc: close the top floating thing, else deselect (never closes the docked pad)
     if (mmenu.classList.contains('open')) moreOpen(false); else if (gmenu.classList.contains('open')) gmenu.classList.remove('open'); else if (winId) closeWin(); else if (barId) closeBar(); else if (pickId) closePicker(); else if (lvAnyOpen()) lvCloseAll(); else if (selId) select(null); LVD = true; return; }
@@ -9484,6 +11094,417 @@ addEventListener('click', ev => { if (performance.now() - lvSwallow < 600) { lvS
 ['pointerdown', 'touchend'].forEach(t => addEventListener(t, () => { const st = document.getElementById('start'); if (st && st.isConnected && !st.classList.contains('gone')) dismissStart(); }, true)); // live: tap-to-start never blocks the first tap (it still unlocks ios audio)
 function liveInit() { lvPanels(); requestAnimationFrame(() => requestAnimationFrame(() => { LVD_READY = true; })); const lvRs = () => { lvPanels(); lvBxK = ''; lvBoxes(); }; addEventListener('resize', lvRs); addEventListener('orientationchange', () => setTimeout(lvRs, 250)); if (window.visualViewport) visualViewport.addEventListener('resize', lvRs); const lvHello = () => { const st = document.getElementById('start'); if (st && st.isConnected && !st.classList.contains('gone')) return setTimeout(lvHello, 400); lvHint(LV_PHONE ? 'the boxes on the edges open the panels · double-tap a planet for its detail' : 'the boxes on the edges open the panels · space plays · double-click a planet for its detail · h hides', 4200); }; setTimeout(lvHello, 600); if (master) master.gain.value = LVMASTER < 0.02 ? 0 : 0.8 * Math.pow(10, (-48 + 54 * LVMASTER) / 20); requestAnimationFrame(lvTick); }
 const lvInitAudio0 = initAudio; initAudio = function () { const fresh = !ac; lvInitAudio0(); if (fresh && master) master.gain.value = LVMASTER < 0.02 ? 0 : 0.8 * Math.pow(10, (-48 + 54 * LVMASTER) / 20); };
+/* ================= space (live only): supernova · constellations · day and night · second sun · tidal lock · gesture orbit · visitors ================= */
+const SP_KEY = 'orbs-live-space', SPC_KEY = 'orbs-live-constellations', NOVA_HOLD = 1200, NOVA_RE = 3.2, NOVA_SPAN = 2;
+const SP = {
+  cfg: { dn: { on: false, day: 16, ang: 0.875 }, sun2: { on: false, ratio: '3:4', bpm: 90 }, vis: { on: false, every: 16 } },
+  cons: [], parts: [], vq: [], riffs: [], visitors: [], charge: null, drawArm: null, stroke: null, conSig: '', hooks: { step: [], draw: [], layout: [], menu: [] }
+};
+const SUN2_RATIOS = { '3:4': 0.75, '2:3': 2 / 3, '4:3': 4 / 3, '3:2': 1.5 };
+const sun2Ratio = () => { const s = SP.cfg.sun2; return s.ratio === 'free' ? Math.max(0.25, Math.min(4, s.bpm / bpm)) : (SUN2_RATIOS[s.ratio] || 0.75); };
+const onSunB = e => SP.cfg.sun2.on && e.sun === 'b';
+const lockOf = e => e.lock && E[e.lock] && e.lock !== e.id ? E[e.lock] : null;
+function spSave() { try {
+  const planets = {}; IDS.forEach(id => { const e = E[id]; if (e.sun === 'b' || lockOf(e) || e.path) planets[id] = { sun: e.sun === 'b' ? 'b' : undefined, lock: lockOf(e) ? e.lock : undefined, path: e.path ? e.path.map(v => +v.toFixed(3)) : undefined }; });
+  localStorage.setItem(SP_KEY, JSON.stringify(Object.assign({}, SP.cfg, { planets }))); localStorage.setItem(SPC_KEY, JSON.stringify(SP.cons)); } catch (x) {} }
+function spLoad() { try {
+  const c = JSON.parse(localStorage.getItem(SP_KEY) || 'null'); if (c) { ['dn', 'sun2', 'vis'].forEach(k => { if (c[k]) Object.assign(SP.cfg[k], c[k]); });
+    Object.entries(c.planets || {}).forEach(([id, p]) => { const e = E[id]; if (!e) return; if (p.sun === 'b') e.sun = 'b'; if (p.lock && E[p.lock]) e.lock = p.lock; if (Array.isArray(p.path) && p.path.length === 64) e.path = p.path; }); }
+  const k = JSON.parse(localStorage.getItem(SPC_KEY) || 'null'); if (Array.isArray(k)) SP.cons = k.filter(x => x && x.name && Array.isArray(x.links)); } catch (x) {} }
+const spT0 = () => playing ? Math.max(ac.currentTime + 0.02, nextT) : ac.currentTime + 0.05; /* the next free 16th on the grid */
+
+/* one-off planet note outside the scheduler (riffs, supernova rolls); logged like a hit */
+function spPlay(e, t, v, durMax, tag) {
+  if (!e || !ac || !e.in) return; const pA = Math.max(0, posNow() + Math.max(0, t - ac.currentTime) / (60 / bpm));
+  const ev = decorate(e, hitEvent(e, pA, (Math.random() * 1e6) | 0), 0); ev.v = (ev.v == null ? 1 : ev.v) * (v == null ? 1 : v); if (durMax) ev.dur = Math.min(ev.dur || durMax, durMax);
+  playPlanet(e, t, ev, ev.dur); try { midiNote(e, ev, t, ev.dur); } catch (x) {}
+  SP.vq.push({ t, id: e.id, v: ev.v }); hitLog.push({ id: e.id, t, p: pA, j: tag || 'space' }); if (hitLog.length > 6000) hitLog.splice(0, 1000);
+}
+
+/* ---- scheduler: sun-b planets run in their own time, locked planets fire with their anchor, a nova silences its planet until it re-forms ---- */
+const spStep0 = playStep;
+playStep = function (n, t) {
+  for (const id of IDS) { const e = E[id]; e._own = !!(lockOf(e) || onSunB(e) || (e.novaUntil && t < e.novaUntil)); }
+  spStep0(n, t);
+  const sd = stepDur();
+  for (const id of IDS) { const e = E[id]; if (!e._own || e.muted || e.inHole || lockOf(e) || (e.novaUntil && t < e.novaUntil)) continue; if (drag && drag.e === e && drag.moved && !drag.tether) continue; if (onSunB(e)) spSchedB(e, n, t, sd); }
+  if (n % 16 === 0) spVisitRoll(t, sd);
+  for (const f of SP.hooks.step) { try { f(n, t, sd); } catch (x) {} }
+};
+function spSchedB(e, n, t, sd) {
+  const r = sun2Ratio(), pS = n / 4 * r, w = 0.25 * r, L = lapOf(e), a0 = aEff(e), hs = hitsOf(e);
+  for (let j = 0; j < hs.length; j++) { const h = nextHitA(L, a0 - hs[j].o, pS); if (h.p < pS + w - 1e-9 && (typeof chanceOk !== 'function' || chanceOk(e, hs[j], h.k, j))) { const db = (h.p - pS) / r; fireHit(e, t + db * 4 * sd, n / 4 + db, h.k, hs[j].v == null ? 1 : hs[j].v, j); } }
+}
+const spFire0 = fireHit; let spDepth = 0;
+fireHit = function (e, t, p, k, v, j) {
+  spFire0(e, t, p, k, v, j); if (spDepth > 4) return; spDepth++;
+  try { for (const id of IDS) { const b = E[id]; if (b !== e && b.lock === e.id && !b.muted && !b.inHole && !(b.novaUntil && t < b.novaUntil)) fireHit(b, t, p, k, v, j); } } finally { spDepth--; }
+};
+
+/* ---- geometry: second-sun time, locked angles, drawn paths, nova size ---- */
+function spPathR(e, ang) { const P = e.path, x = frac(ang) * 64, i = Math.floor(x) % 64, f = x - Math.floor(x); return P[i] * (1 - f) + P[(i + 1) % 64] * f; }
+const spLayout0 = layout;
+layout = function () {
+  spLayout0(); const now = performance.now(), dragged = e => drag && drag.e === e && drag.moved && !drag.tether;
+  for (const id of IDS) { const e = E[id]; if (dragged(e) || e.inHole) continue;
+    if (onSunB(e) && ORB[e.orbit]) e.ang = visAngG(ORB[e.orbit], e.a, curPos * sun2Ratio());
+    if (onSunB(e) || e.path) { const p = onRing(e.path ? spPathR(e, e.ang) : e.rad, e.ang); e.x = p.x; e.y = p.y; } }
+  for (let pass = 0; pass < 2; pass++) for (const id of IDS) { const e = E[id], A = lockOf(e); if (!A || dragged(e) || e.inHole) continue; e.ang = A.ang; const p = onRing(e.path ? spPathR(e, e.ang) : e.rad, e.ang); e.x = p.x; e.y = p.y; }
+  for (const id of IDS) { const e = E[id]; if (!e.nova) continue; const u = (now - e.nova) / 1000; if (u < 0) continue; if (u > NOVA_RE) { e.nova = null; continue; }
+    e.r *= u < 0.15 ? 1 + u * 12 : u < 0.7 ? 0.04 : 0.04 + 0.96 * (1 - Math.pow(1 - (u - 0.7) / (NOVA_RE - 0.7), 3)); }
+  for (const f of SP.hooks.layout) { try { f(); } catch (x) {} }
+};
+
+/* ---- day and night: the half of each orbit that faces the light is open and bright, the far side low-passed and dimmer ---- */
+const spLight = () => { const d = SP.cfg.dn; return d.day ? frac(d.ang + posNow() / (d.day * 4)) : d.ang; };
+const spDay = e => { const c = Math.cos(TAU * (e.ang - spLight())), x = Math.max(0, Math.min(1, (c + 0.3) / 0.6)); return x * x * (3 - 2 * x); }; /* 1 = noon · 0 = midnight, soft terminator */
+const spMix0 = updateMix;
+updateMix = function () {
+  const on = SP.cfg.dn.on;
+  for (const id of IDS) { const e = E[id]; if (on) { const d = spDay(e); e.dnCut = 650 * Math.pow(20000 / 650, d); e.dnG = 0.58 + 0.42 * d; } else { e.dnCut = null; e.dnG = null; } }
+  spMix0();
+};
+
+/* ---- supernova: hold a planet 1.2 s ---- */
+cv.addEventListener('pointerdown', ev => {
+  if (SP.drawArm || !drag || !drag.e || drag.tether || ev.button) return; const d0 = drag, e = d0.e, x0 = ev.clientX, y0 = ev.clientY;
+  SP.charge = { e, t0: performance.now() };
+  const mv = m => { if (Math.hypot(m.clientX - x0, m.clientY - y0) > 9) stop(); }, stop = () => { clearTimeout(tm); if (SP.charge && SP.charge.e === e) SP.charge = null; removeEventListener('pointermove', mv); removeEventListener('pointerup', stop); removeEventListener('pointercancel', stop); };
+  const tm = setTimeout(() => { stop(); if (drag === d0 && !d0.moved) { drag = null; spNova(e.id); } }, NOVA_HOLD);
+  addEventListener('pointermove', mv); addEventListener('pointerup', stop); addEventListener('pointercancel', stop);
+});
+function spNova(id) {
+  const e = E[id]; if (!e) return false; initAudio(); const sd = 60 / bpm / 4, t0 = spT0(), span = NOVA_SPAN * 4 * sd, N = 16;
+  for (let i = 0; i < N; i++) spPlay(e, t0 + span * (i / N), 0.35 + 0.65 * (i / N), sd * 0.9, 'nova');
+  spPlay(e, t0 + span, 1.15, null, 'nova');
+  e.novaUntil = t0 + span + NOVA_RE; const tv = performance.now() + (t0 + span - ac.currentTime) * 1000; e.nova = tv;
+  SP.novaPend = SP.novaPend || []; SP.novaPend.push({ id, at: tv, t0: performance.now() });
+  lvHint('supernova · ' + (e.label || id), 1600); return true;
+}
+function spBurst(e) {
+  const n = LITE ? 22 : 44, now = performance.now();
+  for (let i = 0; i < n; i++) { const a = Math.random() * TAU, s = (40 + Math.random() * 110) * DS; SP.parts.push({ id: e.id, x: e.x, y: e.y, vx: Math.cos(a) * s, vy: Math.sin(a) * s * (0.6 + 0.4 * K), t0: now }); }
+  ripples.push({ x: e.x, y: e.y, t0: now, r0: e.r, big: true });
+}
+
+/* ---- constellations: saved link patterns, played as riffs ---- */
+const spNorm = k => { const [a, b] = String(k).split('|'); return lkey(a, b); }, spSig = arr => arr.map(spNorm).sort().join(',');
+function spConSave(name) {
+  if (!links.size) { lvHint('link some planets first · drop a planet on another', 2200); return null; }
+  const c = { name: (name || 'constellation ' + (SP.cons.length + 1)).toLowerCase().slice(0, 24), links: [...links].map(spNorm).sort() }; SP.cons.push(c); SP.conSig = spSig([...links]); spSave(); lvHint('saved · ' + c.name, 1600); return c;
+}
+function spConRecall(i) {
+  const c = SP.cons[i]; if (!c) return false; links.clear(); c.links.forEach(k => { const [a, b] = k.split('|'); if (E[a] && E[b]) links.add(lkey(a, b)); });
+  regroup(); SP.conSig = spSig([...links]); save(); sheetDirty = true; LVD = true; spRiff(c); return true;
+}
+function spRiff(c) {
+  const adj = {}; c.links.forEach(k => { const [a, b] = k.split('|'); if (!E[a] || !E[b]) return; (adj[a] = adj[a] || []).push(b); (adj[b] = adj[b] || []).push(a); });
+  const seen = new Set(), seq = []; Object.keys(adj).sort((a, b) => E[a].rad - E[b].rad).forEach(s => { if (seen.has(s)) return; const st = [[s, null]]; while (st.length) { const [x, from] = st.pop(); if (seen.has(x)) continue; seen.add(x); seq.push([x, from]); adj[x].slice().sort((a, b) => E[b].rad - E[a].rad).forEach(y => { if (!seen.has(y)) st.push([y, x]); }); } });
+  if (!seq.length) return; initAudio(); const sd = 60 / bpm / 4, t0 = spT0();
+  seq.forEach(([id], i) => spPlay(E[id], t0 + i * sd, 0.95 - 0.25 * (i / seq.length), sd * 3, 'riff'));
+  SP.riffs.push({ seq, t0, sd, name: c.name }); lvHint('constellation · ' + c.name, 1800);
+}
+function spConCheck() { const s = spSig([...links]); if (s === SP.conSig) return; SP.conSig = s; if (!s) return; const c = SP.cons.find(c => spSig(c.links) === s); if (c) spRiff(c); }
+
+/* ---- visitors: a guest comet now and then, one note figure in key ---- */
+function spVisitRoll(t, sd) { const v = SP.cfg.vis; if (v.on && Math.random() < 1 / v.every) spVisit(t, sd); }
+function spVisit(t, sd) {
+  initAudio(); sd = sd || 60 / bpm / 4; t = t || ac.currentTime + 0.05; const a = Math.random(), side = Math.random() < 0.5 ? -1 : 1, tm = t + 16 * sd;
+  SP.visitors.push({ a, side, t0: t, t1: t + 32 * sd, tm, rung: false }); spGuestSound(tm, sd); return true;
+}
+function spGuestSound(t, sd) {
+  if (!ac) return; const bar = Math.floor((posNow() + Math.max(0, t - ac.currentTime) / (60 / bpm)) / 4);
+  let ns = [60, 64, 67]; try { const C = PROG[chordIdx(bar)], cn = chordNotes(C); if (cn && cn.length) ns = cn; } catch (x) {}
+  const top = ns.slice().sort((a, b) => a - b), base = top[0] < 60 ? 12 : 0, fig = [top[0], top[Math.min(1, top.length - 1)], top[top.length - 1], top[0] + 12].map(n => n + base + 12);
+  const pan = ac.createStereoPanner ? ac.createStereoPanner() : null, out = ac.createGain(); out.gain.value = 0.085; if (pan) { pan.pan.value = Math.random() * 1.4 - 0.7; out.connect(pan); pan.connect(master); } else out.connect(master);
+  try { const s = ac.createGain(); s.gain.value = 0.5; out.connect(s); s.connect(fx3.room.input); } catch (x) {}
+  fig.forEach((n, i) => { const tt = t + i * sd * 2, f = mtof(n); [[1, 'sine', 1], [2.003, 'triangle', 0.18]].forEach(([m, ty, gv]) => { const o = ac.createOscillator(), gg = ac.createGain(); o.type = ty; o.frequency.value = f * m; gg.gain.setValueAtTime(0, tt); gg.gain.linearRampToValueAtTime(gv * (1 - i * 0.12), tt + 0.006); gg.gain.exponentialRampToValueAtTime(0.0008, tt + 1.4); o.connect(gg); gg.connect(out); o.start(tt); o.stop(tt + 1.5); }); });
+  hitLog.push({ id: 'visitor', t, p: 0, j: 'visitor' });
+}
+const spVisPos = (v, u) => { const P0 = onRing(1.7, v.a), P2 = onRing(1.7, v.a + 0.42 * v.side), M = onRing(0.36, v.a + 0.21 * v.side), C = { x: 2 * M.x - (P0.x + P2.x) / 2, y: 2 * M.y - (P0.y + P2.y) / 2 }, q = 1 - u; return { x: q * q * P0.x + 2 * q * u * C.x + u * u * P2.x, y: q * q * P0.y + 2 * q * u * C.y + u * u * P2.y }; };
+
+/* ---- gesture orbit: draw a loop around the sun, the selected planet follows it; corners and pauses become its hits ---- */
+function spArm(id) { if (!E[id]) return false; SP.drawArm = id; SP.stroke = null; if (LV_PHONE) { try { lvCloseAll(); } catch (x) {} } document.body.classList.add('sp-draw'); lvHint('draw a loop around the sun for ' + (E[id].label || id) + ' · esc cancels', 4000); LVD = true; return true; }
+function spEsc() { if (!SP.drawArm) return false; SP.drawArm = null; SP.stroke = null; document.body.classList.remove('sp-draw'); lvHint('draw cancelled', 1000); LVD = true; return true; }
+addEventListener('pointerdown', ev => {
+  if (!SP.drawArm || ev.target !== cv || ev.button) return; ev.preventDefault(); ev.stopImmediatePropagation();
+  SP.stroke = { id: SP.drawArm, pts: [{ x: ev.clientX, y: ev.clientY, t: performance.now() }], pid: ev.pointerId }; try { cv.setPointerCapture(ev.pointerId); } catch (x) {}
+}, true);
+addEventListener('pointermove', ev => { const s = SP.stroke; if (!s || ev.pointerId !== s.pid) return; ev.stopImmediatePropagation(); const l = s.pts[s.pts.length - 1]; if (Math.hypot(ev.clientX - l.x, ev.clientY - l.y) >= 2) s.pts.push({ x: ev.clientX, y: ev.clientY, t: performance.now() }); }, true);
+const spUp = ev => { const s = SP.stroke; if (!s || ev.pointerId !== s.pid) return; ev.stopImmediatePropagation(); ev.preventDefault(); SP.stroke = null; const ok = spPathFrom(s.id, s.pts); if (ok) { SP.drawArm = null; document.body.classList.remove('sp-draw'); } };
+addEventListener('pointerup', spUp, true); addEventListener('pointercancel', spUp, true);
+function spPathFrom(id, pts) {
+  const e = E[id]; if (!e || pts.length < 6) { lvHint('too short · draw a loop around the sun', 1800); return false; }
+  const pol = pts.map(p => { const q = pointerPolar(p.x, p.y); return { rad: Math.max(0.1, Math.min(1.15, q.rad)), ang: frac(q.ang), x: p.x, y: p.y, t: p.t }; });
+  let tot = 0; for (let i = 1; i < pol.length; i++) { let d = pol[i].ang - pol[i - 1].ang; d -= Math.round(d); tot += d; }
+  if (Math.abs(tot) < 0.5) { lvHint('go around the sun · at least half a loop', 1800); return false; }
+  const bins = new Array(64).fill(null), cnt = new Array(64).fill(0);
+  for (let i = 1; i < pol.length; i++) { const a = pol[i - 1], b = pol[i]; let d = b.ang - a.ang; d -= Math.round(d); const steps = Math.max(1, Math.ceil(Math.abs(d) * 64 * 2));
+    for (let s = 0; s <= steps; s++) { const f = s / steps, ang = frac(a.ang + d * f), k = Math.floor(ang * 64) % 64; bins[k] = (bins[k] || 0) + a.rad + (b.rad - a.rad) * f; cnt[k]++; } }
+  const P = bins.map((v, k) => cnt[k] ? v / cnt[k] : null), filled = P.map((v, k) => v == null ? -1 : k).filter(k => k >= 0);
+  for (let k = 0; k < 64; k++) if (P[k] == null) { let l = k, r = k, dl = 0, dr = 0; while (P[l] == null) { l = (l + 63) % 64; dl++; } while (P[r] == null) { r = (r + 1) % 64; dr++; } P[k] = (P[l] * dr + P[r] * dl) / (dl + dr); }
+  const S = P.map((v, k) => (P[(k + 63) % 64] + 2 * v + P[(k + 1) % 64]) / 4);
+  /* rhythm: corners (turn over a short window > ~50°) and pauses (speed well below the median) */
+  const sp = [], hitsA = []; for (let i = 1; i < pts.length; i++) sp.push(Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y) / Math.max(1, pts[i].t - pts[i - 1].t));
+  const med = sp.slice().sort((a, b) => a - b)[sp.length >> 1] || 1, W = 3;
+  const dir = (i, j) => Math.atan2(pts[j].y - pts[i].y, pts[j].x - pts[i].x), turn = i => { if (i - W < 0 || i + W >= pts.length) return 0; let d = dir(i, i + W) - dir(i - W, i); d = Math.atan2(Math.sin(d), Math.cos(d)); return Math.abs(d); };
+  const cand = [], nP = pts.length; if (nP > 2 * W + 2 && Math.hypot(pts[0].x - pts[nP - 1].x, pts[0].y - pts[nP - 1].y) < 40) { let d = dir(0, W) - dir(nP - 1 - W, nP - 1); d = Math.abs(Math.atan2(Math.sin(d), Math.cos(d))); if (d > 0.9) cand.push({ i: 0, s: d, v: 1 }); } /* closed loop: the start is a corner too */
+  for (let i = W; i < pts.length - W; i++) { const tv = turn(i); if (tv > 0.9 && tv >= turn(i - 1) && tv >= turn(i + 1)) cand.push({ i, s: tv, v: 1 }); const v = sp[i - 1]; if (v < med * 0.35 && v <= (sp[i - 2] || 1e9) && v <= (sp[i] || 1e9)) cand.push({ i, s: 0.5, v: 0.75 }); }
+  cand.sort((a, b) => b.s - a.s); cand.forEach(c => { const a = pol[c.i].ang; if (hitsA.length < 8 && !hitsA.some(h => Math.abs(((a - h.o) % 1 + 1.5) % 1 - 0.5) < 1 / 20)) hitsA.push({ o: a, v: c.v }); });
+  let pat = hitsA, how = 'corners'; if (pat.length < 2) { const a0 = pol[0].ang; pat = [0, 1, 2, 3].map(j => ({ o: frac(a0 + j / 4), v: 0.85 })); how = 'even'; }
+  pat.sort((a, b) => a.o - b.o); try { pushPat(e); } catch (x) {}
+  e.path = S.map(v => +v.toFixed(3)); e.pat = pat.map(h => ({ o: +h.o.toFixed(4), v: h.v })); save(); spSave(); sheetDirty = true; LVD = true;
+  lvHint((e.label || id) + ' · drawn orbit · ' + pat.length + ' hits from ' + how, 2200); SP.lastPath = { id, how, n: pat.length, filled: filled.length }; return true;
+}
+function spClearPath(id) { const e = E[id]; if (!e || !e.path) return false; e.path = null; spSave(); LVD = true; return true; }
+function spSetLock(id, to) { const e = E[id]; if (!e) return false; if (!to || !E[to] || to === id) { e.lock = null; spSave(); LVD = true; return true; } let x = E[to], n = 0; while (x && n++ < 20) { if (x.id === id) return false; x = lockOf(x); } e.lock = to; spSave(); LVD = true; return true; }
+function spSetSun(id, s) { const e = E[id]; if (!e) return false; e.sun = s === 'b' ? 'b' : null; if (s === 'b' && !SP.cfg.sun2.on) { SP.cfg.sun2.on = true; } spSave(); LVD = true; return true; }
+
+/* ---- drawing: thin white lines over every skin ---- */
+spaceDraw = function (now) {
+  if (SP.cons.length || links.size) spConCheck();
+  const t = ac ? ac.currentTime : 0, sec = now / 1000; g.save(); g.strokeStyle = g.fillStyle = '#fff'; g.lineWidth = 1;
+  const R = RMAX * 1.12;
+  if (SP.cfg.dn.on) { const L = spLight(), lx = Math.sin(TAU * L), ly = -Math.cos(TAU * L) * K, n = Math.hypot(lx, ly) || 1, ux = lx / n, uy = ly / n;
+    g.save(); g.beginPath(); g.ellipse(CX, CY, R, R * K, 0, 0, TAU); g.clip();
+    const gr = g.createLinearGradient(CX + ux * R * 0.1, CY + uy * R * 0.1 * K, CX - ux * R, CY - uy * R * K); gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(0.35, 'rgba(0,0,0,.18)'); gr.addColorStop(1, 'rgba(0,0,0,.34)'); g.fillStyle = gr; g.fillRect(CX - R, CY - R * Math.max(1, K), 2 * R, 2 * R * Math.max(1, K));
+    const gd = g.createLinearGradient(CX, CY, CX + ux * R, CY + uy * R * K); gd.addColorStop(0, 'rgba(255,255,255,0)'); gd.addColorStop(1, 'rgba(255,255,255,.035)'); g.fillStyle = gd; g.fillRect(CX - R, CY - R * Math.max(1, K), 2 * R, 2 * R * Math.max(1, K));
+    g.globalAlpha = 0.16; g.setLineDash([2, 5]); g.beginPath(); const pa = onRing(1.12, L + 0.25), pb = onRing(1.12, L - 0.25); g.moveTo(pa.x, pa.y); g.lineTo(pb.x, pb.y); g.stroke(); g.setLineDash([]); g.restore();
+    const q1 = onRing(1.14, L), q2 = onRing(1.22, L); g.globalAlpha = 0.55; g.beginPath(); g.moveTo(q1.x, q1.y); g.lineTo(q2.x, q2.y); g.stroke(); g.beginPath(); g.arc(q2.x, q2.y, 2.2 * DS, 0, TAU); g.stroke(); g.globalAlpha = 1; }
+  if (SP.cfg.sun2.on) { const r = sun2Ratio(), a = frac(curPos * r / 4), Rb = Math.max(16, SUNR * 2.2), x = CX + Rb * Math.sin(TAU * a), y = CY - Rb * K * Math.cos(TAU * a);
+    g.globalAlpha = 0.12; g.beginPath(); g.ellipse(CX, CY, Rb, Rb * K, 0, 0, TAU); g.stroke(); g.globalAlpha = 0.85; g.beginPath(); g.arc(x, y, Math.max(3, SUNR * 0.42), 0, TAU); g.stroke(); g.globalAlpha = 0.2; g.fill();
+    const beat = frac(curPos * r); g.globalAlpha = 0.5 * (1 - beat); g.beginPath(); g.arc(x, y, Math.max(3, SUNR * 0.42) + 6 * beat, 0, TAU); g.stroke(); g.globalAlpha = 1;
+    for (const id of IDS) { const e = E[id]; if (e.sun !== 'b' || e.inHole) continue; g.globalAlpha = 0.4; g.setLineDash([1.5, 2.5]); g.beginPath(); g.arc(e.x, e.y, e.r + 4, 0, TAU); g.stroke(); g.setLineDash([]); } g.globalAlpha = 1; }
+  for (const id of IDS) { const e = E[id], A = lockOf(e); if (!A || e.inHole) continue; g.globalAlpha = 0.22; g.setLineDash([1, 3]); g.beginPath(); g.moveTo(A.x, A.y); g.lineTo(e.x, e.y); g.stroke(); g.setLineDash([]); g.globalAlpha = 0.5; g.beginPath(); g.arc(e.x, e.y, e.r + 2.5, -0.5, 0.5); g.stroke(); g.globalAlpha = 1; }
+  for (const id of IDS) { const e = E[id]; if (!e.path || e.inHole) continue; g.globalAlpha = id === selId ? 0.3 : 0.12; g.beginPath(); for (let k = 0; k <= 96; k++) { const a = k / 96, p = onRing(spPathR(e, a), a); k ? g.lineTo(p.x, p.y) : g.moveTo(p.x, p.y); } g.stroke(); (e.pat || []).forEach(h => { const p = onRing(spPathR(e, h.o), h.o); g.beginPath(); g.arc(p.x, p.y, 1.6, 0, TAU); g.fill(); }); g.globalAlpha = 1; }
+  if (SP.charge) { const e = SP.charge.e, u = Math.max(0, Math.min(1, (now - SP.charge.t0 - 150) / (NOVA_HOLD - 150))); if (u > 0) { const rr = e.r * (1.4 + 3.2 * u), gg = g.createRadialGradient(e.x, e.y, e.r * 0.5, e.x, e.y, rr); gg.addColorStop(0, 'rgba(255,255,255,' + (0.4 * u).toFixed(3) + ')'); gg.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gg; g.beginPath(); g.arc(e.x, e.y, rr, 0, TAU); g.fill(); g.fillStyle = '#fff'; g.globalAlpha = 0.3 + 0.6 * u; g.beginPath(); g.arc(e.x, e.y, e.r + 3 + 14 * (1 - u), 0, TAU * u); g.stroke(); g.globalAlpha = 1; } }
+  if (SP.novaPend && SP.novaPend.length) SP.novaPend = SP.novaPend.filter(p => { if (now < p.at) { const e = E[p.id]; if (e) { const u = Math.min(1, (now - p.t0) / Math.max(1, p.at - p.t0)); g.globalAlpha = 0.25 + 0.5 * u; g.beginPath(); g.arc(e.x, e.y, e.r + 2 + 10 * u, 0, TAU); g.stroke(); g.globalAlpha = 1; } return true; } if (E[p.id]) spBurst(E[p.id]); return false; });
+  if (SP.parts.length) { SP.parts = SP.parts.filter(p => { const u = (now - p.t0) / 1000; if (u > NOVA_RE) return false; const e = E[p.id]; const ou = Math.min(u, 0.7), ox = p.x + p.vx * ou * (1 - ou / 1.4), oy = p.y + p.vy * ou * (1 - ou / 1.4);
+      let x = ox, y = oy; if (u > 0.7 && e) { const f = Math.pow((u - 0.7) / (NOVA_RE - 0.7), 2); x = ox + (e.x - ox) * f; y = oy + (e.y - oy) * f; }
+      g.globalAlpha = u < 0.7 ? 0.9 : 0.25 + 0.5 * (1 - (u - 0.7) / (NOVA_RE - 0.7)); g.fillRect(x - 0.7, y - 0.7, 1.4, 1.4); return true; }); g.globalAlpha = 1; }
+  if (SP.vq.length && ac) SP.vq = SP.vq.filter(q => { if (t < q.t) return true; const e = E[q.id]; if (e) { e.pulse = Math.max(e.pulse || 0, Math.min(1, q.v || 1)); ripples.push({ x: e.x, y: e.y, t0: now, r0: e.r, v: q.v || 1 }); } return false; });
+  if (SP.riffs.length && ac) SP.riffs = SP.riffs.filter(r => { const k = (t - r.t0) / r.sd; if (k > r.seq.length + 6) return false; g.globalAlpha = 0.7;
+      r.seq.forEach(([id, from], i) => { if (!from || k < i - 1 || k > i + 6) return; const a = E[from], b = E[id]; if (!a || !b) return; const u = Math.max(0, Math.min(1, k - (i - 1))), fade = Math.max(0, 1 - (k - i) / 6); g.globalAlpha = 0.85 * fade; g.lineWidth = 1.5; g.beginPath(); g.moveTo(a.x, a.y); g.lineTo(a.x + (b.x - a.x) * u, a.y + (b.y - a.y) * u); g.stroke(); g.beginPath(); g.arc(a.x + (b.x - a.x) * u, a.y + (b.y - a.y) * u, 2, 0, TAU); g.fill(); });
+      g.lineWidth = 1; g.globalAlpha = 1; return true; });
+  if (SP.visitors.length && ac) SP.visitors = SP.visitors.filter(v => { const u = (t - v.t0) / (v.t1 - v.t0); if (u > 1) return false; if (u < 0) return true;
+      if (!v.rung && t >= v.tm) { v.rung = true; const p = spVisPos(v, 0.5); ripples.push({ x: p.x, y: p.y, t0: now, r0: 3, v: 1 }); }
+      for (let s = 0; s < 14; s++) { const u0 = Math.max(0, u - s * 0.012), u1 = Math.max(0, u - (s + 1) * 0.012), a = spVisPos(v, u0), b = spVisPos(v, u1); g.globalAlpha = 0.6 * (1 - s / 14) * Math.min(1, Math.min(u, 1 - u) * 8); g.beginPath(); g.moveTo(a.x, a.y); g.lineTo(b.x, b.y); g.stroke(); }
+      const h = spVisPos(v, u); g.globalAlpha = Math.min(1, Math.min(u, 1 - u) * 8); g.beginPath(); g.arc(h.x, h.y, 2.6 * DS, 0, TAU); g.stroke(); g.globalAlpha = 1; return true; });
+  if (SP.stroke && SP.stroke.pts.length > 1) { const P = SP.stroke.pts, r = cv.getBoundingClientRect(); g.globalAlpha = 0.75; g.beginPath(); P.forEach((p, i) => i ? g.lineTo(p.x - r.left, p.y - r.top) : g.moveTo(p.x - r.left, p.y - r.top)); g.stroke(); g.globalAlpha = 1; }
+  else if (SP.drawArm && E[SP.drawArm]) { const e = E[SP.drawArm]; g.globalAlpha = 0.35 + 0.25 * Math.sin(sec * 4); g.setLineDash([2, 4]); g.beginPath(); g.arc(e.x, e.y, e.r + 6, 0, TAU); g.stroke(); g.setLineDash([]); g.globalAlpha = 1; }
+  for (const f of SP.hooks.draw) { try { f(g, now); } catch (x) {} }
+  g.restore();
+};
+
+/* ---- labels: the edge boxes are obstacles, so planet names flip inward instead of running under them ---- */
+LABEL_AVOID = () => { const out = []; if (CLEAN) return out; const cr = cv.getBoundingClientRect();
+  document.querySelectorAll('.lbx').forEach(b => { const r = b.getBoundingClientRect(); if (!r.width) return; const cs = getComputedStyle(b); if (cs.visibility === 'hidden' || cs.display === 'none' || +cs.opacity < 0.05) return; out.push([r.left - cr.left - 6, r.top - cr.top - 4, r.right - cr.left + 6, r.bottom - cr.top + 4]); }); return out; };
+HOLD_BAR = false; /* live: holding a planet charges a supernova (its bar is under wave › in the detail) */
+
+/* ---- ui: the space menu (top bar) and the space row of the detail clip ---- */
+const spRM0 = renderMore;
+renderMore = function () {
+  if (lvMenu !== 'space') return spRM0(); const c = SP.cfg, ch = (on, a, l) => '<span class="ch' + (on ? ' on' : '') + '" ' + a + '>' + l + '</span>'; let h = '';
+  h += '<div class="lab">day and night</div><div class="mi" data-spm="dn"><b>day and night</b><span style="flex:1"></span><span class="k">night = low-pass</span>' + lvTog(c.dn.on) + '</div>';
+  if (c.dn.on) h += '<div class="mi" style="cursor:default"><b>day</b><span style="flex:1"></span>' + [8, 16, 32].map(d => ch(c.dn.day === d, 'data-spm="day" data-v="' + d + '"', d)).join(' ') + ' ' + ch(!c.dn.day, 'data-spm="day" data-v="0"', 'still') + ' <span class="k">bars</span></div>';
+  h += '<div class="lab">second sun</div><div class="mi" data-spm="sun2"><b>binary star</b><span style="flex:1"></span><span class="k">own tempo</span>' + lvTog(c.sun2.on) + '</div>';
+  if (c.sun2.on) h += '<div class="mi" style="cursor:default">' + Object.keys(SUN2_RATIOS).map(r => ch(c.sun2.ratio === r, 'data-spm="ratio" data-v="' + r + '"', r)).join(' ') + ' ' + ch(c.sun2.ratio === 'free', 'data-spm="ratio" data-v="free"', 'free') + '</div>'
+    + (c.sun2.ratio === 'free' ? '<div class="mi" style="cursor:default"><b>bpm</b><span style="flex:1"></span>' + ch(false, 'data-spm="bpm" data-v="-1"', '−') + ' <span>' + Math.round(c.sun2.bpm) + '</span> ' + ch(false, 'data-spm="bpm" data-v="1"', '+') + '</div>' : '')
+    + '<div class="mn">' + IDS.filter(id => E[id].sun === 'b').length + ' on sun b · pick a sun in detail › space</div>';
+  h += '<div class="lab">visitors</div><div class="mi" data-spm="vis"><b>visitors</b><span style="flex:1"></span><span class="k">guest comets in key</span>' + lvTog(c.vis.on) + '</div>';
+  h += '<div class="mi" style="cursor:default">' + [[32, 'rare'], [16, 'some'], [8, 'often']].map(([v, l]) => ch(c.vis.every === v, 'data-spm="every" data-v="' + v + '"', l)).join(' ') + '<span style="flex:1"></span>' + ch(false, 'data-spm="visnow"', 'now') + '</div>';
+  h += '<div class="lab">constellations</div><div class="mi" data-spm="consave"><b>save these lines</b><span style="flex:1"></span><span class="k">' + links.size + ' links</span></div>';
+  h += SP.cons.map((k, i) => '<div class="mi" data-spm="con" data-i="' + i + '"><b>' + lvEsc(k.name) + '</b><span style="flex:1"></span><span class="k">' + k.links.length + ' lines</span>' + ch(false, 'data-spm="condel" data-i="' + i + '" title="forget"', '×') + '</div>').join('');
+  if (SP.cons.length) h += '<div class="mn">click one to recall and play it · or redraw its lines by hand</div>';
+  SP.hooks.menu.forEach(m => { try { const x = m.fn(); if (x) h += '<div class="lab">' + lvEsc(m.name) + '</div>' + x; } catch (x) {} });
+  const miss = OX.slots.filter(s => !OX[s] && !OX.loaded.includes(s)); if (miss.length) h += '<div class="mn" style="opacity:.45">modules · ' + miss.join(' · ') + ' plug in here</div>';
+  h += '<div class="mn">hold a planet 1.2 s: supernova · lock and drawn orbits: detail › space</div>';
+  mmenu.innerHTML = h;
+};
+mmenu.addEventListener('click', ev => {
+  const m = ev.target.closest('[data-spm]'); if (!m || lvMenu !== 'space') return; ev.stopPropagation(); const a = m.dataset.spm, v = m.dataset.v, c = SP.cfg;
+  if (a === 'dn') c.dn.on = !c.dn.on; else if (a === 'day') c.dn.day = +v; else if (a === 'sun2') c.sun2.on = !c.sun2.on; else if (a === 'ratio') c.sun2.ratio = v;
+  else if (a === 'bpm') c.sun2.bpm = Math.max(30, Math.min(300, Math.round(c.sun2.bpm) + (+v) * (ev.shiftKey ? 10 : 1))); else if (a === 'vis') c.vis.on = !c.vis.on; else if (a === 'every') c.vis.every = +v;
+  else if (a === 'visnow') spVisit(); else if (a === 'consave') { const n = prompt('name this constellation', 'constellation ' + (SP.cons.length + 1)); if (n != null) spConSave(n); }
+  else if (a === 'condel') SP.cons.splice(+m.dataset.i, 1); else if (a === 'con') spConRecall(+m.dataset.i);
+  for (const f of SP.hooks.menu) if (f.click) { try { f.click(m); } catch (x) {} }
+  spSave(); updateMix && ac && updateMix(); renderMore(); LVD = true;
+});
+const spDet0 = lvDetail;
+lvDetail = function () {
+  spDet0(); const e = E[selId], cl = LV('lClip'); if (!e || !cl) return; const id = e.id, b = e.sun === 'b', armed = SP.drawArm === id;
+  const opts = IDS.filter(x => { if (x === id) return false; let y = E[x], n = 0; while (y && n++ < 20) { if (y.id === id) return false; y = lockOf(y); } return true; });
+  cl.insertAdjacentHTML('beforeend', '<div class="crow sprow"><span class="lb">space</span><span class="dim">sun</span>' + lvCh('a', !b, 'data-sp="sun" data-v="a"') + lvCh('b', b, 'data-sp="sun" data-v="b" title="the second sun: its own tempo (space menu)"')
+    + '<span class="gsep"></span><span class="dim">lock</span><select data-splock="' + id + '" title="tidal lock: hit exactly when this planet hits"><option value="">off</option>' + opts.map(x => '<option value="' + x + '"' + (e.lock === x ? ' selected' : '') + '>' + lvEsc(E[x].label || x) + '</option>').join('') + '</select>'
+    + '<span class="gsep"></span><span class="dim">orbit</span>' + lvCh(armed ? 'drawing…' : 'draw', armed, 'data-sp="draw" title="draw a loop around the sun · corners and pauses become hits"') + (e.path ? lvCh('round', false, 'data-sp="clear" title="back to a round orbit"') : '')
+    + '<span class="gsep"></span>' + lvCh('supernova', !!e.nova, 'data-sp="nova" title="or hold the planet 1.2 s"') + '</div>');
+};
+LV('lClip').addEventListener('click', ev => { const m = ev.target.closest('[data-sp]'); if (!m || !E[selId]) return; ev.stopPropagation(); const a = m.dataset.sp, id = selId;
+  if (a === 'sun') spSetSun(id, m.dataset.v); else if (a === 'draw') { if (SP.drawArm === id) spEsc(); else spArm(id); } else if (a === 'clear') spClearPath(id); else if (a === 'nova') spNova(id); LVD = true; });
+LV('lClip').addEventListener('change', ev => { const s = ev.target.closest('select[data-splock]'); if (!s) return; ev.stopPropagation(); spSetLock(s.dataset.splock, s.value); s.blur(); });
+
+/* ---- window.OrbsExtras: plug-in point for the hum / tilt / autopilot / timeline / duo modules ---- */
+const OX = window.OrbsExtras = window.OrbsExtras || {};
+OX.slots = ['hum', 'tilt', 'autopilot', 'timeline', 'duo'];
+OX.api = { version: 1, get E() { return E; }, get IDS() { return IDS.slice(); }, get ORB() { return ORB; }, get bpm() { return bpm; }, get playing() { return playing; }, get ac() { return ac; }, get selId() { return selId; },
+  posNow, geom: () => ({ CX, CY, K, RMAX, DS }), ctx: () => g, play: (id, t, v) => spPlay(E[id], t == null ? spT0() : t, v), hint: (t, ms) => lvHint(t, ms), select: id => select(id), space: SP,
+  onStep: f => SP.hooks.step.push(f), onDraw: f => SP.hooks.draw.push(f), onLayout: f => SP.hooks.layout.push(f), menu: (name, fn, click) => SP.hooks.menu.push({ name, fn, click }) };
+OX.loaded = [];
+OX.register = (name, mod) => { if (!name || !mod) return false; OX[name] = mod; if (!mod._mounted && typeof mod.mount === 'function') { mod._mounted = true; try { mod.mount(OX.api); } catch (x) { console.warn('orbs extras · ' + name, x); } } if (!OX.loaded.includes(name)) OX.loaded.push(name); if (lvMenu === 'space') renderMore(); return true; };
+function spInit() { spLoad(); SP.conSig = spSig([...links]); OX.slots.forEach(s => { if (OX[s] && OX[s] !== true && !OX[s]._mounted) OX.register(s, OX[s]); }); LVD = true; } /* after liveInit: the planets exist */
+Object.assign(SP, { nova: spNova, conSave: spConSave, conRecall: spConRecall, riff: spRiff, visit: spVisit, arm: spArm, esc: spEsc, pathFrom: spPathFrom, clearPath: spClearPath, setLock: spSetLock, setSun: spSetSun, ratio: sun2Ratio, day: spDay, light: spLight, save: spSave, pathR: spPathR, avoid: () => LABEL_AVOID() });
+/* ================= vmorphs modules wired in (fx/extras-hum · tilt · autopilot · timeline · duo, inlined before the app) ================= */
+const XM = window.OrbsExtras || {}; const MOD = { hum: null, tilt: null, auto: null, autoMutes: null, song: [], songOn: false, duo: { busy: false, code: null, link: null, answer: null, err: null, state: 'idle', role: null, last: '' } };
+const modHas = k => typeof XM[k] === 'function';
+try { const s = JSON.parse(localStorage.getItem('orbs-live-song') || 'null'); if (Array.isArray(s)) MOD.song = s; } catch (x) {}
+const modSongSave = () => { try { localStorage.setItem('orbs-live-song', JSON.stringify(MOD.song)); } catch (x) {} };
+const modDl = (blob, name) => { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.style.display = 'none'; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000); };
+const modTx = (t, ms) => { try { lvHint(t, ms || 2200); } catch (x) { recMsg(t); } };
+
+/* ---- hum: one lap of humming becomes the selected planet's pattern (or a new 'hum' lead), pitch per hit ---- */
+function modClick(t, hi) { const o = ac.createOscillator(), g2 = ac.createGain(); o.frequency.value = hi ? 1760 : 1320; g2.gain.setValueAtTime(0.0001, t); g2.gain.exponentialRampToValueAtTime(0.25, t + 0.003); g2.gain.exponentialRampToValueAtTime(0.0001, t + 0.07); o.connect(g2); g2.connect(master); o.start(t); o.stop(t + 0.1); }
+function modHum(id, opts) {
+  if (!modHas('humStart')) { modTx('hum module missing'); return null; }
+  if (MOD.hum) { const r = XM.humStop(); modHumApply(MOD.hum, r); return null; }
+  initAudio(); let e = E[id || selId]; if (!e) { e = lvAddPlanet('lead'); if (!e) return null; e.label = 'hum'; }
+  if (!playing) play();
+  const L = lapOf(e), sb = 4 * Math.ceil((Math.max(0, posNow()) + 1.3) / 4), tc = timeAtPos(sb - 1), t0 = timeAtPos(sb), job = { id: e.id, sb, L, t0, notes: 0 };
+  MOD.hum = job; modClick(tc, true); modTx('hum · count-in · then one lap (' + lapTxt(L) + ')', 1800); LVD = true;
+  const res = XM.humStart(Object.assign({ ctx: ac, key: 'a', scale: 'minor', lapBeats: L, bpm, startAt: t0,
+    onPitch: p => { if (p && p.name && MOD.hum === job) { job.last = p.name; } },
+    onDone: r => { if (MOD.hum === job) modHumApply(job, r); } }, opts || {}));
+  Promise.resolve(res).then(r => { if (r && r.ok === false && MOD.hum === job) { MOD.hum = null; LVD = true; modTx(r.reason === 'denied' ? 'hum · mic blocked · allow the microphone' : 'hum · no microphone', 2600); } }).catch(() => { if (MOD.hum === job) { MOD.hum = null; modTx('hum · no microphone'); } });
+  return job;
+}
+function modHumApply(job, r) {
+  MOD.hum = null; LVD = true; const e = E[job.id]; if (!e || !r) return false; const pat = XM.humToPat(r);
+  if (!pat.length) { modTx('hum · nothing heard', 1800); return false; }
+  const sh = job.sb / job.L + aEff(e); try { pushPat(e); } catch (x) {}
+  e.pat = pat.map(h => { const q = { o: +frac(h.o + sh).toFixed(6), v: +(+h.v).toFixed(3) }; if (h.n != null) q.n = h.n; if (h.len) q.len = h.len; return q; }).sort((a, b) => a.o - b.o);
+  save(); sheetDirty = true; select(e.id); modTx('hum · ' + (e.label || e.id) + ' · ' + pat.length + ' notes in a minor', 2400); MOD.lastHum = { id: e.id, n: pat.length, pat: e.pat }; return true;
+}
+
+/* ---- tilt: the phone's tilt drives the selected group's filter (forward/back) and pan (left/right) ---- */
+function modTilt() { /* must run synchronously inside the click (ios asks for permission here) */
+  if (!modHas('tiltEnable')) { modTx('tilt module missing'); return null; }
+  if (MOD.tilt) { XM.tiltDisable(); MOD.tilt = null; modTx('tilt off', 1000); return false; }
+  let pend = null, raf = 0; const job = MOD.tilt = { on: true, n: 0 };
+  const p = XM.tiltEnable({ onTilt: v => { pend = v; if (!raf) raf = requestAnimationFrame(() => { raf = 0; const e = E[selId]; if (!e || !pend || MOD.tilt !== job) return; const i = e.orbit; orbSet(i, 'amount', clamp((pend.filter - 0.5) * 2, -1, 1)); orbSet(i, 'pan', clamp(pend.pan, -1, 1)); job.n++; LVD = true; }); } });
+  Promise.resolve(p).then(r => { if (MOD.tilt !== job) return; if (!r || !r.supported || !r.granted) { MOD.tilt = null; modTx(r && r.reason === 'denied' ? 'tilt · motion access denied' : 'tilt · no motion sensor here', 2200); if (lvMenu === 'space') renderMore(); } else modTx('tilt on · tip to filter, roll to pan the selected group', 2400); });
+  return true;
+}
+
+/* ---- autopilot: a 5-minute dj arc over the current planets (mutes and the group filters) ---- */
+function modAuto(on) {
+  if (!modHas('autopilotStart')) { modTx('autopilot module missing'); return null; }
+  if (on == null) on = !MOD.auto;
+  if (!on) { if (!MOD.auto) return false; try { XM.autopilotStop(); } catch (x) {} const m = MOD.autoMutes; MOD.auto = null; MOD.autoMutes = null; if (m) for (const id in m) if (E[id]) E[id].muted = m[id]; ORB.forEach((o, i) => { try { orbSet(i, 'amount', 0); } catch (x) {} }); save(); sheetDirty = true; modAutoUi(); modTx('autopilot off · your mutes are back', 1600); return false; }
+  initAudio(); if (!playing) play(); MOD.autoMutes = {}; IDS.forEach(id => { MOD.autoMutes[id] = !!E[id].muted; });
+  const sb = 4 * Math.ceil((Math.max(0, posNow()) + 0.5) / 4), t0 = timeAtPos(sb), job = MOD.auto = { section: 'intro', fired: 0, t0 };
+  const at = (when, f) => setTimeout(() => { if (MOD.auto === job) f(); }, Math.max(0, (when - ac.currentTime) * 1000));
+  const plan = XM.autopilotStart(IDS.filter(id => !E[id].inHole).map(id => ({ id, base: baseOf(id) })), { bpm, ctx: ac, startAt: t0, seed: (Date.now() / 1000) | 0,
+    onAction: (a, when) => at(when, () => { job.fired++;
+      if (a.type === 'mute' || a.type === 'unmute') { const e = E[a.target]; if (e) { e.muted = a.type === 'mute'; sheetDirty = true; } }
+      else if (a.type === 'filter') { const n = Math.max(1, Math.round((a.rampReal || 0) / 0.12)), v0 = job.filter || 0; for (let k = 1; k <= n; k++) setTimeout(() => { if (MOD.auto !== job) return; const v = v0 + (a.value - v0) * k / n; ORB.forEach((o, i) => { try { orbSet(i, 'amount', v); } catch (x) {} }); }, (a.rampReal || 0) * 1000 * (k - 1) / n); job.filter = a.value; }
+      else if (a.type === 'energy') job.energy = a.value; }),
+    onSection: (s, when) => at(when, () => { job.section = s.name; modAutoUi(); recMsg('autopilot · ' + s.name); }),
+    onEnd: () => { if (MOD.auto === job) { MOD.auto = null; MOD.autoMutes = null; modAutoUi(); modTx('autopilot · the set is over', 2200); } } });
+  job.plan = plan; modAutoUi(); modTx('autopilot · ' + Math.round(plan.duration / 60 * 10) / 10 + ' min arc · from the next bar', 2000); return plan;
+}
+function modAutoUi() { const b = document.getElementById('lAuto'); if (!b) return; b.classList.toggle('on', !!MOD.auto); const v = document.getElementById('lAutoS'); if (v) v.textContent = MOD.auto ? MOD.auto.section : ''; }
+
+/* ---- song timeline: sections of saved scenes, played through or exported as one wav ---- */
+const SONG_NAMES = ['intro', 'build', 'drop', 'break', 'outro'];
+function modSongTemplate() { const slots = SCENE_SLOTS.filter(s => SCENES[s]); if (!slots.length) { modTx('save a scene first · browser › scenes', 2400); return false; } MOD.song = XM.timelineTemplate(slots).map(s => ({ name: s.name, scene: s.scene, bars: s.bars })); modSongSave(); return true; }
+function modSongPlay(on) {
+  if (!modHas('timelineStart')) { modTx('timeline module missing'); return null; }
+  if (on == null) on = !MOD.songOn; if (!on) { XM.timelineStop(); MOD.songOn = false; renderMore(); return false; }
+  const v = XM.timelineValidate(MOD.song, { scenes: SCENES }); if (!v.ok) { modTx('song · ' + (v.errors[0] || 'add sections'), 2600); return false; }
+  initAudio(); if (!playing) play(); const sb = Math.ceil(Math.max(0, posNow()) / 4 + 0.05);
+  XM.timelineStart(MOD.song, { bpm, scenes: SCENES, now: () => posNow() * 60 / bpm, when: sb * 4 * 60 / bpm, lookahead: 0,
+    applyScene: (slot, s, i, o) => gotoScene(slot, o.morph || 0), onSection: (s, i) => { MOD.songAt = i; recMsg('song · ' + s.name); if (lvMenu === 'song') renderMore(); }, onEnd: () => { MOD.songOn = false; modTx('song · end', 1600); if (lvMenu === 'song') renderMore(); } });
+  MOD.songOn = true; MOD.songAt = 0; return true;
+}
+async function modSongExport() {
+  if (!modHas('timelineExport')) { modTx('timeline module missing'); return null; }
+  const v = XM.timelineValidate(MOD.song, { scenes: SCENES }); if (!v.ok) { modTx('song · ' + (v.errors[0] || 'add sections'), 2600); return null; }
+  initAudio(); const before = sysSnap(); const L = XM.timelineLength(MOD.song, { bpm }); recMsg('rendering song · ' + L.bars + ' bars…');
+  try { const r = await XM.timelineExport(MOD.song, { bpm, scenes: SCENES, tail: Math.min(4, ROOM.size) + 0.3, applyScene: slot => applyDiscrete(SCENES[slot]), renderSection: (c, d, s, i, o) => renderInto(c, d, { solo: null }, o.beats), restore: () => applyDiscrete(before) });
+    modDl(r.wav, 'orbs-' + bpm + 'bpm-song.wav'); recMsg('song wav · ' + r.bars + ' bars · ' + Math.round(r.seconds) + ' s'); MOD.lastExport = { bars: r.bars, seconds: r.seconds, bytes: r.bytes }; return r; }
+  catch (x) { recMsg('song export failed · ' + (x && x.message || x)); return null; }
+}
+
+/* ---- duo (beta): a second device plays half the planets · host shows a qr / link, the guest sends an answer code back ---- */
+let duoMirror = {};
+const duoSnap = () => { const planets = {}; IDS.forEach(id => { const e = E[id]; planets[id] = { muted: !!e.muted, vol: +(+e.vol).toFixed(3), lap: lapOf(e) }; }); return { planets, bpm, playing }; };
+async function modDuoHost() {
+  if (!modHas('duoHost')) return null; const D = MOD.duo; D.busy = true; D.err = null; D.role = 'host'; renderMore();
+  try { D.code = await XM.duoHost(); D.link = XM.duoLink(D.code, location.href.split('#')[0]); } catch (x) { D.err = 'could not make a code · ' + (x && x.message || x); }
+  D.busy = false; if (lvMenu === 'export') renderMore(); return D.code;
+}
+async function modDuoAccept(txt) { const D = MOD.duo; try { await XM.duoAccept(txt); D.err = null; } catch (x) { D.err = 'that answer did not work · ' + (x && x.message || x); } if (lvMenu === 'export') renderMore(); }
+async function modDuoJoin(code) { const D = MOD.duo; D.role = 'guest'; D.busy = true; try { D.answer = await XM.duoJoin(code); } catch (x) { D.err = 'could not join · ' + (x && x.message || x); } D.busy = false; lvMenu = 'export'; moreOpen(true); return D.answer; }
+function modDuoWire() {
+  if (!modHas('duoOnState')) return;
+  XM.duoOnState(s => { const D = MOD.duo; D.state = s.state; if (s.state === 'open' && XM.duoInfo().role === 'host') { XM.duoAssign(IDS.filter(id => !E[id].inHole)); XM.duoSync(duoSnap()); duoMirror = JSON.parse(JSON.stringify(duoSnap().planets)); }
+    if (s.state === 'open') modTx('play together · connected', 1800); if (lvMenu === 'export') renderMore(); });
+  XM.duoOnMessage((m, meta) => { const info = XM.duoInfo(); if (info.role === 'host') { if (!meta.accepted || !E[m.planet]) return; const e = E[m.planet];
+      if (m.t === 'mute') e.muted = !!m.muted; else if (m.t === 'vol') e.vol = clamp(+m.value, 0, 1); else if (m.t === 'fx' && ['cut', 'pn', 'verb', 'echo', 'prob', 'drift'].includes(m.param)) e[m.param] = +m.value;
+      else if (m.t === 'trigger') spPlay(e, ac.currentTime + 0.01, m.vel == null ? 0.8 : m.vel, 0.6, 'duo');
+      if (duoMirror[m.planet]) Object.assign(duoMirror[m.planet], { muted: !!e.muted, vol: +(+e.vol).toFixed(3) }); sheetDirty = true; LVD = true; }
+    else if (m.t === 'sync') modDuoApply(); });
+  setInterval(modDuoTick, 200);
+}
+function modDuoApply() { const s = XM.duoInfo().snapshot; if (!s || !s.planets) return; for (const id in s.planets) { const e = E[id], p = s.planets[id]; if (!e || !p) continue; if (p.muted != null) e.muted = !!p.muted; if (p.vol != null) e.vol = +p.vol; } if (s.bpm && Math.abs(s.bpm - bpm) > 0.01) { try { setBpm(s.bpm); } catch (x) {} } duoMirror = JSON.parse(JSON.stringify(s.planets)); sheetDirty = true; LVD = true; }
+function modDuoTick() {
+  const info = XM.duoInfo ? XM.duoInfo() : null; if (!info || info.state !== 'open') return;
+  if (info.role === 'host') { const d = {}; let n = 0; IDS.forEach(id => { const e = E[id], m = duoMirror[id] || {}, v = +(+e.vol).toFixed(3); if (m.muted !== !!e.muted || m.vol !== v) { d[id] = { muted: !!e.muted, vol: v }; duoMirror[id] = Object.assign({}, m, d[id]); n++; } }); if (n) XM.duoSync({ planets: d, bpm }, { delta: true }); }
+  else { const mine = (info.assign && info.assign.guest) || []; mine.forEach(id => { const e = E[id], m = duoMirror[id]; if (!e || !m) return; if (m.muted !== !!e.muted) { XM.duoSend({ t: 'mute', planet: id, muted: !!e.muted }); m.muted = !!e.muted; } const v = +(+e.vol).toFixed(3); if (Math.abs(m.vol - v) > 0.004) { XM.duoSend({ t: 'vol', planet: id, value: v }); m.vol = v; } }); }
+}
+function modDuoHTML() {
+  if (!modHas('duoHost')) return ''; const D = MOD.duo, info = XM.duoInfo(), st = info.state; let h = '<div class="lab">play together <span class="beta">beta</span></div>';
+  if (st === 'open') { const a = info.assign || {}; h += '<div class="mn">connected' + (info.rtt ? ' · ' + Math.round(info.rtt) + ' ms' : '') + ' · you: ' + ((info.role === 'host' ? a.host : a.guest) || []).join(' ') + '</div><div class="mi" data-lduo="end"><b>end</b></div>'; return h; }
+  if (D.role === 'guest') { h += D.busy ? '<div class="mn">joining…</div>' : D.answer ? '<div class="mn">send this answer back to the host</div><div class="mn"><textarea readonly class="duocode">' + lvEsc(D.answer) + '</textarea></div><div class="mi" data-lduo="copyans"><b>copy answer</b></div>' : ''; }
+  else if (!D.code) h += '<div class="mi" data-lduo="host"><b>' + (D.busy ? 'making a code…' : 'play with a phone') + '</b><span style="flex:1"></span><span class="k">same wi-fi</span></div>';
+  else h += '<div class="mn">scan on the phone, or send the link</div><div class="mn"><canvas id="duoQr" width="220" height="220" style="width:168px;height:168px;background:#fff;display:block;margin:2px auto"></canvas></div><div class="mi" style="cursor:default"><span class="ch" data-lduo="copylink">copy link</span> <span class="ch" data-lduo="copycode">copy code</span></div><div class="mn"><input id="duoAns" placeholder="paste the phone\'s answer" class="duocode"></div><div class="mi" data-lduo="accept"><b>connect</b></div>';
+  if (D.err) h += '<div class="mn">' + lvEsc(D.err) + '</div>'; return h;
+}
+const modCopy = t => { try { navigator.clipboard.writeText(t); modTx('copied', 900); } catch (x) {} };
+
+/* ---- ui wiring: top bar (autopilot, song menu), space menu (hum · tilt), share menu (duo), detail space row (hum) ---- */
+const modRM0 = renderMore;
+renderMore = function () {
+  if (lvMenu === 'song') { const ch = (on, a, l) => '<span class="ch' + (on ? ' on' : '') + '" ' + a + '>' + l + '</span>', slots = SCENE_SLOTS.filter(s => SCENES[s]); let h = '<div class="lab">song timeline</div>';
+    if (!slots.length) h += '<div class="mn">save scenes first · browser › scenes · then line them up here</div>';
+    h += MOD.song.map((s, i) => '<div class="mi srow' + (MOD.songOn && MOD.songAt === i ? ' on' : '') + '" style="cursor:default"><select data-ls="name" data-i="' + i + '">' + SONG_NAMES.map(n => '<option' + (n === s.name ? ' selected' : '') + '>' + n + '</option>').join('') + '</select><select data-ls="scene" data-i="' + i + '">' + SCENE_SLOTS.map(n => '<option' + (n === s.scene ? ' selected' : '') + (SCENES[n] ? '' : ' disabled') + '>' + n + '</option>').join('') + '</select><span style="flex:1"></span>' + ch(false, 'data-lsong="minus" data-i="' + i + '"', '−') + '<span class="k">' + s.bars + '</span>' + ch(false, 'data-lsong="plus" data-i="' + i + '"', '+') + ch(false, 'data-lsong="del" data-i="' + i + '"', '×') + '</div>').join('');
+    h += '<div class="mi" style="cursor:default">' + ch(false, 'data-lsong="add"', '+ section') + ' ' + ch(false, 'data-lsong="tpl"', 'template') + '<span style="flex:1"></span><span class="k">' + (MOD.song.length ? XM.timelineLength(MOD.song, { bpm }).bars + ' bars' : '') + '</span></div>';
+    h += '<div class="ms"></div><div class="mi" data-lsong="play"><b>' + (MOD.songOn ? 'stop song' : 'play song') + '</b><span style="flex:1"></span>' + lvTog(MOD.songOn) + '</div><div class="mi" data-lsong="wav"><b>export wav</b><span style="flex:1"></span><span class="k">whole song</span></div>';
+    mmenu.innerHTML = h; return; }
+  modRM0();
+  if (lvMenu === 'export') { mmenu.insertAdjacentHTML('beforeend', modDuoHTML()); const c = document.getElementById('duoQr'); if (c && MOD.duo.link) { try { XM.duoQrCanvas(c, MOD.duo.link, { px: 220 }); } catch (x) {} } }
+};
+mmenu.addEventListener('click', ev => {
+  const s = ev.target.closest('[data-lsong]'), d = ev.target.closest('[data-lduo]'); if (!s && !d) return; ev.stopPropagation();
+  if (s) { const a = s.dataset.lsong, i = +s.dataset.i, S = MOD.song;
+    if (a === 'plus') S[i].bars = Math.min(64, S[i].bars + (S[i].bars >= 8 ? 4 : 1)); else if (a === 'minus') S[i].bars = Math.max(1, S[i].bars - (S[i].bars > 8 ? 4 : 1)); else if (a === 'del') S.splice(i, 1);
+    else if (a === 'add') { const sl = SCENE_SLOTS.find(x => SCENES[x]) || 'intro'; S.push({ name: SONG_NAMES[Math.min(S.length, 4)], scene: sl, bars: 8 }); } else if (a === 'tpl') modSongTemplate();
+    else if (a === 'play') modSongPlay(); else if (a === 'wav') modSongExport(); modSongSave(); }
+  if (d) { const a = d.dataset.lduo; if (a === 'host') modDuoHost(); else if (a === 'copylink') modCopy(MOD.duo.link); else if (a === 'copycode') modCopy(MOD.duo.code); else if (a === 'copyans') modCopy(MOD.duo.answer);
+    else if (a === 'accept') { const v = (document.getElementById('duoAns') || {}).value; if (v) modDuoAccept(v.trim()); } else if (a === 'end') { XM.duoClose(); MOD.duo = { busy: false, state: 'idle', role: null }; } }
+  setTimeout(() => { if (lvMenu) renderMore(); }, 0);
+});
+mmenu.addEventListener('change', ev => { const s = ev.target.closest('select[data-ls]'); if (!s) return; const it = MOD.song[+s.dataset.i]; if (it) { it[s.dataset.ls] = s.value; modSongSave(); } });
+mmenu.addEventListener('pointerdown', ev => { if (ev.target.closest('#duoAns,.duocode')) ev.stopPropagation(); });
+OX.api.menu('modules', () => (modHas('tiltEnable') ? '<div class="mi" data-spm="tilt"><b>tilt</b><span style="flex:1"></span><span class="k">phone: tip = filter, roll = pan</span>' + lvTog(!!MOD.tilt) + '</div>' : '') + (modHas('humStart') ? '<div class="mi" data-spm="hum"><b>' + (MOD.hum ? 'stop humming' : 'hum a planet') + '</b><span style="flex:1"></span><span class="k">' + (E[selId] ? 'into ' + lvEsc(E[selId].label || selId) : 'new planet') + '</span></div>' : ''),
+  m => { const a = m.dataset.spm; if (a === 'tilt') modTilt(); else if (a === 'hum') { moreOpen(false); modHum(); } });
+OX.slots.forEach(s => { if (!OX.loaded.includes(s)) OX.loaded.push(s); });
+const modDet0 = lvDetail;
+lvDetail = function () { modDet0(); const r = document.querySelector('#lClip .sprow'); if (r && modHas('humStart')) r.insertAdjacentHTML('beforeend', '<span class="gsep"></span>' + lvCh(MOD.hum && MOD.hum.id === selId ? 'humming…' : 'hum', !!(MOD.hum && MOD.hum.id === selId), 'data-lmod="hum" title="hum one lap: rhythm and notes (a minor) into this planet"')); };
+LV('lClip').addEventListener('click', ev => { const m = ev.target.closest('[data-lmod]'); if (!m) return; ev.stopPropagation(); if (m.dataset.lmod === 'hum') modHum(selId); LVD = true; });
+function modInit() {
+  const a = document.getElementById('lAuto'); if (a) a.addEventListener('click', ev => { ev.stopPropagation(); modAuto(); });
+  modDuoWire(); const code = modHas('duoCodeFromUrl') ? XM.duoCodeFromUrl() : null; if (code) setTimeout(() => modDuoJoin(code), 1500);
+}
 
 
 /* ---------------- sample picker ---------------- */
@@ -9836,7 +11857,7 @@ window.SS = { E, get ORB() { return ORB; }, IDS, links, get TETH() { return TETH
   get VIEW() { return VIEW; }, zoomAt, setView, zoomFit, zoom11, get COMET() { return COMET; }, setComet, comets, shareLink, shareState, chanceOk, MOON_OFF, POLY, renderMore, get spaceDown() { return spaceDown; },
   sysSnap, applyDiscrete, storeScene, gotoScene, get SCENES() { return SCENES; }, get MORPH() { return MORPH; }, set SCENE_BARS(v) { SCENE_BARS = v; }, mutate, undoMutate, MUT_UNDO, setJam, get JAM() { return JAM; }, jamHit, jamNudge, driftOff, swallow, get HOLE() { return HOLE; }, sunTap, get CHORD() { return CHORD; }, chordIdx, chordName, hitEvent,
   get XS() { return XS; }, setXS, hitsIn, midiFor, exportMidi, exportWav, renderInto, get bin() { return bin; }, binauralOn, get ECL() { return ECL; }, GRAV, startGravity, sizeSemis, sizeWheel, get MOODCSS() { return MOODCSS; }, setTrailKind, trailOf, trailMix, chopPlanet, playSlice, startPractice, endPractice, pracTap, get prac() { return prac; }, get lastPractice() { return lastPractice; }, gravGesture, X, save, setWinTab, get WTAB() { return WTAB; }, setSec, secOpen, set SEC_ALL(v) { SEC_ALL = !!v; sheetDirty = true; }, set UI_ALL(v) { UI_ALL = !!v; sheetDirty = true; if (winId) renderWin(); }, get SHEET() { return SHEET; }, sheetCollapse, applySheet, moreOpen, get SECS() { return SECS; }, get SKIN() { return SKIN; }, setSkin, SKIN_IDS, SKINS, drawScene, SKC, SKSTAT, get fieldBuilds() { return fieldBuilds; }, get CLEAN() { return CLEAN; }, setClean, get CLEAN_LABELS() { return CLEAN_LABELS; }, get XFADE() { return XFADE; }, get GRAV_DONE() { return GRAV_DONE; }, releaseGravity, linked, get lastShare() { return lastShare; }, get PAD9() { return PAD9; }, pad9Init, pad9Toggle, pad9Open, pad9Commit, playPlanetSound, P9V, posAt, timeAtPos, get recCount() { return recCount; } };
-liveInit(); Object.defineProperties(window.SS, Object.getOwnPropertyDescriptors({ LIVE: true, get LVP() { return LVP; }, lvCollapse, lvAddPlanet, lvDevToggle, lvDevOn: (dev, id) => { const e = E[id]; return !!e && lvDevOn(dev, e, ORB[e.orbit]); }, lvGet, lvSet, get LVOFF() { return LVOFF; }, lvPadSlot, get lvTemp() { return lvTemp; }, lvOverdub, get lvOd() { return lvOd; }, get master() { return master; }, get LVMASTER() { return LVMASTER; }, get LABELS_ON() { return LABELS_ON; }, get lvMenu() { return lvMenu; }, lvOpenMenu, get recBarsN() { return recBarsN; }, hitDotAt: (x, y) => !!(hitDot(x, y, 4) || hitLabel(x, y) || linkAt(x, y) || Math.hypot(x - CX, y - CY) < SUNR + 12), lvBoxes, lvCloseAll, recMsg: s => recMsg(s), lvSnd: () => lvSndDrag }));
+liveInit(); spInit(); modInit(); Object.defineProperties(window.SS, Object.getOwnPropertyDescriptors({ LIVE: true, get space() { return SP; }, get mods() { return MOD; }, decorate, hitEvent, modHum, modHumApply, modTilt, modAuto, modSongPlay, modSongExport, modSongTemplate, modDuoHost, modDuoTick, get LVP() { return LVP; }, lvCollapse, lvAddPlanet, lvDevToggle, lvDevOn: (dev, id) => { const e = E[id]; return !!e && lvDevOn(dev, e, ORB[e.orbit]); }, lvGet, lvSet, get LVOFF() { return LVOFF; }, lvPadSlot, get lvTemp() { return lvTemp; }, lvOverdub, get lvOd() { return lvOd; }, get master() { return master; }, get LVMASTER() { return LVMASTER; }, get LABELS_ON() { return LABELS_ON; }, get lvMenu() { return lvMenu; }, lvOpenMenu, get recBarsN() { return recBarsN; }, hitDotAt: (x, y) => !!(hitDot(x, y, 4) || hitLabel(x, y) || linkAt(x, y) || Math.hypot(x - CX, y - CY) < SUNR + 12), lvBoxes, lvCloseAll, recMsg: s => recMsg(s), lvSnd: () => lvSndDrag }));
 })();
 </script>
 </body>

@@ -6490,7 +6490,7 @@ function applySaved(e, o) {
   if (isFinite(o.prob)) e.prob = clamp(+o.prob, 0, 1); if (isFinite(o.moons)) e.moons = clamp(o.moons | 0, 0, 3); if (isFinite(o.drift)) e.drift = clamp(+o.drift, 0, 1); e.inHole = !!o.inHole && !!o.muted;
   if (isFinite(o.size)) e.size = clamp(+o.size, 0, 1); if (o.trail && Array.isArray(o.trail.points) && (o.trail.kind === 'cut' || o.trail.kind === 'vol')) e.trail = { kind: o.trail.kind, points: o.trail.points.filter(p => p && isFinite(p.phase) && isFinite(p.value)).slice(0, 32).map(p => ({ phase: frac(+p.phase), value: clamp(+p.value, 0, 1), bend: clamp(+p.bend || 0, -1, 1) })) };
   if (Array.isArray(o.chops)) e.chops = o.chops.filter(c => c && isFinite(c.start) && isFinite(c.end)).slice(0, 32).map(c => ({ start: +c.start, end: +c.end, peak: +c.peak || 0 }));
-  e.pat = Array.isArray(o.pat) ? o.pat.filter(h => h && isFinite(h.o) && isFinite(h.v)).map(h => { const q = { o: frac(+h.o), v: clamp(+h.v, 0, 1) }; if (isFinite(h.c) && +h.c < 1) q.c = clamp(+h.c, 0, 1); if (Number.isInteger(h.s) && h.s >= 0) q.s = h.s; return q; }).slice(0, 128) : [];
+  e.pat = Array.isArray(o.pat) ? o.pat.filter(h => h && isFinite(h.o) && isFinite(h.v)).map(h => { const q = { o: frac(+h.o), v: clamp(+h.v, 0, 1) }; if (isFinite(h.c) && +h.c < 1) q.c = clamp(+h.c, 0, 1); if (Number.isInteger(h.s) && h.s >= 0) q.s = h.s; if (isFinite(h.n) && h.n != null) q.n = clamp(Math.round(+h.n), 0, 127); if (isFinite(h.len) && +h.len > 0) q.len = Math.min(16, +h.len); return q; }).slice(0, 128) : [];
   if (e.side === 'rec' && o.label) e.label = String(o.label).slice(0, 14);
 }
 function load() { try { const s = JSON.parse(localStorage.getItem(LS) || 'null'); if (!s) return;
@@ -6788,7 +6788,7 @@ function playStep(n, t) {
   stepTimes.push({ n, t, sd }); if (stepTimes.length > 48) stepTimes.shift();
   if (n % 16 === 0) { barTimes.push({ t, b: n / 16 }); if (barTimes.length > 8) barTimes.shift(); }
   for (const id of IDS) {
-    const e = E[id]; if (e.muted || (drag && drag.e === e && drag.moved && !drag.tether)) continue;
+    const e = E[id]; if (e.muted || e._own || (drag && drag.e === e && drag.moved && !drag.tether)) continue; // _own: the live page schedules this planet itself (second sun · tidal lock · supernova)
     const L = lapOf(e), a0 = aEff(e), hs = hitsOf(e);
     for (let j = 0; j < hs.length; j++) {
       const h = nextHitA(L, a0 - hs[j].o, pb);
@@ -6828,7 +6828,7 @@ function hitEvent(e, p, k) {
   ev.loop = B0.variant === 'file' && !!B0.loop && !!B0.buf;
   return ev;
 }
-function decorate(e, ev, j) { pitchEv(e, ev); if (j < 100 && e.chops) { const hh = hitsOf(e)[j]; if (hh && hh.s != null) ev.slice = hh.s; } return ev; }
+function decorate(e, ev, j) { if (j < 100) { const hh = hitsOf(e)[j]; if (hh && hh.n != null) { ev.n = hh.n; if (hh.len) ev.dur = hh.len * lapOf(e) * 60 / bpm / 16; } } /* hummed hits carry their own pitch */ pitchEv(e, ev); if (j < 100 && e.chops) { const hh = hitsOf(e)[j]; if (hh && hh.s != null) ev.slice = hh.s; } return ev; }
 function fireHit(e, t, p, k, v = 1, j = 0) {
   const ghost = j >= 100, ev = decorate(e, hitEvent(e, p, k + j * 101), j); ev.v *= v; if (ghost) { ev.dur = Math.min(ev.dur, 0.12); ev.roll = null; if (e.mflash) e.mflash[j - 100] = t; else e.mflash = { [j - 100]: t }; }
   const om = ORB[e.orbit] && ORB[e.orbit].st.muted;
@@ -7107,18 +7107,18 @@ function updateMix() {
     const mutedNow = e.muted || (drag && drag.e === e && drag.moved && drag.tgt && drag.tgt.mute);
     routePlanet(e); const os = ORB[e.orbit] ? ORB[e.orbit].st : null, og = os ? (os.muted ? 0 : OrbsFX.dbToGain(os.gainDb)) : 1, S = OrbsFX.SMOOTH;
     const tm = trailMix(e);
-    setP(e, 'v', e.vg.gain, mutedNow ? 0 : Math.pow(e.vol, 1.3) * e.lvl * (tm && tm.vol != null ? tm.vol : 1), S);
+    setP(e, 'v', e.vg.gain, mutedNow ? 0 : Math.pow(e.vol, 1.3) * e.lvl * (tm && tm.vol != null ? tm.vol : 1) * (e.dnG == null ? 1 : e.dnG), S); // dnG / dnCut: live day and night
     setP(e, 'p', e.pan.pan, clamp(e.pn, -1, 1) * 0.9, S);
     setP(e, 's', e.sg.gain, e.verb * og, S); // planet reverb send into the batch 3 room, follows the group's gain / mute
     setP(e, 'd', e.dg.gain, e.echo * 0.6 * og, S); // planet echo = its send into the group delay
-    setP(e, 'c', e.flt.frequency, Math.min(cutHz(tm && tm.cut != null ? Math.min(e.cut, tm.cut) : e.cut), e.eclCut || 1e5), S); // trail + eclipse close the filter further
+    setP(e, 'c', e.flt.frequency, Math.min(cutHz(tm && tm.cut != null ? Math.min(e.cut, tm.cut) : e.cut), e.eclCut || 1e5, e.dnCut || 1e5), S); // trail + eclipse close the filter further
     ccTick(e);
   }
 }
 
 /* ---------------- interaction ---------------- */
 let drag = null;
-const ripples = []; let RIP_LIVE = false, ripLive = () => {}; // the live page swaps in its own ripple style (scaled to the system)
+const ripples = []; let RIP_LIVE = false, ripLive = () => {}, HOLD_BAR = true, LABEL_AVOID = null, spaceDraw = null; // live hooks: hold = supernova there, labels avoid the edge boxes, space overlays // the live page swaps in its own ripple style (scaled to the system)
 const hitR = e => Math.max(e.r + 4 + (e.moons ? 3.2 * e.moons + 2 : 0), touchMode ? 22 : 12); // moon rings count as the planet (qa #5)
 function hitDot(x, y, extra = 0) { let best = null, bd = 1e9; for (const id of IDS) { const e = E[id], d = Math.hypot(x - e.x, y - e.y); if (d < hitR(e) + extra && d <= bd) { bd = d; best = { e, d }; } } return best; }
 let LABEL_FONT = '400 10.5px ui-rounded, "SF Pro Rounded", "Nunito", "Quicksand", "Varela Round", system-ui, sans-serif';
@@ -7136,7 +7136,7 @@ function labelCands(e, w) {
   return list;
 }
 function layoutLabels() {
-  g.font = LABEL_FONT; const placed = [];
+  g.font = LABEL_FONT; const placed = LABEL_AVOID ? LABEL_AVOID() : [];
   const dots = IDS.map(id => { const e = E[id]; return [e.x - e.r - 2, e.y - e.r - 2, e.x + e.r + 2, e.y + e.r + 2, id]; });
   const order = IDS.slice().sort((a, b) => ((b === selId) - (a === selId)) || ((drag && drag.e.id === b) - (drag && drag.e.id === a)) || (E[b].vol - E[a].vol) || (IDS.indexOf(a) - IDS.indexOf(b)));
   for (const id of order) {
@@ -7187,7 +7187,7 @@ cv.addEventListener('pointerdown', ev => {
   cv.setPointerCapture(ev.pointerId);
   const d0 = drag = { t0: performance.now(), e: h.e, sx: x, sy: y, px: x, py: y, ox: h.e.x - x, oy: h.e.y - y, moved: false, tgt: null, tether: !!ev.shiftKey, d0: {} };
   for (const p of partnersOf(h.e.id)) d0.d0[p] = Math.hypot(E[p].x - h.e.x, E[p].y - h.e.y);
-  if (!d0.tether) d0.lp = setTimeout(() => { if (drag === d0 && !d0.moved) { drag = null; select(d0.e.id); openBar(d0.e.id); } }, 550);
+  if (!d0.tether && HOLD_BAR) d0.lp = setTimeout(() => { if (drag === d0 && !d0.moved) { drag = null; select(d0.e.id); openBar(d0.e.id); } }, 550);
 });
 cv.addEventListener('dblclick', ev => { layout(); if (Math.hypot(ev.clientX - CX, ev.clientY - CY) < SUNR + (touchMode ? 20 : 12)) return; const lk = linkAt(ev.clientX, ev.clientY, true) || linkAt(ev.clientX, ev.clientY); if (lk && linked(lk[0], lk[1])) unlink(lk[0], lk[1]); });
 cv.addEventListener('pointermove', ev => {
@@ -7391,7 +7391,7 @@ function frame(now) {
   if (drag && drag.moved && drag.tgt && drag.tgt.mute) { g.textAlign = 'center'; g.globalAlpha = 0.5; g.fillText('mute', drag.px, drag.py - drag.e.r - 14); }
   g.globalAlpha = 1;
     } });
-  drawRecIndicator(); drawBar(); if (winId) drawWinRing(); drawXfade(now); if (PAD9) pad9Tick();
+  if (spaceDraw) spaceDraw(now); drawRecIndicator(); drawBar(); if (winId) drawWinRing(); drawXfade(now); if (PAD9) pad9Tick();
   SKSTAT.push(performance.now() - f0); if (SKSTAT.length > 240) SKSTAT.shift();
   requestAnimationFrame(frame);
 }
