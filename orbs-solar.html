@@ -107,7 +107,7 @@
   #barNote{opacity:.3;margin-top:10px;min-height:1.2em}
   #zoom{display:flex;gap:9px} #zoom em{font-style:normal;opacity:.75} #zoom em:hover{opacity:1} #zoom em.on{opacity:1;border-bottom:1px solid rgba(255,255,255,.6)}
   .laps.poly .pt{opacity:.25;cursor:default;border:0!important}
-  #mmenu{z-index:8;background:rgba(0,0,0,.96);border:1px solid rgba(255,255,255,.2);padding:8px 0;min-width:190px;display:none;font-size:11px}
+  #mmenu{z-index:8;background:rgba(0,0,0,.96);border:1px solid rgba(255,255,255,.2);padding:8px 0;min-width:190px;display:none;font-size:11px;max-height:calc(100vh - 56px);overflow-y:auto}
   #mmenu.open{display:block}
   #mmenu .mi{display:flex;align-items:center;gap:10px;padding:7px 16px;cursor:pointer;opacity:.55} #mmenu .mi:hover{opacity:1} #mmenu .mi.on{opacity:1}
   #mmenu .mi b{font-weight:500;flex:1} #mmenu .mi .ck{width:7px;height:7px;border:1px solid #fff;border-radius:50%;opacity:.7} #mmenu .mi.on .ck{background:#fff}
@@ -191,7 +191,7 @@
   <span id="snap" class="on" title="snap planets to the 1/16 grid">snap 1/16</span>
   <span id="midi" title="send midi to ableton (ch 1–8)">midi</span>
   <span id="zoom" title="zoom: wheel or pinch around the cursor · + / − keys · space-drag or middle-drag to pan"><em data-z="fit">fit</em><em data-z="1">1:1</em></span>
-  <span id="more" title="more: comets, share link …">more</span>
+  <span id="more" title="more: comets, scenes, export, binaural, eclipses, gravity, mood light, share link …">more</span>
 </div>
 <div id="sheet" class="ui"></div>
 <div id="gmenu" class="ui"></div>
@@ -2326,6 +2326,11 @@
   const LAPS = [1, 2, 4, 8, 16];
   const BPM_MIN = 40, BPM_MAX = 220;
   const SWING_MIN = 0, SWING_MAX = 60;
+  /* swing units: 0–60, identical to OrbsFX and the app's swing slider (shown as %).
+     the value is the percent of one 16th-note by which odd 16ths are delayed:
+       t += (swing/100) * (60/bpm) * 0.25
+     0 = straight. 18 = light lofi drag. 58 = laid-back boom-bap, just shy of
+     an 8th-note triplet (~67). not a 0–100 DAW "swing amount" and not 50=straight. */
   const NOTE_NAMES = ['c', 'c#', 'd', 'd#', 'e', 'f', 'f#', 'g', 'g#', 'a', 'a#', 'b'];
   const SCALE_INT = {
     major: [0, 2, 4, 5, 7, 9, 11],
@@ -2407,7 +2412,9 @@
     lofi: 'lofi', 'lo-fi': 'lofi', 'lofihiphop': 'lofi', 'lofihop': 'lofi',
     'lo-fihiphop': 'lofi', dnb: 'dnb', 'dandb': 'dnb', 'drumandbass': 'dnb',
     dub: 'dub', reggae: 'dub', dubreggae: 'dub', meditation: 'meditation',
-    buddha: 'meditation', bowls: 'meditation'
+    buddha: 'meditation', bowls: 'meditation',
+    hiphop: 'hiphop', hip: 'hiphop', boombap: 'hiphop',
+    psytrance: 'psytrance', psy: 'psytrance'
   };
 
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -2565,6 +2572,7 @@
   const A_MIN = { root: 9, name: 'A', mode: 'minor' };
   const A_DOR = { root: 9, name: 'A', mode: 'dorian' };
   const A_PEN = { root: 9, name: 'A', mode: 'pentatonic' };
+  const A_PHR = { root: 9, name: 'A', mode: 'phrygian' };
 
   function prog(symbols, oct) {
     return symbols.map(s => parseChord(s, oct == null ? 3 : oct));
@@ -2678,6 +2686,24 @@
   });
 
   add({
+    id: 'hiphop', name: 'hip hop', bpm: 90, swing: 58, // 58% of a 16th — see SWING_MIN comment
+    key: Object.assign({}, A_MIN),
+    prog: prog(['Am9', 'Fmaj7', 'Dm9', 'G7']),
+    fx: { reverb: { send: 0.22, decay: 1.8 }, delay: { send: 0.1, delayBeats: 0.75, feedback: 0.2 } },
+    orbits: [4, 2, 1, 16],
+    elements: {
+      kick:   el('round',  { hit: { kind: 'drum', n: 36, velocity: 0.95, length: 0.5 }, lap: 4, hits: [0, 2.5], orbit: 0, vol: 0.92, verb: 0.06, echo: 0, cut: 0.95 }),
+      hats:   el('closed', { hit: { kind: 'drum', n: 42, velocity: 0.55, length: 0.07 }, lap: 1, hits: [0, 0.5], orbit: 2, vol: 0.48, verb: 0.1, echo: 0, cut: 1 }),
+      snare:  el('tight',  { hit: { kind: 'drum', n: 38, velocity: 0.88, length: 0.18 }, lap: 2, hits: [1, 3], orbit: 1, vol: 0.8, verb: 0.16, echo: 0.04, cut: 1 }),
+      perc:   el('wood',   { hit: { kind: 'note', role: 'fifth', octave: 4, velocity: 0.4, length: 0.08 }, lap: 4, hits: [0.75, 3.75], orbit: 0, vol: 0.38, verb: 0.16, echo: 0.12, cut: 0.9 }),
+      bass:   el('sub',    { hit: { kind: 'note', role: 'root', octave: 1, velocity: 0.9, length: 1.7, glide: true }, lap: 4, hits: [0, 2], orbit: 2, vol: 0.85, verb: 0.04, echo: 0, cut: 0.7 }),
+      lead:   el('triangle', { hit: { kind: 'note', role: 'chord', octave: 5, velocity: 0.5, length: 0.7 }, lap: 8, hits: [4.5, 6], orbit: 2, vol: 0.42, verb: 0.28, echo: 0.18, cut: 0.85 }),
+      chords: el('keys',   { hit: { kind: 'chord', voicing: 'spread', velocity: 0.6, length: 3.2 }, lap: 4, hits: [0], orbit: 2, vol: 0.55, verb: 0.28, echo: 0.1, cut: 0.8 }),
+      pad:    el('warm',   { hit: { kind: 'pad', velocity: 0.42, length: 16 }, lap: 16, hits: [0], orbit: 3, vol: 0.4, verb: 0.4, echo: 0.08, cut: 0.65 })
+    }
+  });
+
+  add({
     id: 'trap', name: 'trap', bpm: 140, swing: 4,
     key: Object.assign({}, A_MIN),
     prog: prog(['Am', 'Dm', 'F', 'Em']),
@@ -2695,20 +2721,41 @@
     }
   });
   add({
+    /* upgraded in place (id and aliases kept): richer two-step break, rolling hats,
+       reese bass on a long low root (the factory reese is the mid growl; the
+       octave-1 fundamental is the sub), and a darker pad. */
     id: 'dnb', name: 'drum & bass', bpm: 174, swing: 0,
     key: Object.assign({}, A_MIN),
-    prog: prog(['Am', 'G', 'F', 'Em']),
-    fx: { reverb: { send: 0.16, decay: 0.9 }, delay: { send: 0.15, delayBeats: 0.5, feedback: 0.25 } },
+    prog: prog(['Am', 'F', 'Dm', 'Em']),
+    fx: { reverb: { send: 0.14, decay: 0.8 }, delay: { send: 0.12, delayBeats: 0.25, feedback: 0.22 } },
     orbits: [4, 2, 1, 16],
     elements: {
-      kick:   el('punch', { hit: { kind: 'drum', n: 36, velocity: 1, length: 0.28 }, lap: 4, hits: [0, 1.5], orbit: 0, vol: 0.95, verb: 0.03, echo: 0, cut: 1 }),
-      hats:   el('tick',  { hit: { kind: 'drum', n: 42, velocity: 0.6, length: 0.04 }, lap: 1, hits: [0, 0.25, 0.5, 0.75], orbit: 2, vol: 0.48, verb: 0.06, echo: 0, cut: 1 }),
-      snare:  el('tight', { hit: { kind: 'drum', n: 38, velocity: 0.9, length: 0.14 }, lap: 2, hits: [1, 3], orbit: 1, vol: 0.82, verb: 0.12, echo: 0, cut: 1 }),
-      perc:   el('wood',  { hit: { kind: 'note', role: 'fifth', octave: 4, velocity: 0.45, length: 0.07 }, lap: 4, hits: [0.75, 2.25, 3.25], orbit: 1, vol: 0.4, verb: 0.1, echo: 0.12, cut: 0.9 }),
-      bass:   el('reese', { hit: { kind: 'note', role: 'root', octave: 1, velocity: 0.9, length: 3.5 }, lap: 4, hits: [0], orbit: 2, vol: 0.85, verb: 0.04, echo: 0, cut: 0.7 }),
-      lead:   el('saw',   { hit: { kind: 'arp', direction: 'up', rate: 0.25, octave: 5, velocity: 0.62, length: 0.18 }, lap: 2, hits: [0, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75], orbit: 2, vol: 0.5, verb: 0.18, echo: 0.28, cut: 0.88 }),
-      chords: el('stab',  { hit: { kind: 'chord', voicing: 'close', velocity: 0.52, length: 0.3 }, lap: 4, hits: [0, 2], orbit: 2, vol: 0.48, verb: 0.14, echo: 0.1, cut: 0.8 }),
-      pad:    el('air',   { hit: { kind: 'pad', velocity: 0.45, length: 16 }, lap: 16, hits: [0], orbit: 3, vol: 0.4, verb: 0.4, echo: 0.1, cut: 0.65 })
+      kick:   el('punch', { hit: { kind: 'drum', n: 36, velocity: 1, length: 0.28 }, lap: 4, hits: [0, 1.5, 3.75], orbit: 0, vol: 0.95, verb: 0.03, echo: 0, cut: 1 }),
+      hats:   el('tick',  { hit: { kind: 'drum', n: 42, velocity: 0.62, length: 0.035, openAt: [3.75] }, lap: 1, hits: [0, 0.25, 0.5, 0.75], orbit: 2, vol: 0.5, verb: 0.06, echo: 0, cut: 1 }),
+      snare:  el('tight', { hit: { kind: 'drum', n: 38, velocity: 0.92, length: 0.13 }, lap: 2, hits: [1, 3], orbit: 1, vol: 0.85, verb: 0.1, echo: 0, cut: 1 }),
+      perc:   el('wood',  { hit: { kind: 'note', role: 'fifth', octave: 4, velocity: 0.42, length: 0.07 }, lap: 4, hits: [0.75, 2.25, 3.25], orbit: 1, vol: 0.4, verb: 0.1, echo: 0.1, cut: 0.9 }),
+      bass:   el('reese', { hit: { kind: 'note', role: 'line', octave: 1, velocity: 0.88, length: 1.8, line: [[0, 1], [2, 5]] }, lap: 4, hits: [0, 2], orbit: 2, vol: 0.86, verb: 0.03, echo: 0, cut: 0.68 }),
+      lead:   el('saw',   { hit: { kind: 'note', role: 'line', octave: 5, velocity: 0.55, length: 0.22, line: [[0, 5], [0.5, 1], [1.5, 4], [2.5, 5], [3, 7]] }, lap: 4, hits: [0, 0.5, 1.5, 2.5, 3], orbit: 2, vol: 0.48, verb: 0.16, echo: 0.22, cut: 0.88 }),
+      chords: el('stab',  { hit: { kind: 'chord', voicing: 'close', velocity: 0.5, length: 0.28 }, lap: 4, hits: [0, 2], orbit: 2, vol: 0.46, verb: 0.12, echo: 0.08, cut: 0.8 }),
+      pad:    el('air',   { hit: { kind: 'pad', velocity: 0.4, length: 16 }, lap: 16, hits: [0], orbit: 3, vol: 0.38, verb: 0.42, echo: 0.08, cut: 0.55, voice: { type: 'triangle', cutoff: 420, q: 0.35, attack: 1.1, release: 1.6, detune: 8 } })
+    }
+  });
+
+  add({
+    id: 'psytrance', name: 'psytrance', bpm: 142, swing: 0,
+    key: Object.assign({}, A_PHR),
+    prog: prog(['Am', 'Bb', 'C', 'Gm']),
+    fx: { reverb: { send: 0.22, decay: 2.0 }, delay: { send: 0.2, delayBeats: 0.25, feedback: 0.35 } },
+    orbits: [1, 2, 4, 16],
+    elements: {
+      kick:   el('punch', { hit: { kind: 'drum', n: 36, velocity: 1, length: 0.4 }, lap: 1, hits: [0], orbit: 0, vol: 0.95, verb: 0.04, echo: 0, cut: 1 }),
+      hats:   el('tick',  { hit: { kind: 'drum', n: 42, velocity: 0.52, length: 0.035 }, lap: 1, hits: [0, 0.25, 0.5, 0.75], orbit: 0, vol: 0.45, verb: 0.08, echo: 0, cut: 1 }),
+      snare:  el('clap',  { hit: { kind: 'drum', n: 38, velocity: 0.48, length: 0.14 }, lap: 2, hits: [1, 3], orbit: 1, vol: 0.55, verb: 0.14, echo: 0.06, cut: 1 }),
+      perc:   el('wood',  { hit: { kind: 'note', role: 'fifth', octave: 4, velocity: 0.35, length: 0.07 }, lap: 4, hits: [1.75, 3.25], orbit: 1, vol: 0.35, verb: 0.12, echo: 0.1, cut: 0.9 }),
+      bass:   el('pluck', { hit: { kind: 'note', role: 'root', octave: 1, velocity: 0.86, length: 0.2 }, lap: 1, hits: [0.25, 0.5, 0.75], orbit: 2, vol: 0.84, verb: 0.03, echo: 0, cut: 0.75, voice: { type: 'sawtooth', cutoff: 520, q: 1.2, attack: 0.004, release: 0.05, sustain: 0.35 } }),
+      lead:   el('saw',   { hit: { kind: 'note', role: 'line', octave: 5, velocity: 0.58, length: 0.16, line: [[0, 1], [0.5, 2], [1, 1], [1.5, 5], [2, 4], [2.5, 1], [3, 5], [3.5, 'b2']] }, lap: 4, hits: [0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5], orbit: 2, vol: 0.5, verb: 0.2, echo: 0.28, cut: 0.9, voice: { type: 'sawtooth', cutoff: 1100, q: 7.5, attack: 0.004, release: 0.06, sustain: 0.45, detune: 4 } }),
+      chords: el('stab',  { hit: { kind: 'chord', voicing: 'close', velocity: 0.48, length: 0.35 }, lap: 4, hits: [0], orbit: 2, vol: 0.45, verb: 0.16, echo: 0.12, cut: 0.8 }),
+      pad:    el('air',   { hit: { kind: 'pad', velocity: 0.4, length: 16 }, lap: 16, hits: [0], orbit: 3, vol: 0.4, verb: 0.4, echo: 0.12, cut: 0.6 })
     }
   });
 
@@ -2802,7 +2849,7 @@
     }
   });
 
-  const ORDER = ['house', 'techno', 'lofi', 'trap', 'dnb', 'ambient', 'dub', 'afrobeat', 'synthwave', 'meditation'];
+  const ORDER = ['house', 'techno', 'lofi', 'hiphop', 'trap', 'dnb', 'psytrance', 'ambient', 'dub', 'afrobeat', 'synthwave', 'meditation'];
 
   function resolve(genre) {
     if (genre && typeof genre === 'object' && genre.elements && genre.bpm) return genre;
@@ -3090,9 +3137,25 @@
     return { ok: issues.length === 0, issues };
   }
 
+  /* suggested app GTRIM_DB entries (dB). the live app applies these on
+     master after the mix (clamp −12..+6) so each genre sits near the others.
+     do not edit orbs-solar.html from this module — paste into GTRIM_DB on merge.
+     filled after offline measurement; 0 means "not yet measured". */
+  /* measured with an OfflineAudioContext that mirrors orbs-solar voices,
+     default vols (the app does not apply genre vol), master 0.8 + comp +
+     limiter + clipper, 4 bars, RMS after skipping bar 1. target = median
+     of the other 9 genres after their existing GTRIM_DB entries.
+     paste these into orbs-solar.html GTRIM_DB (do not edit the app here). */
+  const SUGGESTED_TRIM = {
+    'dnb:sounds': 0.4, 'dnb:relayout': 0,
+    'psytrance:sounds': 1.5, 'psytrance:relayout': 0.7,
+    'hiphop:sounds': -0.2, 'hiphop:relayout': -0.8
+  };
+
   return {
     list, get, apply, noteFor, chordAt, validate,
     ELEMENTS, VAR_NAMES, LAPS, BPM_MIN, BPM_MAX,
+    SWING_MIN, SWING_MAX, SUGGESTED_TRIM,
     VOICE_PARAMS, SCALE_INT, QUALITY,
     mtof, ftom, pcOf, pcName, midiToName,
     scaleIntervals, scalePcs, inScale, nearestInScale,
@@ -3565,6 +3628,1422 @@
 
 </script>
 <script>
+/* ===== orbs extras io (inlined from fx/extras-io.js, by vmorphs) ===== */
+/* orbs extras: midi / wav export, field chop, practice score
+   merge-safe on window.OrbsExtras (never overwrites existing keys). also CJS.
+   no deps.
+*/
+(function (root, factory) {
+  const api = factory();
+  const scope = (typeof globalThis !== 'undefined') ? globalThis
+    : (root && typeof root === 'object') ? root
+    : (typeof self !== 'undefined' ? self : this);
+  const extras = (scope.OrbsExtras && typeof scope.OrbsExtras === 'object')
+    ? scope.OrbsExtras
+    : (scope.OrbsExtras = {});
+  Object.keys(api).forEach(k => {
+    if (!Object.prototype.hasOwnProperty.call(extras, k)) extras[k] = api[k];
+  });
+  if (typeof module === 'object' && module.exports) module.exports = extras;
+}(typeof self !== 'undefined' ? self : this, function () {
+  'use strict';
+
+  const CHANNELS = {
+    kick: 1, snare: 2, hats: 3, perc: 4,
+    bass: 5, pad: 6, chords: 7, lead: 8
+  };
+  const DEFAULT_NOTES = {
+    kick: 36, snare: 38, hats: 42, perc: 48,
+    bass: 33, pad: [45, 52, 60], chords: [60, 63, 67], lead: 72
+  };
+
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const frac = x => x - Math.floor(x);
+  const isNum = v => typeof v === 'number' && isFinite(v);
+
+  function gcd(a, b) {
+    a = Math.abs(a | 0); b = Math.abs(b | 0);
+    while (b) { const t = a % b; a = b; b = t; }
+    return a || 1;
+  }
+  function lcm(a, b) {
+    if (!a || !b) return a || b || 1;
+    return Math.abs((a / gcd(a, b)) * b);
+  }
+
+  function aToHit(a) {
+    const x = frac(isFinite(+a) ? +a : 0);
+    return x < 1e-9 || x > 1 - 1e-9 ? 0 : 1 - x;
+  }
+
+  function recChannel(id) {
+    const m = String(id || '').match(/^rec(\d+)$/i);
+    if (!m) return 0;
+    return Math.min(16, 8 + (+m[1] || 1));
+  }
+
+  function baseName(id) {
+    return String(id || '').split('~')[0];
+  }
+
+  function resolveChannel(p) {
+    if (!p) return 1;
+    if (isNum(p.channel) && p.channel >= 1 && p.channel <= 16) return p.channel | 0;
+    if (isNum(p.ch) && p.ch >= 1 && p.ch <= 16) return p.ch | 0;
+    const el = p.element || p.id || p.name;
+    const base = baseName(el);
+    if (CHANNELS[base]) return CHANNELS[base];
+    const rec = recChannel(base);
+    return rec || 1;
+  }
+
+  function defaultNote(p) {
+    const base = baseName((p && (p.element || p.id)) || '');
+    if (DEFAULT_NOTES[base] != null) return DEFAULT_NOTES[base];
+    return 60;
+  }
+
+  function asNotes(n, fallback) {
+    if (n == null) return asNotes(fallback, 60);
+    if (Array.isArray(n)) {
+      const out = n.map(x => +x).filter(x => isFinite(x));
+      return out.length ? out.map(x => clamp(Math.round(x), 0, 127)) : asNotes(fallback, 60);
+    }
+    const v = +n;
+    if (!isFinite(v)) return asNotes(fallback, 60);
+    return [clamp(Math.round(v), 0, 127)];
+  }
+
+  function vel7(v, vol) {
+    const g = isNum(vol) ? clamp(vol, 0, 1) : 1;
+    if (v == null) return clamp(Math.round(0.8 * g * 127), 1, 127);
+    const n = +v;
+    if (!isFinite(n)) return clamp(Math.round(0.8 * g * 127), 1, 127);
+    if (n >= 0 && n <= 1) return clamp(Math.round(n * g * 127), 1, 127);
+    return clamp(Math.round(n * g), 1, 127);
+  }
+
+  function normalizeHit(h, i, p) {
+    if (h == null) return null;
+    if (typeof h === 'number' && isFinite(h)) {
+      const vels = Array.isArray(p.velocities) ? p.velocities : Array.isArray(p.vels) ? p.vels : null;
+      const notes = Array.isArray(p.notes) && !Array.isArray(p.note) ? p.notes : null;
+      return {
+        beat: +h,
+        vel: vels && vels[i] != null ? vels[i] : (p.velocity != null ? p.velocity : p.vel),
+        note: notes && notes[i] != null ? notes[i] : null,
+        dur: p.length != null ? p.length : (p.dur != null ? p.dur : p.durBeats)
+      };
+    }
+    if (typeof h === 'object') {
+      const beat = h.beat != null ? +h.beat : (h.t != null ? +h.t : (h.s != null ? +h.s : (h.h != null ? +h.h : +h.o)));
+      if (!isFinite(beat)) return null;
+      return {
+        beat: beat,
+        vel: h.vel != null ? h.vel : (h.v != null ? h.v : h.velocity),
+        note: h.note != null ? h.note : (h.n != null ? h.n : h.notes),
+        dur: h.dur != null ? h.dur : (h.length != null ? h.length : h.durBeats)
+      };
+    }
+    return null;
+  }
+
+  function planetPattern(p) {
+    const lap = isNum(p.lap) && p.lap > 0 ? +p.lap : 4;
+    let period = isNum(p.cycle) && p.cycle > 0 ? +p.cycle : lap;
+    let hits = [];
+    if (Array.isArray(p.hits) && p.hits.length) {
+      hits = p.hits.map((h, i) => normalizeHit(h, i, p)).filter(Boolean);
+      const mx = hits.reduce((m, h) => Math.max(m, h.beat), 0);
+      if (mx >= period - 1e-9) period = Math.max(period, Math.ceil(mx + 1e-6));
+    } else if (Array.isArray(p.pat) && p.pat.length) {
+      const base = aToHit(p.a || 0);
+      hits = p.pat.map((h, i) => {
+        const o = h && (isNum(h.o) ? h.o : isNum(h.offset) ? h.offset : +h);
+        if (!isFinite(o)) return null;
+        return {
+          beat: frac(base + o) * lap,
+          vel: h && (h.v != null ? h.v : h.vel),
+          note: h && (h.n != null ? h.n : h.note),
+          dur: h && (h.dur != null ? h.dur : h.length)
+        };
+      }).filter(Boolean);
+    } else {
+      const beat = aToHit(p.a || 0) * lap;
+      hits = [{
+        beat: beat,
+        vel: p.velocity != null ? p.velocity : p.vel,
+        note: p.note != null ? p.note : p.n,
+        dur: p.length != null ? p.length : p.dur
+      }];
+    }
+    const fallbackNote = (p.note != null ? p.note : (p.n != null ? p.n : (p.hit && (p.hit.n != null ? p.hit.n : p.hit.note))));
+    const fallbackVel = (p.velocity != null ? p.velocity : (p.vel != null ? p.vel : (p.hit && p.hit.velocity)));
+    const fallbackDur = (p.length != null ? p.length : (p.dur != null ? p.dur : (p.hit && p.hit.length)));
+    return { lap, period, hits, fallbackNote, fallbackVel, fallbackDur, vol: p.vol };
+  }
+
+  function loopLengthBeats(planets, opts) {
+    opts = opts || {};
+    if (isNum(opts.loopBeats) && opts.loopBeats > 0) return +opts.loopBeats;
+    if (isNum(opts.bars) && opts.bars > 0) return +opts.bars * 4;
+    const ppq = opts.ppq || 480;
+    const ticks = planets.map(p => {
+      const pat = planetPattern(p);
+      return Math.max(1, Math.round(pat.period * ppq));
+    });
+    if (!ticks.length) return 16;
+    const t = ticks.reduce((a, b) => lcm(a, b), 1);
+    return t / ppq;
+  }
+
+  /* ---------------- SMF writer / parser ---------------- */
+
+  function vlqBytes(v) {
+    v = Math.max(0, v | 0);
+    const bytes = [v & 0x7f];
+    v >>= 7;
+    while (v > 0) { bytes.unshift((v & 0x7f) | 0x80); v >>= 7; }
+    return bytes;
+  }
+
+  function pushVLQ(out, v) {
+    const b = vlqBytes(v);
+    for (let i = 0; i < b.length; i++) out.push(b[i]);
+  }
+
+  function writeChunk(id, payload) {
+    const arr = new Uint8Array(8 + payload.length);
+    arr[0] = id.charCodeAt(0); arr[1] = id.charCodeAt(1);
+    arr[2] = id.charCodeAt(2); arr[3] = id.charCodeAt(3);
+    const len = payload.length;
+    arr[4] = (len >>> 24) & 0xff;
+    arr[5] = (len >>> 16) & 0xff;
+    arr[6] = (len >>> 8) & 0xff;
+    arr[7] = len & 0xff;
+    arr.set(payload, 8);
+    return arr;
+  }
+
+  function ev(tick, bytes) { return { tick: tick, bytes: bytes }; }
+
+  function trackBytes(events, endTick) {
+    events = events.slice().sort((a, b) => {
+      if (a.tick !== b.tick) return a.tick - b.tick;
+      const ao = a.bytes[0] & 0xf0, bo = b.bytes[0] & 0xf0;
+      // note-offs (80 or 90 vel0) before note-ons at the same tick
+      const aOff = ao === 0x80 || (ao === 0x90 && a.bytes[2] === 0);
+      const bOff = bo === 0x80 || (bo === 0x90 && b.bytes[2] === 0);
+      if (aOff !== bOff) return aOff ? -1 : 1;
+      return 0;
+    });
+    const out = [];
+    let last = 0;
+    for (let i = 0; i < events.length; i++) {
+      const e = events[i];
+      const t = Math.max(last, e.tick | 0);
+      pushVLQ(out, t - last);
+      last = t;
+      for (let j = 0; j < e.bytes.length; j++) out.push(e.bytes[j] & 0xff);
+    }
+    const end = Math.max(last, endTick | 0);
+    pushVLQ(out, end - last);
+    out.push(0xff, 0x2f, 0x00);
+    return new Uint8Array(out);
+  }
+
+  function metaName(name) {
+    const s = String(name || '');
+    const bytes = [];
+    for (let i = 0; i < s.length; i++) bytes.push(s.charCodeAt(i) & 0x7f);
+    return ev(0, [0xff, 0x03, bytes.length].concat(bytes));
+  }
+
+  function metaTempo(bpm) {
+    const us = Math.max(1, Math.round(60000000 / (isNum(bpm) && bpm > 0 ? bpm : 120)));
+    return ev(0, [0xff, 0x51, 0x03, (us >> 16) & 0xff, (us >> 8) & 0xff, us & 0xff]);
+  }
+
+  function metaTimeSig(num, den) {
+    num = num || 4;
+    den = den || 4;
+    let dd = 0, d = den;
+    while (d > 1) { d >>= 1; dd++; }
+    return ev(0, [0xff, 0x58, 0x04, num, dd, 24, 8]);
+  }
+
+  function planetEvents(p, opts, ppq, loopBeats) {
+    if (p && (p.muted || p.mute)) return { events: [], ch: resolveChannel(p), name: (p.name || p.id || 'track') };
+    const pat = planetPattern(p);
+    const ch = (resolveChannel(p) - 1) & 15;
+    const events = [];
+    const fallback = defaultNote(p);
+    const hitDur = isNum(pat.fallbackDur) && pat.fallbackDur > 0 ? pat.fallbackDur : 0.25;
+    const period = pat.period > 0 ? pat.period : loopBeats;
+    for (let cycle = 0; cycle * period < loopBeats - 1e-9; cycle++) {
+      const base = cycle * period;
+      for (let i = 0; i < pat.hits.length; i++) {
+        const h = pat.hits[i];
+        const beat = base + h.beat;
+        if (beat < -1e-9 || beat >= loopBeats - 1e-12) continue;
+        const tick = Math.round(beat * ppq);
+        const notes = asNotes(h.note != null ? h.note : (pat.fallbackNote != null ? pat.fallbackNote : fallback), fallback);
+        const vel = vel7(h.vel != null ? h.vel : pat.fallbackVel, pat.vol);
+        let durBeats = isNum(h.dur) && h.dur > 0 ? h.dur : hitDur;
+        // if length looks like seconds (and bpm known), leave as beats; treat values > 32 as seconds only if >> period
+        if (durBeats > 32 && opts && opts.bpm) durBeats = durBeats * opts.bpm / 60;
+        let off = tick + Math.max(1, Math.round(durBeats * ppq));
+        const loopTick = Math.round(loopBeats * ppq);
+        if (off > loopTick) off = loopTick;
+        if (off <= tick) off = tick + 1;
+        for (let n = 0; n < notes.length; n++) {
+          events.push(ev(tick, [0x90 | ch, notes[n], vel]));
+          events.push(ev(off, [0x80 | ch, notes[n], 0]));
+        }
+      }
+    }
+    const name = (opts && opts.names && (opts.names[p.id] || (Array.isArray(opts.names) && opts.names[planetsIndex(opts, p)]))) || p.name || p.id || 'track';
+    return { events: events, ch: ch + 1, name: String(name) };
+  }
+
+  function planetsIndex(opts, p) { return 0; }
+
+  function toMidi(planets, opts) {
+    opts = opts || {};
+    const list = !planets ? [] : (Array.isArray(planets) ? planets : Object.keys(planets).map(k => {
+      const p = planets[k];
+      return (p && typeof p === 'object') ? Object.assign({ id: p.id || k }, p) : null;
+    }).filter(Boolean));
+    const bpm = isNum(opts.bpm) && opts.bpm > 0 ? +opts.bpm : 120;
+    const ppq = isNum(opts.ppq) && opts.ppq > 0 ? (opts.ppq | 0) : 480;
+    const type = opts.type === 0 || opts.type === '0' ? 0 : 1;
+    const loopBeats = loopLengthBeats(list, Object.assign({}, opts, { ppq: ppq }));
+    const loopTick = Math.round(loopBeats * ppq);
+    const local = Object.assign({}, opts, { bpm: bpm });
+
+    const parts = list.map(p => planetEvents(p, local, ppq, loopBeats));
+    const tracks = [];
+
+    if (type === 0) {
+      const evs = [metaName(opts.names && opts.names.conductor ? opts.names.conductor : 'orbs'), metaTempo(bpm), metaTimeSig(4, 4)];
+      parts.forEach(p => { for (let i = 0; i < p.events.length; i++) evs.push(p.events[i]); });
+      tracks.push(trackBytes(evs, loopTick));
+    } else {
+      const condName = (opts.names && (opts.names.conductor || opts.names._conductor)) || 'orbs';
+      tracks.push(trackBytes([metaName(condName), metaTempo(bpm), metaTimeSig(4, 4)], loopTick));
+      parts.forEach(p => {
+        const evs = [metaName(p.name)];
+        for (let i = 0; i < p.events.length; i++) evs.push(p.events[i]);
+        tracks.push(trackBytes(evs, loopTick));
+      });
+    }
+
+    const header = new Uint8Array(14);
+    header.set([0x4d, 0x54, 0x68, 0x64, 0, 0, 0, 6]);
+    header[8] = 0; header[9] = type;
+    header[10] = (tracks.length >> 8) & 0xff; header[11] = tracks.length & 0xff;
+    header[12] = (ppq >> 8) & 0xff; header[13] = ppq & 0xff;
+    const chunks = [header];
+    let total = 14;
+    for (let i = 0; i < tracks.length; i++) {
+      const c = writeChunk('MTrk', tracks[i]);
+      chunks.push(c); total += c.length;
+    }
+    const out = new Uint8Array(total);
+    let o = 0;
+    for (let i = 0; i < chunks.length; i++) { out.set(chunks[i], o); o += chunks[i].length; }
+    return out;
+  }
+
+  function downloadMidi(data, filename) {
+    const bytes = data instanceof Uint8Array ? data : new Uint8Array(data);
+    if (typeof Blob === 'undefined') return bytes.buffer;
+    const blob = new Blob([bytes], { type: 'audio/midi' });
+    if (typeof document !== 'undefined') {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = filename || 'orbs.mid';
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        try { URL.revokeObjectURL(a.href); a.remove(); } catch (e) {}
+      }, 1500);
+    }
+    return blob;
+  }
+
+  function parseVLQ(buf, p) {
+    let v = 0, i = 0, b;
+    do {
+      if (p.i >= buf.length) throw new Error('vlq overflow');
+      b = buf[p.i++];
+      v = (v << 7) | (b & 0x7f);
+      if (++i > 4) throw new Error('vlq too long');
+    } while (b & 0x80);
+    return v;
+  }
+
+  function parseMidi(data) {
+    const buf = data instanceof Uint8Array ? data : new Uint8Array(data);
+    const p = { i: 0 };
+    const str = n => {
+      let s = '';
+      for (let i = 0; i < n; i++) s += String.fromCharCode(buf[p.i++]);
+      return s;
+    };
+    const u32 = () => (buf[p.i++] << 24 | buf[p.i++] << 16 | buf[p.i++] << 8 | buf[p.i++]) >>> 0;
+    const u16 = () => (buf[p.i++] << 8 | buf[p.i++]) & 0xffff;
+    if (str(4) !== 'MThd') throw new Error('no MThd');
+    const hlen = u32();
+    if (hlen < 6) throw new Error('bad header len');
+    const format = u16(), ntrk = u16(), ppq = u16();
+    p.i += hlen - 6;
+    const tracks = [];
+    for (let t = 0; t < ntrk; t++) {
+      if (str(4) !== 'MTrk') throw new Error('no MTrk at track ' + t);
+      const len = u32(), end = p.i + len;
+      let tick = 0, running = 0, name = '', tempo = null, usq = null;
+      let noteOn = 0, noteOff = 0, eot = false;
+      const events = [], open = new Map();
+      while (p.i < end) {
+        tick += parseVLQ(buf, p);
+        let st = buf[p.i];
+        if (st >= 0x80) { p.i++; } else { st = running; }
+        if (st === 0xff) {
+          const type = buf[p.i++], l = parseVLQ(buf, p);
+          const start = p.i; p.i += l;
+          const dataBytes = buf.slice(start, start + l);
+          if (type === 3) {
+            name = String.fromCharCode.apply(null, dataBytes);
+          } else if (type === 0x51 && l === 3) {
+            usq = (dataBytes[0] << 16) | (dataBytes[1] << 8) | dataBytes[2];
+            tempo = 60000000 / usq;
+          } else if (type === 0x2f) {
+            eot = true;
+          }
+          events.push({ tick: tick, type: 'meta', meta: type, data: dataBytes });
+        } else if (st === 0xf0 || st === 0xf7) {
+          const l = parseVLQ(buf, p); p.i += l;
+        } else {
+          running = st;
+          const hi = st & 0xf0, ch = (st & 15) + 1;
+          const d1 = buf[p.i++];
+          const d2 = (hi === 0xc0 || hi === 0xd0) ? 0 : buf[p.i++];
+          events.push({ tick: tick, type: hi, ch: ch, d1: d1, d2: d2 });
+          const key = ch + ':' + d1;
+          if (hi === 0x90 && d2 > 0) { noteOn++; open.set(key, (open.get(key) || 0) + 1); }
+          else if (hi === 0x80 || (hi === 0x90 && d2 === 0)) {
+            noteOff++;
+            open.set(key, Math.max(0, (open.get(key) || 0) - 1));
+          }
+        }
+      }
+      const dangling = Array.from(open.values()).reduce((a, b) => a + b, 0);
+      tracks.push({
+        name: name, endTick: tick, noteOn: noteOn, noteOff: noteOff,
+        tempo: tempo, tempoUs: usq, eot: eot, dangling: dangling, events: events
+      });
+    }
+    return { format: format, ntrk: ntrk, ppq: ppq, tracks: tracks };
+  }
+
+  /* ---------------- WAV encode / offline render ---------------- */
+
+  function channelData(buf, c) {
+    if (typeof buf.getChannelData === 'function') return buf.getChannelData(c);
+    if (buf.channels && buf.channels[c]) return buf.channels[c];
+    return new Float32Array(buf.length || 0);
+  }
+
+  function encodeWav(audioBuffer, opts) {
+    opts = opts || {};
+    const sr = audioBuffer.sampleRate || 44100;
+    const ch = audioBuffer.numberOfChannels || audioBuffer.channels || 1;
+    const nCh = typeof ch === 'number' ? ch : ch.length;
+    const n = audioBuffer.length != null ? audioBuffer.length : channelData(audioBuffer, 0).length;
+    const depth = opts.bitDepth === 24 ? 24 : (opts.bitDepth === '32f' || opts.bitDepth === 32 ? 32 : 16);
+    const isFloat = depth === 32;
+    const bytesPer = isFloat ? 4 : (depth === 24 ? 3 : 2);
+    const dataSize = n * nCh * bytesPer;
+    const fmtSize = 16;
+    const ab = new ArrayBuffer(44 + dataSize + (dataSize & 1));
+    const view = new DataView(ab);
+    const wu = (o, s) => { for (let i = 0; i < s.length; i++) view.setUint8(o + i, s.charCodeAt(i)); };
+    wu(0, 'RIFF');
+    view.setUint32(4, 36 + dataSize + (dataSize & 1), true);
+    wu(8, 'WAVE');
+    wu(12, 'fmt ');
+    view.setUint32(16, fmtSize, true);
+    view.setUint16(20, isFloat ? 3 : 1, true);
+    view.setUint16(22, nCh, true);
+    view.setUint32(24, sr, true);
+    view.setUint32(28, sr * nCh * bytesPer, true);
+    view.setUint16(32, nCh * bytesPer, true);
+    view.setUint16(34, isFloat ? 32 : depth, true);
+    wu(36, 'data');
+    view.setUint32(40, dataSize, true);
+    const planes = [];
+    for (let c = 0; c < nCh; c++) planes.push(channelData(audioBuffer, c));
+    let o = 44;
+    for (let i = 0; i < n; i++) {
+      for (let c = 0; c < nCh; c++) {
+        let s = planes[c][i] || 0;
+        if (isFloat) {
+          view.setFloat32(o, s, true); o += 4;
+        } else if (depth === 24) {
+          s = clamp(s, -1, 1);
+          let v = Math.round(s * 0x7fffff);
+          if (v > 0x7fffff) v = 0x7fffff;
+          if (v < -0x800000) v = -0x800000;
+          if (v < 0) v += 0x1000000;
+          view.setUint8(o, v & 0xff);
+          view.setUint8(o + 1, (v >> 8) & 0xff);
+          view.setUint8(o + 2, (v >> 16) & 0xff);
+          o += 3;
+        } else {
+          s = clamp(s, -1, 1);
+          let v = Math.round(s * 0x7fff);
+          if (v > 32767) v = 32767;
+          if (v < -32768) v = -32768;
+          view.setInt16(o, v, true); o += 2;
+        }
+      }
+    }
+    if (dataSize & 1) view.setUint8(44 + dataSize, 0);
+    return ab;
+  }
+
+  function OfflineCtor() {
+    if (typeof OfflineAudioContext !== 'undefined') return OfflineAudioContext;
+    if (typeof webkitOfflineAudioContext !== 'undefined') return webkitOfflineAudioContext;
+    return null;
+  }
+
+  async function renderWav(opts) {
+    opts = opts || {};
+    const Ctor = OfflineCtor();
+    if (!Ctor) throw new Error('OfflineAudioContext is not available');
+    const sr = isNum(opts.sampleRate) && opts.sampleRate > 0 ? (opts.sampleRate | 0) : 44100;
+    const ch = isNum(opts.channels) && opts.channels > 0 ? (opts.channels | 0) : 2;
+    const dur = isNum(opts.duration) && opts.duration > 0 ? +opts.duration : 1;
+    const frames = Math.max(1, Math.round(dur * sr));
+    const ctx = new Ctor(ch, frames, sr);
+    const dest = ctx.destination;
+    if (typeof opts.render === 'function') {
+      await opts.render(ctx, dest, opts.opts || opts);
+    }
+    const buffer = await ctx.startRendering();
+    const bytes = encodeWav(buffer, { bitDepth: opts.bitDepth || 16 });
+    const wav = typeof Blob !== 'undefined' ? new Blob([bytes], { type: 'audio/wav' }) : bytes;
+    return { buffer: buffer, wav: wav, bytes: bytes };
+  }
+
+  async function renderStems(planetIds, render, opts) {
+    if (render && typeof render === 'object' && typeof render.render === 'function' && opts == null) {
+      opts = render;
+      render = opts.render;
+    }
+    opts = opts || {};
+    if (typeof render !== 'function') throw new Error('renderStems needs a render callback');
+    const ids = planetIds || opts.planetIds || [];
+    const base = {
+      duration: opts.duration, sampleRate: opts.sampleRate,
+      channels: opts.channels, bitDepth: opts.bitDepth
+    };
+    const stems = {};
+    for (let i = 0; i < ids.length; i++) {
+      const id = ids[i];
+      stems[id] = await renderWav(Object.assign({}, base, {
+        render: (ctx, dest) => render(ctx, dest, { solo: id })
+      }));
+    }
+    const mix = await renderWav(Object.assign({}, base, {
+      render: (ctx, dest) => render(ctx, dest, { solo: null, mix: true })
+    }));
+    return { stems: stems, mix: mix };
+  }
+
+  /* ---------------- field chop ---------------- */
+
+  function monoOf(buf) {
+    const n = buf.length, ch = buf.numberOfChannels || 1;
+    if (ch === 1) return channelData(buf, 0);
+    const out = new Float32Array(n);
+    for (let c = 0; c < ch; c++) {
+      const d = channelData(buf, c);
+      for (let i = 0; i < n; i++) out[i] += d[i] / ch;
+    }
+    return out;
+  }
+
+  function median(a) {
+    if (!a.length) return 0;
+    const b = a.slice().sort((x, y) => x - y);
+    const m = b.length >> 1;
+    return b.length % 2 ? b[m] : 0.5 * (b[m - 1] + b[m]);
+  }
+
+  function chop(audioBuffer, opts) {
+    opts = opts || {};
+    if (!audioBuffer || !audioBuffer.sampleRate) return [];
+    const sr = audioBuffer.sampleRate;
+    const x = monoOf(audioBuffer);
+    const n = x.length;
+    const maxHits = opts.maxHits == null ? 16 : Math.max(0, opts.maxHits | 0);
+    const minGapMs = opts.minGapMs == null ? 60 : Math.max(0, +opts.minGapMs);
+    const minGap = Math.round(minGapMs * 0.001 * sr);
+    const sensitivity = opts.sensitivity == null ? 0.55 : clamp(+opts.sensitivity, 0, 1);
+
+    const hop = Math.max(32, Math.round(sr * 0.0025)); // ~2.5 ms
+    const win = hop * 4;
+    const nFrames = Math.max(1, 1 + Math.floor((n - win) / hop));
+    const env = new Float32Array(nFrames);
+    const henv = new Float32Array(nFrames);
+    const peak = new Float32Array(nFrames);
+    for (let f = 0; f < nFrames; f++) {
+      const a = f * hop, b = Math.min(n, a + win);
+      let e = 0, h = 0, pk = 0;
+      let prev = a > 0 ? x[a - 1] : 0;
+      for (let i = a; i < b; i++) {
+        const s = x[i], as = s < 0 ? -s : s;
+        e += s * s;
+        const d = s - prev; h += d * d;
+        if (as > pk) pk = as;
+        prev = s;
+      }
+      const den = Math.max(1, b - a);
+      env[f] = Math.sqrt(e / den);
+      henv[f] = Math.sqrt(h / den);
+      peak[f] = pk;
+    }
+    const flux = new Float32Array(nFrames);
+    let maxFlux = 0;
+    for (let f = 0; f < nFrames; f++) {
+      const de = env[f] - (f ? env[f - 1] : env[0]);
+      const dh = henv[f] - (f ? henv[f - 1] : henv[0]);
+      const v = Math.max(0, de) + 1.4 * Math.max(0, dh);
+      flux[f] = v;
+      if (v > maxFlux) maxFlux = v;
+    }
+    if (maxFlux <= 1e-12) return [];
+
+    const hw = Math.max(3, Math.round((0.12 * sr) / hop));
+    const k = 1.15 + 2.4 * (1 - sensitivity);
+    const thresh = new Float32Array(nFrames);
+    const tmp = [];
+    for (let f = 0; f < nFrames; f++) {
+      tmp.length = 0;
+      const a = Math.max(0, f - hw), b = Math.min(nFrames, f + hw + 1);
+      for (let i = a; i < b; i++) tmp.push(flux[i]);
+      const med = median(tmp);
+      let mad = 0;
+      for (let i = 0; i < tmp.length; i++) mad += Math.abs(tmp[i] - med);
+      mad = (mad / Math.max(1, tmp.length)) * 1.4826;
+      thresh[f] = med + k * (mad + 1e-7);
+    }
+    if (opts.threshold != null && isFinite(+opts.threshold)) {
+      const t = +opts.threshold;
+      const abs = t <= 1 ? t * maxFlux : t;
+      for (let f = 0; f < nFrames; f++) thresh[f] = Math.max(thresh[f], abs);
+    }
+
+    const raw = [];
+    for (let f = 1; f < nFrames - 1; f++) {
+      if (flux[f] < thresh[f]) continue;
+      if (flux[f] < flux[f - 1] || flux[f] <= flux[f + 1]) continue;
+      // the triggering frame often starts before the transient; search the
+      // whole frame (and one hop after) for the true abs peak.
+      const a = Math.max(0, f * hop), b = Math.min(n, f * hop + win + hop);
+      let bestI = a, bestA = 0;
+      for (let i = a; i < b; i++) {
+        const as = x[i] < 0 ? -x[i] : x[i];
+        if (as > bestA) { bestA = as; bestI = i; }
+      }
+      raw.push({ i: bestI, start: bestI / sr, peak: bestA, flux: flux[f] });
+    }
+
+    raw.sort((a, b) => a.i - b.i);
+    const spaced = [];
+    for (let i = 0; i < raw.length; i++) {
+      const c = raw[i];
+      const prev = spaced[spaced.length - 1];
+      if (prev && (c.i - prev.i) < minGap) {
+        if (c.peak > prev.peak) spaced[spaced.length - 1] = c;
+      } else {
+        spaced.push(c);
+      }
+    }
+
+    let kept = spaced;
+    if (kept.length > maxHits) {
+      kept = kept.slice().sort((a, b) => b.peak - a.peak || b.flux - a.flux).slice(0, maxHits);
+      kept.sort((a, b) => a.i - b.i);
+    }
+
+    const silence = Math.max(0.0005, (opts.silence != null ? +opts.silence : 0.08));
+    const hits = kept.map((c, idx) => {
+      const nextStart = idx + 1 < kept.length ? kept[idx + 1].i : n;
+      // find silence after the peak, or stop at the next onset
+      let end = nextStart;
+      const floor = Math.max(1e-4, c.peak * silence);
+      const hold = Math.round(0.012 * sr); // 12 ms of quiet
+      let quiet = 0;
+      const from = Math.min(n, c.i + Math.round(0.004 * sr));
+      for (let i = from; i < nextStart; i++) {
+        const as = x[i] < 0 ? -x[i] : x[i];
+        if (as <= floor) {
+          quiet++;
+          if (quiet >= hold) { end = i - hold + 1; break; }
+        } else quiet = 0;
+      }
+      if (end <= c.i) end = Math.min(n, c.i + hop);
+      // peak in [start, end)
+      let pk = 0;
+      for (let i = c.i; i < end; i++) {
+        const as = x[i] < 0 ? -x[i] : x[i];
+        if (as > pk) pk = as;
+      }
+      return { start: c.i / sr, end: end / sr, peak: pk };
+    });
+    return hits;
+  }
+
+  /* ---------------- practice score ---------------- */
+
+  function score(targetBeats, tapTimes, opts) {
+    opts = opts || {};
+    const bpm = isNum(opts.bpm) && opts.bpm > 0 ? +opts.bpm : 120;
+    const startTime = isNum(opts.startTime) ? +opts.startTime : 0;
+    const toleranceMs = opts.toleranceMs == null ? 60 : Math.max(0, +opts.toleranceMs);
+    const lapBeats = isNum(opts.lapBeats) && opts.lapBeats > 0 ? +opts.lapBeats : 0;
+    const beatSec = 60 / bpm;
+
+    const taps = (tapTimes || []).map((t, i) => ({ t: +t, i: i })).filter(x => isFinite(x.t));
+    taps.sort((a, b) => a.t - b.t);
+
+    const base = (targetBeats || []).map((b, i) => ({ beat: +b, i: i })).filter(x => isFinite(x.beat));
+    const targets = [];
+    if (!lapBeats) {
+      base.forEach(b => targets.push({ beat: b.beat, time: startTime + b.beat * beatSec, src: b.i }));
+    } else {
+      const lastTap = taps.length ? taps[taps.length - 1].t : startTime;
+      const windowEnd = Math.max(startTime + lapBeats * beatSec, lastTap) + (toleranceMs * 0.001) + 1e-6;
+      const nLaps = Math.max(1, Math.ceil((windowEnd - startTime) / (lapBeats * beatSec) - 1e-9));
+      for (let L = 0; L < nLaps; L++) {
+        for (let i = 0; i < base.length; i++) {
+          const beat = L * lapBeats + base[i].beat;
+          const time = startTime + beat * beatSec;
+          if (time > windowEnd + 1e-9) continue;
+          if (time < startTime - toleranceMs * 0.001) continue;
+          targets.push({ beat: beat, time: time, src: base[i].i, lap: L });
+        }
+      }
+    }
+    targets.sort((a, b) => a.time - b.time);
+
+    const pairs = [];
+    for (let i = 0; i < targets.length; i++) {
+      for (let j = 0; j < taps.length; j++) {
+        const dt = (taps[j].t - targets[i].time) * 1000;
+        pairs.push({ ti: i, kj: j, dt: dt, adt: Math.abs(dt) });
+      }
+    }
+    pairs.sort((a, b) => a.adt - b.adt || a.ti - b.ti);
+
+    const tUsed = new Uint8Array(targets.length);
+    const kUsed = new Uint8Array(taps.length);
+    const assign = new Array(targets.length);
+    for (let i = 0; i < assign.length; i++) assign[i] = null;
+    for (let i = 0; i < pairs.length; i++) {
+      const p = pairs[i];
+      if (tUsed[p.ti] || kUsed[p.kj]) continue;
+      tUsed[p.ti] = 1; kUsed[p.kj] = 1;
+      assign[p.ti] = p;
+    }
+
+    const hits = [];
+    let hitN = 0, missN = 0, offsetSum = 0;
+    for (let i = 0; i < targets.length; i++) {
+      const p = assign[i];
+      const tgt = targets[i];
+      if (!p) {
+        hits.push({ target: tgt.beat, tap: null, offsetMs: null, hit: false });
+        missN++;
+        continue;
+      }
+      const ok = p.adt <= toleranceMs + 1e-9;
+      hits.push({ target: tgt.beat, tap: taps[p.kj].t, offsetMs: p.dt, hit: ok });
+      if (ok) { hitN++; offsetSum += p.dt; }
+      else missN++;
+    }
+    let extraN = 0;
+    for (let j = 0; j < taps.length; j++) if (!kUsed[j]) extraN++;
+
+    const meanOffsetMs = hitN ? offsetSum / hitN : 0;
+    // score: each target contributes up to 1 (perfect hit), extras take half a target each
+    let quality = 0;
+    for (let i = 0; i < hits.length; i++) {
+      if (!hits[i].hit) continue;
+      quality += Math.max(0, 1 - 0.5 * Math.abs(hits[i].offsetMs) / Math.max(1e-6, toleranceMs));
+    }
+    const denom = Math.max(1, targets.length);
+    const extraPen = 0.5 * extraN / denom;
+    const sc = clamp((quality / denom - extraPen) * 100, 0, 100);
+
+    return {
+      hits: hits,
+      misses: missN,
+      extras: extraN,
+      meanOffsetMs: meanOffsetMs,
+      score: sc
+    };
+  }
+
+  return {
+    toMidi: toMidi,
+    downloadMidi: downloadMidi,
+    parseMidi: parseMidi,
+    loopLengthBeats: loopLengthBeats,
+    renderWav: renderWav,
+    renderStems: renderStems,
+    encodeWav: encodeWav,
+    chop: chop,
+    score: score,
+    CHANNELS: CHANNELS,
+    aToHit: aToHit
+  };
+}));
+
+</script>
+<script>
+/* ===== orbs extras space (inlined from fx/extras-space.js, by vmorphs) ===== */
+/* orbs extras — space: binaural, eclipses, gravity, size-as-pitch, mood light, trail
+   plain umd / cjs, no deps.
+   publishes onto window.OrbsExtras (creates it if missing, never overwrites keys).
+   angle `a` is radians, 0 at 12 o'clock / in front of the listener, clockwise.
+   (host: convert solar's 0–1 vis angle with a * Math.PI * 2).
+   laps are in beats, matching the solar app.
+*/
+(function (root, factory) {
+  const api = factory();
+  function merge(dest) {
+    if (!dest || typeof dest !== 'object') return dest;
+    const keys = Object.keys(api);
+    for (let i = 0; i < keys.length; i++) {
+      if (dest[keys[i]] == null) dest[keys[i]] = api[keys[i]];
+    }
+    return dest;
+  }
+  if (typeof module === 'object' && module.exports) {
+    if (module.exports && typeof module.exports === 'object') merge(module.exports);
+    else module.exports = api;
+  }
+  if (root && typeof root === 'object') {
+    root.OrbsExtras = merge(root.OrbsExtras || (root.OrbsExtras = {}));
+  }
+}(typeof self !== 'undefined' ? self : this, function () {
+  'use strict';
+
+  const TAU = Math.PI * 2;
+  const LAPS = [1, 2, 4, 8, 16];
+  const GENRE_IDS = ['house', 'techno', 'lofi', 'trap', 'dnb', 'ambient', 'dub', 'afrobeat', 'synthwave', 'meditation', 'psytrance', 'hiphop'];
+  // hues for a near-black tint (degrees). kept muted; actual rgb is luma-capped.
+  const GENRE_HUES = {
+    house: 328, techno: 198, lofi: 28, trap: 278, dnb: 132,
+    ambient: 186, dub: 148, afrobeat: 42, synthwave: 312, meditation: 252, psytrance: 88, hiphop: 16
+  };
+  const LUMA_CAP = 12 / 255; // ~#0c0c0c
+  const FADE = 0.03;
+  const POS_TC = 0.02;
+
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const angDiff = (a, b) => {
+    let d = Math.abs(a - b) % TAU;
+    if (d > Math.PI) d = TAU - d;
+    return d;
+  };
+  const nowOf = ctx => (ctx && typeof ctx.currentTime === 'number') ? ctx.currentTime : 0;
+  function snapTo(v, allowed) {
+    if (!allowed || !allowed.length) return v;
+    let best = allowed[0], bd = Infinity;
+    for (let i = 0; i < allowed.length; i++) {
+      const d = Math.abs(allowed[i] - v);
+      if (d < bd) { bd = d; best = allowed[i]; }
+    }
+    return best;
+  }
+
+  /* ============================================================
+     2) binaural — HRTF panner + equal-power crossfade vs stereo
+     ============================================================ */
+  function binauralPos(a, r, scale) {
+    const s = scale == null ? 1 : scale;
+    const rr = isFinite(+r) ? +r : 0;
+    const aa = isFinite(+a) ? +a : 0;
+    return { x: Math.sin(aa) * rr * s, y: 0, z: -Math.cos(aa) * rr * s };
+  }
+
+  function makeEqualPowerCurves(fromHrtf, toHrtf, n) {
+    const N = n || 32;
+    const sCurve = new Float32Array(N);
+    const hCurve = new Float32Array(N);
+    const t0 = fromHrtf ? Math.PI / 2 : 0;
+    const t1 = toHrtf ? Math.PI / 2 : 0;
+    for (let i = 0; i < N; i++) {
+      const th = t0 + (t1 - t0) * (i / (N - 1));
+      sCurve[i] = Math.cos(th);
+      hCurve[i] = Math.sin(th);
+    }
+    return { sCurve, hCurve };
+  }
+
+  function binaural(ctx, opts) {
+    if (!ctx || typeof ctx.createPanner !== 'function') throw new Error('OrbsExtras.binaural requires an AudioContext');
+    const options = opts || {};
+    let scale = options.scale == null ? 1 : +options.scale;
+    let enabled = !!options.enabled;
+    const fade = options.fade == null ? FADE : Math.max(0.005, +options.fade);
+    const nodes = Object.create(null);
+
+    if (ctx.listener) {
+      try {
+        if (ctx.listener.positionX) {
+          ctx.listener.positionX.value = 0;
+          ctx.listener.positionY.value = 0;
+          ctx.listener.positionZ.value = 0;
+        }
+        if (ctx.listener.forwardX) {
+          ctx.listener.forwardX.value = 0;
+          ctx.listener.forwardY.value = 0;
+          ctx.listener.forwardZ.value = -1;
+          ctx.listener.upX.value = 0;
+          ctx.listener.upY.value = 1;
+          ctx.listener.upZ.value = 0;
+        }
+      } catch (e) {}
+    }
+
+    function applyPos(panner, a, r, immediate) {
+      const p = binauralPos(a, r, scale);
+      const t = nowOf(ctx);
+      if (panner.positionX) {
+        if (immediate) {
+          panner.positionX.value = p.x;
+          panner.positionY.value = p.y;
+          panner.positionZ.value = p.z;
+        }
+        try {
+          panner.positionX.setTargetAtTime(p.x, t, POS_TC);
+          panner.positionY.setTargetAtTime(p.y, t, POS_TC);
+          panner.positionZ.setTargetAtTime(p.z, t, POS_TC);
+        } catch (e) {
+          if (typeof panner.setPosition === 'function') panner.setPosition(p.x, p.y, p.z);
+        }
+      } else if (typeof panner.setPosition === 'function') {
+        panner.setPosition(p.x, p.y, p.z);
+      }
+      return p;
+    }
+
+    function fadeTo(toHrtf, atTime) {
+      const t0 = atTime == null ? nowOf(ctx) : atTime;
+      const curves = makeEqualPowerCurves(enabled, toHrtf, 32);
+      const ids = Object.keys(nodes);
+      for (let i = 0; i < ids.length; i++) {
+        const n = nodes[ids[i]];
+        try { n.stereoGain.gain.cancelScheduledValues(t0); } catch (e) {}
+        try { n.hrtfGain.gain.cancelScheduledValues(t0); } catch (e) {}
+        try {
+          n.stereoGain.gain.setValueCurveAtTime(curves.sCurve, t0, fade);
+          n.hrtfGain.gain.setValueCurveAtTime(curves.hCurve, t0, fade);
+        } catch (e) {
+          const end = t0 + fade;
+          n.stereoGain.gain.setValueAtTime(n.stereoGain.gain.value, t0);
+          n.hrtfGain.gain.setValueAtTime(n.hrtfGain.gain.value, t0);
+          n.stereoGain.gain.linearRampToValueAtTime(curves.sCurve[curves.sCurve.length - 1], end);
+          n.hrtfGain.gain.linearRampToValueAtTime(curves.hCurve[curves.hCurve.length - 1], end);
+        }
+      }
+      enabled = !!toHrtf;
+      return enabled;
+    }
+
+    function attach(id, inputNode, outputNode) {
+      if (nodes[id]) detach(id);
+      const stereoGain = ctx.createGain();
+      const hrtfGain = ctx.createGain();
+      stereoGain.gain.value = enabled ? 0 : 1;
+      hrtfGain.gain.value = enabled ? 1 : 0;
+      const stereo = ctx.createStereoPanner();
+      stereo.pan.value = 0;
+      const panner = ctx.createPanner();
+      panner.panningModel = 'HRTF';
+      panner.distanceModel = 'inverse';
+      panner.refDistance = 1;
+      panner.maxDistance = 10000;
+      panner.rolloffFactor = 1;
+      panner.coneInnerAngle = 360;
+      panner.coneOuterAngle = 360;
+      if (panner.positionX) { panner.positionX.value = 0; panner.positionY.value = 0; panner.positionZ.value = 0; }
+      inputNode.connect(stereoGain);
+      stereoGain.connect(stereo);
+      stereo.connect(outputNode);
+      inputNode.connect(hrtfGain);
+      hrtfGain.connect(panner);
+      panner.connect(outputNode);
+      nodes[id] = { inputNode, outputNode, stereoGain, hrtfGain, stereo, panner, a: 0, r: 0 };
+      return nodes[id];
+    }
+
+    function detach(id) {
+      const n = nodes[id];
+      if (!n) return false;
+      try { n.inputNode.disconnect(n.stereoGain); } catch (e) {}
+      try { n.inputNode.disconnect(n.hrtfGain); } catch (e) {}
+      try { n.stereo.disconnect(); } catch (e) {}
+      try { n.panner.disconnect(); } catch (e) {}
+      try { n.stereoGain.disconnect(); } catch (e) {}
+      try { n.hrtfGain.disconnect(); } catch (e) {}
+      delete nodes[id];
+      return true;
+    }
+
+    function update(id, a, r) {
+      const n = nodes[id];
+      if (!n) throw new Error('OrbsExtras.binaural: unknown id "' + id + '"');
+      n.a = a; n.r = r;
+      const p = applyPos(n.panner, a, r, true);
+      n.x = p.x; n.y = p.y; n.z = p.z;
+      return p;
+    }
+
+    function setEnabled(on, atTime) { return fadeTo(!!on, atTime); }
+
+    function position(id) {
+      const n = nodes[id];
+      if (!n) return null;
+      if (n.panner.positionX) {
+        return { x: n.panner.positionX.value, y: n.panner.positionY.value, z: n.panner.positionZ.value };
+      }
+      return { x: n.x || 0, y: n.y || 0, z: n.z || 0 };
+    }
+
+    function dispose() {
+      Object.keys(nodes).forEach(detach);
+    }
+
+    const api = {
+      attach, detach, update, setEnabled, position, dispose,
+      get scale() { return scale; },
+      set scale(v) {
+        scale = +v;
+        const ids = Object.keys(nodes);
+        for (let i = 0; i < ids.length; i++) {
+          const n = nodes[ids[i]];
+          applyPos(n.panner, n.a, n.r, true);
+        }
+      },
+      get enabled() { return enabled; },
+      get fade() { return fade; },
+      node: id => nodes[id] || null
+    };
+    return api;
+  }
+
+  /* ============================================================
+     3) eclipses
+     ============================================================ */
+  function eclipses(planets, opts) {
+    const o = opts || {};
+    const tol = o.tolerance == null ? 0.25 : +o.tolerance;
+    const minGap = o.minGap == null ? 0 : +o.minGap;
+    const list = planets || [];
+    const out = [];
+    for (let i = 0; i < list.length; i++) {
+      for (let j = i + 1; j < list.length; j++) {
+        const A = list[i], B = list[j];
+        const dr = (B.r || 0) - (A.r || 0);
+        if (Math.abs(dr) < minGap) continue;
+        const front = dr > 0 ? A : B;
+        const behind = dr > 0 ? B : A;
+        const d = angDiff(A.a || 0, B.a || 0);
+        if (d >= tol) continue;
+        const u = d / (tol || 1e-9);
+        const amount = 0.5 * (1 + Math.cos(Math.PI * u)); // 1 at 0, 0 at tolerance
+        out.push({ front: front.id, behind: behind.id, amount, delta: d, gap: Math.abs(dr) });
+      }
+    }
+    out.sort((p, q) => q.amount - p.amount);
+    return out;
+  }
+
+  function eclipseSmoother(opts) {
+    const o = opts || {};
+    const attack = o.attack == null ? 0.04 : +o.attack;
+    const release = o.release == null ? 0.16 : +o.release;
+    const maxDuckDb = o.maxDuckDb == null ? -8 : +o.maxDuckDb;
+    const minCutoff = o.minCutoff == null ? 480 : +o.minCutoff;
+    const maxCutoff = o.maxCutoff == null ? 16000 : +o.maxCutoff;
+    const cur = Object.create(null);
+
+    function map(v) {
+      const duckDb = v * maxDuckDb;
+      const cutoff = minCutoff * Math.pow(maxCutoff / Math.max(minCutoff, 1e-6), 1 - v);
+      return { amount: v, duckDb, cutoff };
+    }
+
+    function update(list, dt) {
+      const target = Object.create(null);
+      const rows = list || [];
+      for (let i = 0; i < rows.length; i++) {
+        const e = rows[i];
+        const id = e.behind;
+        target[id] = Math.max(target[id] || 0, e.amount || 0);
+      }
+      const ids = Object.keys(cur);
+      for (const k in target) if (ids.indexOf(k) < 0) ids.push(k);
+      const out = {};
+      const step = dt == null ? 1 / 60 : +dt;
+      for (let i = 0; i < ids.length; i++) {
+        const id = ids[i];
+        const tgt = target[id] || 0;
+        let v = cur[id] || 0;
+        const tau = tgt > v ? attack : release;
+        const k = tau <= 1e-6 ? 1 : (1 - Math.exp(-step / tau));
+        v += (tgt - v) * k;
+        if (v < 1e-4 && tgt === 0) v = 0;
+        cur[id] = v;
+        out[id] = map(v);
+      }
+      return out;
+    }
+
+    return { update, map, state: cur };
+  }
+
+  /* ============================================================
+     4) gravity — group lap contracts (or reverses) over N bars
+     ============================================================ */
+  function ease(t, curve) {
+    const x = clamp(t, 0, 1);
+    if (typeof curve === 'number' && isFinite(curve)) return Math.pow(x, curve);
+    if (curve === 'easeOut') return 1 - Math.pow(1 - x, 2);
+    if (curve === 'easeInOut') return x < 0.5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2;
+    if (curve === 'linear') return x;
+    return x * x; // easeIn — gravity accelerates inward
+  }
+
+  function gravity(group, opts) {
+    const o = opts || {};
+    const fromLap = o.fromLap == null ? 8 : +o.fromLap;
+    const toLap = o.toLap == null ? 1 : +o.toLap;
+    const bars = Math.max(1e-6, o.bars == null ? 4 : +o.bars);
+    const curve = o.curve == null ? 'easeIn' : o.curve;
+    const allowed = o.laps || LAPS;
+    const continuous = !!o.continuous;
+    const listeners = [];
+    let running = false;
+    let dir = 1;
+    let originBar = 0;
+    let originU = 0;
+    let u = 0;
+    let lastEmitted = null;
+    const meta = group && typeof group === 'object' ? group : { id: group };
+
+    function lapOf(uu) {
+      const x = fromLap + (toLap - fromLap) * ease(clamp(uu, 0, 1), curve);
+      return continuous ? x : snapTo(x, allowed);
+    }
+    function emit(force) {
+      const lap = lapOf(u);
+      if (force || lap !== lastEmitted) {
+        lastEmitted = lap;
+        for (let i = 0; i < listeners.length; i++) listeners[i](lap, u, meta);
+      }
+      return lap;
+    }
+    function onChange(fn) {
+      if (typeof fn === 'function') listeners.push(fn);
+      return () => {
+        const i = listeners.indexOf(fn);
+        if (i >= 0) listeners.splice(i, 1);
+      };
+    }
+    function start(bar) {
+      running = true;
+      dir = 1;
+      originBar = bar == null ? 0 : +bar;
+      originU = 0;
+      u = 0;
+      return emit(true);
+    }
+    function reverse(bar) {
+      running = true;
+      dir = -1;
+      originBar = bar == null ? 0 : +bar;
+      originU = u;
+      return emit(true);
+    }
+    function cancel() {
+      running = false;
+      dir = 1;
+      u = 0;
+      return emit(true);
+    }
+    function lapAt(bar) {
+      const b = bar == null ? 0 : +bar;
+      if (running) {
+        const progress = (b - originBar) / bars;
+        u = dir === 1 ? clamp(progress, 0, 1) : clamp(originU - progress, 0, 1);
+        if ((dir === 1 && u >= 1) || (dir === -1 && u <= 0)) running = false;
+      }
+      return emit();
+    }
+    function lapAtTime(seconds, bpm) {
+      const bps = (isFinite(+bpm) && +bpm > 0 ? +bpm : 120) / 60;
+      const bar = (seconds * bps) / 4; // 4/4: 4 beats per bar
+      return lapAt(bar);
+    }
+
+    return {
+      start, reverse, cancel, lapAt, lapAtTime, onChange, ease: t => ease(t, curve),
+      get lap() { return lapOf(u); },
+      get progress() { return u; },
+      get running() { return running; },
+      get fromLap() { return fromLap; },
+      get toLap() { return toLap; },
+      get bars() { return bars; },
+      group: meta
+    };
+  }
+
+  /* ============================================================
+     5) size-as-pitch — bigger = lower
+     ============================================================ */
+  function sizeToPitch(size, opts) {
+    const o = opts || {};
+    const min = o.min == null ? 0 : +o.min;
+    const max = o.max == null ? 1 : +o.max;
+    const range = o.rangeSemis == null ? 12 : +o.rangeSemis;
+    const center = o.center == null ? (min + max) / 2 : +o.center;
+    const s = clamp(+size, min, max);
+    const span = max - min;
+    const t = span === 0 ? 0.5 : (s - min) / span;
+    const tC = span === 0 ? 0.5 : (clamp(center, min, max) - min) / span;
+    const semis = (tC - t) * range;
+    const rate = Math.pow(2, semis / 12);
+    return { semis, rate, size: s };
+  }
+  function pitchToSize(semis, opts) {
+    const o = opts || {};
+    const min = o.min == null ? 0 : +o.min;
+    const max = o.max == null ? 1 : +o.max;
+    const range = o.rangeSemis == null ? 12 : +o.rangeSemis;
+    const center = o.center == null ? (min + max) / 2 : +o.center;
+    const span = max - min;
+    const tC = span === 0 ? 0.5 : (clamp(center, min, max) - min) / span;
+    const t = range === 0 ? tC : tC - (+semis) / range;
+    return min + clamp(t, 0, 1) * span;
+  }
+  sizeToPitch.inverse = pitchToSize;
+
+  /* ============================================================
+     6) mood light — near-black per-genre tint, luma-capped
+     ============================================================ */
+  function hsvToRgb(h, s, v) {
+    const hh = ((h % 360) + 360) % 360 / 60;
+    const c = v * s, x = c * (1 - Math.abs(hh % 2 - 1)), m = v - c;
+    let r = 0, g = 0, b = 0;
+    if (hh < 1) { r = c; g = x; }
+    else if (hh < 2) { r = x; g = c; }
+    else if (hh < 3) { g = c; b = x; }
+    else if (hh < 4) { g = x; b = c; }
+    else if (hh < 5) { r = x; b = c; }
+    else { r = c; b = x; }
+    return [r + m, g + m, b + m];
+  }
+  function luma709(r, g, b) { return 0.2126 * r + 0.7152 * g + 0.0722 * b; }
+
+  function moodColor(genreId, energyRms, opts) {
+    const o = opts || {};
+    const cap = o.maxLuma == null ? LUMA_CAP : +o.maxLuma;
+    const maxA = o.maxAlpha == null ? 1 : clamp(+o.maxAlpha, 0, 1);
+    const energy = clamp(isFinite(+energyRms) ? +energyRms : 0, 0, 1);
+    const id = String(genreId || '').toLowerCase().replace(/[^a-z]/g, '');
+    const hue = GENRE_HUES[id] != null ? GENRE_HUES[id] : (o.hue != null ? +o.hue : 0);
+    const sat = o.sat == null ? 0.4 : clamp(+o.sat, 0, 1);
+    let rgb = hsvToRgb(hue, sat, 1);
+    const y = luma709(rgb[0], rgb[1], rgb[2]) || 1e-6;
+    const target = cap * energy;
+    const scale = Math.min(target, cap) / y;
+    const r = Math.round(clamp(rgb[0] * scale, 0, 1) * 255);
+    const g = Math.round(clamp(rgb[1] * scale, 0, 1) * 255);
+    const b = Math.round(clamp(rgb[2] * scale, 0, 1) * 255);
+    const alpha = clamp(energy, 0, 1) * maxA;
+    const css = 'rgb(' + r + ', ' + g + ', ' + b + ')';
+    const rgba = 'rgba(' + r + ', ' + g + ', ' + b + ', ' + alpha.toFixed(3) + ')';
+    return { css, rgba, rgb: [r, g, b], alpha, hue, energy, luma: luma709(r / 255, g / 255, b / 255) };
+  }
+
+  function moodEnergy(opts) {
+    const o = opts || {};
+    const attack = o.attack == null ? 0.05 : +o.attack;
+    const release = o.release == null ? 0.25 : +o.release;
+    let v = 0;
+    function update(rms, dt) {
+      const tgt = clamp(isFinite(+rms) ? +rms : 0, 0, 1);
+      const tau = tgt > v ? attack : release;
+      const step = dt == null ? 1 / 60 : +dt;
+      const k = tau <= 1e-6 ? 1 : (1 - Math.exp(-step / tau));
+      v += (tgt - v) * k;
+      return v;
+    }
+    return {
+      update,
+      get value() { return v; },
+      set value(x) { v = clamp(x, 0, 1); },
+      reset() { v = 0; }
+    };
+  }
+
+  /* ============================================================
+     7) trail automation
+     ============================================================ */
+  function wrap01(p) {
+    const x = p % 1;
+    return x < 0 ? x + 1 : x;
+  }
+  function easeBend(t, bend) {
+    const u = clamp(t, 0, 1);
+    if (!bend) return u;
+    const k = 1 + Math.abs(bend) * 2;
+    return bend > 0 ? Math.pow(u, k) : 1 - Math.pow(1 - u, k);
+  }
+
+  function trail(init) {
+    let points = [];
+    function sort() {
+      points.sort((a, b) => a.phase - b.phase);
+    }
+    function norm(p) {
+      return {
+        phase: wrap01(p.phase),
+        value: +p.value,
+        bend: clamp(p.bend == null ? 0 : +p.bend, -1, 1)
+      };
+    }
+    if (init && Array.isArray(init.points)) {
+      points = init.points.map(norm);
+      sort();
+    }
+    if (!points.length) points = [{ phase: 0, value: 0, bend: 0 }];
+
+    function valueAt(phase) {
+      const p = wrap01(phase);
+      if (points.length === 1) return points[0].value;
+      let i = 0;
+      while (i < points.length && points[i].phase <= p + 1e-12) i++;
+      const b = points[i % points.length];
+      const a = points[(i - 1 + points.length) % points.length];
+      let span = b.phase - a.phase;
+      let t;
+      if (span <= 1e-12) {
+        // wrap across 0, or identical phase
+        span = (b.phase + 1) - a.phase;
+        const pp = p < a.phase ? p + 1 : p;
+        t = span <= 1e-12 ? 0 : (pp - a.phase) / span;
+      } else {
+        t = (p - a.phase) / span;
+      }
+      t = easeBend(t, a.bend);
+      return a.value + (b.value - a.value) * t;
+    }
+
+    function add(phase, value, bend) {
+      const pt = norm({ phase, value, bend: bend == null ? 0 : bend });
+      points.push(pt);
+      sort();
+      return pt;
+    }
+    function move(i, patch) {
+      if (!points[i]) return null;
+      if (patch.phase != null) points[i].phase = wrap01(patch.phase);
+      if (patch.value != null) points[i].value = +patch.value;
+      if (patch.bend != null) points[i].bend = clamp(+patch.bend, -1, 1);
+      sort();
+      return points[i];
+    }
+    function remove(i) {
+      if (points.length <= 1 || !points[i]) return false;
+      points.splice(i, 1);
+      return true;
+    }
+    function toJSON() {
+      return { points: points.map(p => ({ phase: p.phase, value: p.value, bend: p.bend })) };
+    }
+    function samples(n, map) {
+      const N = Math.max(2, n || 64);
+      const arr = new Float32Array(N);
+      const fn = typeof map === 'function' ? map : (v => v);
+      for (let i = 0; i < N; i++) arr[i] = fn(valueAt(i / (N - 1)));
+      return arr;
+    }
+    function mapValue(v, kind, min, max) {
+      if (kind === 'log' && min != null && max != null && min > 0 && max > 0) {
+        return min * Math.pow(max / min, clamp(v, 0, 1));
+      }
+      return v;
+    }
+    function apply(param, opts) {
+      const o = opts || {};
+      const start = o.startTime == null ? 0 : +o.startTime;
+      const dur = o.lapSeconds == null ? 1 : Math.max(1e-4, +o.lapSeconds);
+      const kind = o.map || 'lin';
+      const n = o.samples || 128;
+      const arr = samples(n, v => mapValue(v, kind, o.min, o.max));
+      const mode = o.mode || 'curve';
+      if (mode === 'step' || typeof param.setValueCurveAtTime !== 'function') {
+        const tc = o.timeConstant == null ? 0.02 : +o.timeConstant;
+        const steps = o.steps || 16;
+        for (let i = 0; i < steps; i++) {
+          const t = start + (i / steps) * dur;
+          const v = mapValue(valueAt(i / steps), kind, o.min, o.max);
+          try { param.setTargetAtTime(v, t, tc); } catch (e) { param.setValueAtTime(v, t); }
+        }
+        return arr;
+      }
+      try {
+        param.cancelScheduledValues(start);
+        param.setValueCurveAtTime(arr, start, dur);
+      } catch (e) {
+        const tc = 0.02;
+        for (let i = 0; i < n; i++) param.setTargetAtTime(arr[i], start + (i / (n - 1)) * dur, tc);
+      }
+      return arr;
+    }
+
+    return {
+      valueAt, add, move, remove, toJSON, samples, apply,
+      get points() { return points.map(p => ({ phase: p.phase, value: p.value, bend: p.bend })); }
+    };
+  }
+
+  return {
+    binaural, binauralPos, makeEqualPowerCurves,
+    eclipses, eclipseSmoother,
+    gravity,
+    sizeToPitch, pitchToSize,
+    moodColor, moodEnergy,
+    trail,
+    GENRE_HUES, GENRE_IDS, LAPS, LUMA_CAP, FADE,
+    clamp, angDiff, wrap01
+  };
+}));
+
+</script>
+<script>
 (() => {
 'use strict';
 /* ---------------- setup ---------------- */
@@ -3622,7 +5101,7 @@ let still = false, bpm = 108, snapOn = true, recCount = 0, cloneCount = 0, sheet
 const LS = 'orbs-solar-v1';
 let ready = false, pending = [], savedGroups = null, oldOrbs = null;
 const PKEYS = ['rad', 'a', 'vol', 'pn', 'echo', 'verb', 'cut', 'muted', 'seed'];
-const KEEP = ['trimS', 'trimE', 'rev', 'loop', 'bars', 'recBpm', 'phase', 'recorded', 'label', 'side', 'base', 'gid', 'pat', 'voice', 'prob', 'moons', 'drift', 'inHole'];
+const KEEP = ['trimS', 'trimE', 'rev', 'loop', 'bars', 'recBpm', 'phase', 'recorded', 'label', 'side', 'base', 'gid', 'pat', 'voice', 'prob', 'moons', 'drift', 'inHole', 'size', 'trail', 'chops'];
 const dbOut = st => Object.assign({}, st, { gainDb: isFinite(st.gainDb) ? st.gainDb : '-inf' });
 function save() { if (!ready || window.__orbsShareLoading) return; try {
   const els = {}; IDS.forEach(id => { const e = E[id], o = els[id] = { v: e.variant }; PKEYS.concat(KEEP).forEach(k => { if (e[k] !== undefined) o[k] = e[k]; }); o.a = +(+e.a).toFixed(5); o.rad = +(+e.rad).toFixed(4); });
@@ -3635,7 +5114,9 @@ function applySaved(e, o) {
   if (typeof o.gid === 'string') e.gid = o.gid;
   if (o.voice && typeof o.voice === 'object') e.voice = o.voice;
   if (isFinite(o.prob)) e.prob = clamp(+o.prob, 0, 1); if (isFinite(o.moons)) e.moons = clamp(o.moons | 0, 0, 3); if (isFinite(o.drift)) e.drift = clamp(+o.drift, 0, 1); e.inHole = !!o.inHole && !!o.muted;
-  e.pat = Array.isArray(o.pat) ? o.pat.filter(h => h && isFinite(h.o) && isFinite(h.v)).map(h => { const q = { o: frac(+h.o), v: clamp(+h.v, 0, 1) }; if (isFinite(h.c) && +h.c < 1) q.c = clamp(+h.c, 0, 1); return q; }).slice(0, 128) : [];
+  if (isFinite(o.size)) e.size = clamp(+o.size, 0, 1); if (o.trail && Array.isArray(o.trail.points) && (o.trail.kind === 'cut' || o.trail.kind === 'vol')) e.trail = { kind: o.trail.kind, points: o.trail.points.filter(p => p && isFinite(p.phase) && isFinite(p.value)).slice(0, 32).map(p => ({ phase: frac(+p.phase), value: clamp(+p.value, 0, 1), bend: clamp(+p.bend || 0, -1, 1) })) };
+  if (Array.isArray(o.chops)) e.chops = o.chops.filter(c => c && isFinite(c.start) && isFinite(c.end)).slice(0, 32).map(c => ({ start: +c.start, end: +c.end, peak: +c.peak || 0 }));
+  e.pat = Array.isArray(o.pat) ? o.pat.filter(h => h && isFinite(h.o) && isFinite(h.v)).map(h => { const q = { o: frac(+h.o), v: clamp(+h.v, 0, 1) }; if (isFinite(h.c) && +h.c < 1) q.c = clamp(+h.c, 0, 1); if (Number.isInteger(h.s) && h.s >= 0) q.s = h.s; return q; }).slice(0, 128) : [];
   if (e.side === 'rec' && o.label) e.label = String(o.label).slice(0, 14);
 }
 function load() { try { const s = JSON.parse(localStorage.getItem(LS) || 'null'); if (!s) return;
@@ -3673,7 +5154,7 @@ function buildGroups() { // after every planet exists: saved groups → ORB, or 
       mem.forEach((id, j) => { const e = E[id]; e.gid = o.id; e.rad = bandMid(bandOfLap(o.lap)) + (j % 3 - 1) * 0.025; if (j) links.add(lkey(mem[j - 1], id)); }); });
     IDS.forEach(id => { if (!E[id].gid || !ORB.some(o => o.id === E[id].gid)) E[id].gid = ORB[0].id; });
   } else if (savedGroups) {
-    savedGroups.slice(0, 64).forEach(sg => { const o = mkOrb(LAPS.includes(sg.lap) ? sg.lap : POLY.includes(sg.lap) ? 4 : 4, sg.st, sg.t2); if (POLY.includes(sg.lap)) { o.poly = sg.lap; o.lap = sg.lap; } o.rsend = clamp(+sg.rsend || 0, 0, 1); o.solo = !!sg.solo; o._sid = sg.id; ORB.push(o); });
+    savedGroups.slice(0, 64).forEach(sg => { const o = mkOrb(LAPS.includes(sg.lap) ? sg.lap : POLY.includes(sg.lap) ? (sg.st && LAPS.includes(sg.st.lap * 4) ? sg.st.lap * 4 : OrbsFX.snapLap(sg.lap / 4) * 4) : 4, sg.st, sg.t2); /* poly: keep the fx module's own lap (qa) */ if (POLY.includes(sg.lap)) { o.poly = sg.lap; o.lap = sg.lap; } o.rsend = clamp(+sg.rsend || 0, 0, 1); o.solo = !!sg.solo; o._sid = sg.id; ORB.push(o); });
     IDS.forEach(id => { const e = E[id], o = ORB.find(x => x._sid === e.gid); e.gid = o ? o.id : null; });
   } else { // fresh: one group per connected set, lap from distance
     components().forEach(c => { const o = mkOrb(BANDS[bandOf(E[c[0]].rad)], { quantize: snapOn }); o.rsend = 0; o.solo = false; ORB.push(o); c.forEach(id => E[id].gid = o.id); });
@@ -3800,7 +5281,7 @@ function gate(t, end, pk, a, rel, dest, sus = 1, dec = 0.1) {
 }
 const kickV = p => (t, ev, dest) => {
   const out = p.lp ? filt('lowpass', p.lp, 0.5, dest) : dest;
-  const o = ac.createOscillator(); o.type = 'sine'; o.frequency.setValueAtTime(p.f0, t); o.frequency.exponentialRampToValueAtTime(p.f1, t + p.sw);
+  const o = ac.createOscillator(); o.type = 'sine'; o.frequency.setValueAtTime(p.f0 * (ev.tune || 1), t); o.frequency.exponentialRampToValueAtTime(p.f1 * (ev.tune || 1), t + p.sw);
   o.connect(envG(t, ev.v * (p.amp || 1), 0.003, p.dec, out)); o.start(t); o.stop(t + p.dec + 0.1);
   if (p.click) { const n = noise(t, 0.04); n.connect(filt('highpass', 3000, null, envG(t, ev.v * p.click, 0.001, p.cd || 0.012, out))); }
   if (p.dust) { const n = noise(t, 0.3); n.connect(filt('bandpass', 1200, 0.5, envG(t, ev.v * p.dust, 0.001, 0.25, out))); }
@@ -3867,7 +5348,7 @@ function playSample(id, t, ev, dest, dur) {
   const e0 = E[id]; if (!rendering) e0.lastHitT = t;
   const b = getPlayBuf(e0), drum = DRUMS.has(id) || e0.side === 'rec', notes = drum ? [null] : (Array.isArray(ev.n) ? ev.n : [ev.n]);
   notes.forEach(n => {
-    const s = ac.createBufferSource(); s.buffer = b; if (n != null) s.playbackRate.value = Math.pow(2, (n - 48) / 12); // root assumed C3
+    const s = ac.createBufferSource(); s.buffer = b; if (n != null) s.playbackRate.value = Math.pow(2, (n - 48) / 12); else if (ev.rate) s.playbackRate.value = ev.rate; // root assumed C3
     const gn = ac.createGain(), pk = ev.v * (drum ? 0.9 : 0.6 / Math.sqrt(notes.length)); gn.gain.setValueAtTime(pk, t);
     s.connect(gn); gn.connect(dest); s.start(t);
     if (!drum) { const end = t + Math.max(0.1, dur); gn.gain.setValueAtTime(pk, end); gn.gain.linearRampToValueAtTime(0, end + 0.15); s.stop(end + 0.2); }
@@ -3973,9 +5454,11 @@ function hitEvent(e, p, k) {
   ev.loop = B0.variant === 'file' && !!B0.loop && !!B0.buf;
   return ev;
 }
+function decorate(e, ev, j) { pitchEv(e, ev); if (j < 100 && e.chops) { const hh = hitsOf(e)[j]; if (hh && hh.s != null) ev.slice = hh.s; } return ev; }
 function fireHit(e, t, p, k, v = 1, j = 0) {
-  const ghost = j >= 100, ev = hitEvent(e, p, k + j * 101); ev.v *= v; if (ghost) { ev.dur = Math.min(ev.dur, 0.12); ev.roll = null; if (e.mflash) e.mflash[j - 100] = t; else e.mflash = { [j - 100]: t }; }
+  const ghost = j >= 100, ev = decorate(e, hitEvent(e, p, k + j * 101), j); ev.v *= v; if (ghost) { ev.dur = Math.min(ev.dur, 0.12); ev.roll = null; if (e.mflash) e.mflash[j - 100] = t; else e.mflash = { [j - 100]: t }; }
   const om = ORB[e.orbit] && ORB[e.orbit].st.muted;
+  if (e._ghost) { visQ.push({ t, id: e.id, v: 0 }); hitLog.push({ id: e.id, t, p, j: 'ghost' }); return; } // practice: the planet is silent, you play it
   playPlanet(e, t, ev, ev.dur); if (!om) midiNote(e, ev, t, ev.dur);
   if (ev.roll) for (let r = 1; r < ev.roll.length; r++) { const tr = t + ev.roll[r] * 60 / bpm, er = Object.assign({}, ev, { v: ev.v * (0.75 + 0.2 * r / ev.roll.length), roll: null }); playPlanet(e, tr, er, Math.min(er.dur, 0.08)); if (!om) midiNote(e, er, tr, 0.05); } // trap rolls
   visQ.push({ t, id: e.id, v: ev.v }); hitLog.push({ id: e.id, t, p, j }); if (hitLog.length > 5000) hitLog.shift();
@@ -4079,18 +5562,20 @@ function stop() {
 }
 const toggle = () => playing ? stop() : play();
 document.getElementById('play').addEventListener('click', e => { e.currentTarget.blur(); toggle(); });
+const typingIn = t => t && (/^(INPUT|SELECT|TEXTAREA|BUTTON)$/.test(t.tagName) || t.isContentEditable); // keys belong to form controls (qa #3)
 addEventListener('keydown', e => {
-  if (e.target && e.target.tagName === 'INPUT') return;
+  if (typingIn(e.target)) return;
   if (e.metaKey || e.ctrlKey || e.altKey) return;
   if (winId && padKey(e)) return;
-  if (jamKey(e)) return;
+  if (!winId && jamKey(e)) return; // jam keys and zoom stay off behind the planet window (qa)
   if (e.code === 'Space') { e.preventDefault(); if (!e.repeat) { spaceDown = true; spacePanned = false; } } // space: play / stop on release, or hold + drag to pan
+  else if (winId && /^[-+=_]$/.test(e.key)) {}
   else if (e.key === '+' || e.key === '=') { e.preventDefault(); zoomKey(1.25); } else if (e.key === '-' || e.key === '_') { e.preventDefault(); zoomKey(0.8); }
   else if (e.code === 'KeyT') { e.preventDefault(); tapTempo(); }
   else if (e.code === 'Escape' && winId) closeWin();
   else if (e.code === 'ArrowUp') setBpm(bpm + 1); else if (e.code === 'ArrowDown') setBpm(bpm - 1);
 });
-addEventListener('keyup', e => { if (e.code !== 'Space' || !spaceDown) return; spaceDown = false; if (e.target && e.target.tagName === 'INPUT') return; if (!spacePanned) toggle(); spacePanned = false; cv.style.cursor = 'default'; });
+addEventListener('keyup', e => { if (e.code !== 'Space' || !spaceDown) return; spaceDown = false; if (typingIn(e.target)) return; if (!spacePanned) toggle(); spacePanned = false; cv.style.cursor = 'default'; });
 addEventListener('blur', () => { spaceDown = false; });
 // song position in beats (frozen at 0 when stopped, so the layout is the score)
 function posAt(t) {
@@ -4144,7 +5629,7 @@ function applyView() { CX = CX0 + VIEW.px; CY = CY0 + VIEW.py; RMAX = RMAX0 * VI
 function resize() {
   DPR = Math.min(2, window.devicePixelRatio || 1);
   W = innerWidth; H = innerHeight; cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR); M = Math.min(W, H);
-  const sr = sheet.getBoundingClientRect(), tb = topEl.getBoundingClientRect().bottom;
+  const sr = sheet.getBoundingClientRect(), tb = topEl.getBoundingClientRect().bottom; { const pk = document.getElementById('picker'); if (pk) pk.style.top = Math.round(tb) + 'px'; } // the picker opens below the top bar, so fit · 1:1 · more stay visible (qa)
   SIDE = sr.left > 40;
   SA = SIDE ? { x: 0, y: tb, w: sr.left, h: H - tb } : { x: 0, y: tb, w: W, h: Math.max(160, sr.top - tb) };
   CX0 = SA.x + SA.w / 2; CY0 = SA.y + SA.h / 2;
@@ -4175,7 +5660,7 @@ function layout() {
   curPos = posNow();
   for (const id of IDS) {
     const e = E[id]; e.ang = visAng(e.orbit, e.a, curPos);
-    e.r = (2.6 + 5.6 * Math.pow(e.vol, 0.8)) * DS;
+    e.r = (2.6 + 5.6 * Math.pow(e.vol, 0.8)) * DS * sizeScale(e);
     if (drag && drag.e === e && drag.moved && !drag.tether) { e.x = drag.px; e.y = drag.py; continue; }
     const p = onRing(e.rad, e.ang); e.x = p.x; e.y = p.y;
   }
@@ -4238,11 +5723,12 @@ function updateMix() {
     const e = E[id]; if (!e.vg) continue;
     const mutedNow = e.muted || (drag && drag.e === e && drag.moved && drag.tgt && drag.tgt.mute);
     routePlanet(e); const os = ORB[e.orbit] ? ORB[e.orbit].st : null, og = os ? (os.muted ? 0 : OrbsFX.dbToGain(os.gainDb)) : 1, S = OrbsFX.SMOOTH;
-    setP(e, 'v', e.vg.gain, mutedNow ? 0 : Math.pow(e.vol, 1.3) * e.lvl, S);
+    const tm = trailMix(e);
+    setP(e, 'v', e.vg.gain, mutedNow ? 0 : Math.pow(e.vol, 1.3) * e.lvl * (tm && tm.vol != null ? tm.vol : 1), S);
     setP(e, 'p', e.pan.pan, clamp(e.pn, -1, 1) * 0.9, S);
     setP(e, 's', e.sg.gain, e.verb * og, S); // planet reverb send into the batch 3 room, follows the group's gain / mute
     setP(e, 'd', e.dg.gain, e.echo * 0.6 * og, S); // planet echo = its send into the group delay
-    setP(e, 'c', e.flt.frequency, cutHz(e.cut), S);
+    setP(e, 'c', e.flt.frequency, Math.min(cutHz(tm && tm.cut != null ? Math.min(e.cut, tm.cut) : e.cut), e.eclCut || 1e5), S); // trail + eclipse close the filter further
     ccTick(e);
   }
 }
@@ -4250,7 +5736,7 @@ function updateMix() {
 /* ---------------- interaction ---------------- */
 let drag = null;
 const ripples = [];
-const hitR = e => Math.max(e.r + 4, touchMode ? 22 : 12);
+const hitR = e => Math.max(e.r + 4 + (e.moons ? 3.2 * e.moons + 2 : 0), touchMode ? 22 : 12); // moon rings count as the planet (qa #5)
 function hitDot(x, y, extra = 0) { let best = null, bd = 1e9; for (const id of IDS) { const e = E[id], d = Math.hypot(x - e.x, y - e.y); if (d < hitR(e) + extra && d <= bd) { bd = d; best = { e, d }; } } return best; }
 const LABEL_FONT = '400 10.5px ui-rounded, "SF Pro Rounded", "Nunito", "Quicksand", "Varela Round", system-ui, sans-serif';
 // labels never overlap: each frame every name tries outward side, other side, above, below (keeping its last spot when free);
@@ -4299,7 +5785,7 @@ function linkAt(x, y, mid) { // nearest connection line under the pointer (mid: 
     if (d < bd && Math.hypot(x - A.x, y - A.y) > A.r + 1 && Math.hypot(x - B.x, y - B.y) > B.r + 1) { bd = d; best = [a, b]; } }
   return best;
 }
-let lastTap = { t: 0, x: 0, y: 0 };
+let lastTap = { t: 0, x: 0, y: 0 }, sunPrev = null;
 cv.addEventListener('pointerdown', ev => {
   if (panDown(ev)) return; // zoom / pan gestures (middle drag, space-drag, two-finger pinch) come first
   const x = ev.clientX, y = ev.clientY; layout(); touchMode = ev.pointerType === 'touch' || (COARSE && ev.pointerType !== 'mouse');
@@ -4312,15 +5798,15 @@ cv.addEventListener('pointerdown', ev => {
     if (lk) { if (dbl) { unlink(lk[0], lk[1]); lastTap.t = 0; } return; } // a line: double-click / double-tap cuts it
     const lb = hitLabel(x, y); if (lb) { openPicker(baseOf(lb.id)); select(lb.id); return; }
     if (pickId) { closePicker(); return; }
-    if (Math.hypot(x - CX, y - CY) < SUNR + (touchMode ? 20 : 12)) { initAudio(); sunTap(); return; } // chord sun: tap steps the chords (play / stop: ▷ or space)
+    if (Math.hypot(x - CX, y - CY) < SUNR + (touchMode ? 20 : 12)) { initAudio(); sunTap(); return; } // on the sun the sun wins: quick taps step chords, a line through it is cut off the sun (qa #5) // chord sun: tap steps the chords (play / stop: ▷ or space)
     return;
   }
   cv.setPointerCapture(ev.pointerId);
-  const d0 = drag = { e: h.e, sx: x, sy: y, px: x, py: y, ox: h.e.x - x, oy: h.e.y - y, moved: false, tgt: null, tether: !!ev.shiftKey, d0: {} };
+  const d0 = drag = { t0: performance.now(), e: h.e, sx: x, sy: y, px: x, py: y, ox: h.e.x - x, oy: h.e.y - y, moved: false, tgt: null, tether: !!ev.shiftKey, d0: {} };
   for (const p of partnersOf(h.e.id)) d0.d0[p] = Math.hypot(E[p].x - h.e.x, E[p].y - h.e.y);
   if (!d0.tether) d0.lp = setTimeout(() => { if (drag === d0 && !d0.moved) { drag = null; select(d0.e.id); openBar(d0.e.id); } }, 550);
 });
-cv.addEventListener('dblclick', ev => { layout(); const lk = linkAt(ev.clientX, ev.clientY, true) || linkAt(ev.clientX, ev.clientY); if (lk && linked(lk[0], lk[1])) unlink(lk[0], lk[1]); });
+cv.addEventListener('dblclick', ev => { layout(); if (Math.hypot(ev.clientX - CX, ev.clientY - CY) < SUNR + (touchMode ? 20 : 12)) return; const lk = linkAt(ev.clientX, ev.clientY, true) || linkAt(ev.clientX, ev.clientY); if (lk && linked(lk[0], lk[1])) unlink(lk[0], lk[1]); });
 cv.addEventListener('pointermove', ev => {
   if (panMove(ev)) return;
   const x = ev.clientX, y = ev.clientY;
@@ -4360,8 +5846,9 @@ function endDrag(ev) {
   } else {
     e.muted = false; e.inHole = false;
     if (t.breaks.length) { t.breaks.forEach(p => links.delete(lkey(e.id, p))); regroup(); recMsg((e.label || e.id) + ' disconnected'); }
-    const i = e.orbit; setGroupLap(i, t.lap, e); const o = ORB[i];
-    e.rad = clampRadLap(t.rad, o.lap); e.a = snapA(aFromAngG(o, t.ang, pos), o.lap);
+    const i = e.orbit;
+    if (gravGesture(d, t, i)) { const o = ORB[i]; e.a = snapA(aFromAngG(o, t.ang, pos), o.lap); } // slow drag inward while playing: the lap speeds up over bars
+    else { setGroupLap(i, t.lap, e); const o = ORB[i]; e.rad = clampRadLap(t.rad, o.lap); e.a = snapA(aFromAngG(o, t.ang, pos), o.lap); }
   }
   select(e.id); layout(); ripples.push({ x: e.x, y: e.y, t0: performance.now(), r0: e.r, big: true }); sheetDirty = true; save();
 }
@@ -4415,7 +5902,7 @@ function smoky(A, B, bright, T, seed) { // connection: a thin smoky white line (
 const hash = s => { let h = 7; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) % 9973; return h; };
 function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000); last = now; const T = now / 1000;
-  layout(); morphTick(); updateMix();
+  layout(); morphTick(); extrasTick(dt); updateMix();
   if (drag && drag.moved) drag.tgt = dragTarget(drag);
   if (ac && playing) while (visQ.length && visQ[0].t <= ac.currentTime) {
     const q = visQ.shift(), e = E[q.id]; if (!e) continue; e.pulse = Math.max(e.pulse, q.v); trigFlash = Math.max(trigFlash, 0.6 + 0.4 * q.v);
@@ -4429,7 +5916,7 @@ function frame(now) {
 
   g.setTransform(DPR, 0, 0, DPR, 0, 0);
   g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1; g.setLineDash([]); g.shadowBlur = 0;
-  g.fillStyle = '#000'; g.fillRect(0, 0, W, H);
+  g.fillStyle = MOODCSS; g.fillRect(0, 0, W, H);
   g.fillStyle = g.strokeStyle = '#fff'; g.lineCap = 'round';
   const hair = Math.max(0.5, 1 / DPR) * 0.9, sel = E[selId], dragging = drag && drag.moved && !drag.tether ? drag : null;
   // --- no permanent rings: just a faint ghost ring for the selected planet and the one being dragged ---
@@ -4506,9 +5993,10 @@ function frame(now) {
   if (dragging && dragging.tgt && !dragging.tgt.mute && !dragging.tgt.hole) { const tg = dragging.tgt; g.font = LABEL_FONT; g.textAlign = 'center'; g.textBaseline = 'middle'; g.globalAlpha = 0.55;
     g.fillText(tg.connect ? '→ ' + (tg.connect.label || tg.connect.id) + ' · ' + lapTxt(tg.lap) : lapTxt(tg.lap) + (tg.breaks && tg.breaks.length ? ' · disconnect' : ''), dragging.px, dragging.py + dragging.e.r + 14); }
   // --- planets ---
+  drawTrails(); drawEclipses(); g.globalAlpha = 1;
   g.font = LABEL_FONT; g.textBaseline = 'middle';
   for (const id of IDS) {
-    const e = E[id], r = e.r * (1 + 0.35 * e.pulse), dragging = drag && drag.e === e && drag.moved, mutedLook = e.muted || (ORB[e.orbit] && (ORB[e.orbit].st.muted || (anySolo() && !ORB[e.orbit].solo)) && !dragging) || (dragging && drag.tgt && drag.tgt.mute);
+    const e = E[id], r = e.r * (1 + 0.35 * e.pulse), dragging = drag && drag.e === e && drag.moved, mutedLook = e.muted || (ORB[e.orbit] && (ORB[e.orbit].st.muted || (anySolo() && !ORB[e.orbit].solo)) && !dragging) || (dragging && drag.tgt && drag.tgt.mute) || e._ghost;
     if (mutedLook) { g.globalAlpha = 0.4; g.lineWidth = 0.9; g.beginPath(); g.arc(e.x, e.y, r, 0, TAU); g.stroke(); }
     else { g.globalAlpha = 0.95; g.beginPath(); g.arc(e.x, e.y, r, 0, TAU); g.fill(); }
     if (!mutedLook && e.verb > 0.2) { g.globalAlpha = 0.12 + 0.18 * e.verb; g.lineWidth = 0.6; g.setLineDash([0.5, 3]); g.beginPath(); g.arc(e.x, e.y, r + 3 + 6 * e.verb, 0, TAU); g.stroke(); g.setLineDash([]); }
@@ -4622,7 +6110,7 @@ function renderSheet() {
     h += '<div class="ofx">' + orbFxHTML(i, selId) + '</div>';
     h += '</div></div>';
   });
-  h += '<div class="foot">' + (still ? 'still: planets stay put and a hand sweeps from the sun at each group\'s lap; a planet plays when its hand passes it' : 'moving: each planet plays once per lap, when it crosses the line at 12') + ' · distance from the sun sets the lap · drop a planet on another to connect · drag it away or double-click the line to cut · shift-drag to duck · off the edge mutes · click a planet for its window · hold for its bar · ▷ or space plays · tap the sun to step the chords (bass, chords, pad, lead follow), hold it for auto · drop a planet in the black hole (bottom left) to silence it, drag it out again · drift makes its hits wander a little each lap · wheel / pinch zooms, + / − too, space-drag or middle-drag pans, fit · 1:1 up top · in a planet\'s window: moons add ghost notes, chance thins its hits, click a tick on the ring to set that hit\'s chance · poly laps (3 · 5 · 7 beats) drift against the bar · more: comets, scenes (save intro / drop / break, morph over bars), mutate (keeps kick + bass, undoable), jam keys (1–9 play planets, ← → nudge), share link</div>';
+  h += '<div class="foot">' + (still ? 'still: planets stay put and a hand sweeps from the sun at each group\'s lap; a planet plays when its hand passes it' : 'moving: each planet plays once per lap, when it crosses the line at 12') + ' · distance from the sun sets the lap · drop a planet on another to connect · drag it away or double-click the line to cut · shift-drag to duck · off the edge mutes · click a planet for its window · hold for its bar · ▷ or space plays · tap the sun to step the chords (bass, chords, pad, lead follow), hold it for auto · drop a planet in the black hole (bottom left) to silence it, drag it out again · drift makes its hits wander a little each lap · wheel / pinch zooms, + / − too, space-drag or middle-drag pans, fit · 1:1 up top · in a planet\'s window: moons add ghost notes, chance thins its hits, click a tick on the ring to set that hit\'s chance · poly laps (3 · 5 · 7 beats) drift against the bar · more: comets, scenes (save intro / drop / break, morph over bars), mutate (keeps kick + bass, undoable), jam keys (1–9 play planets, ← → nudge), share link (with scenes; your own system is backed up when you open one: more › back to my system) · scenes keep group fx too · more → export .mid / wav mix / wav stems, binaural (headphones), eclipses, gravity (slow drag inward while playing = a build), mood light · shift + wheel over a planet = its size = its pitch (bigger is lower) · planet window: trail (draw a filter / volume curve over the lap), build, export its clip or stem, chop a recording into hits, practice its part on the pad for a score</div>';
   sheet.innerHTML = h;
   if (scrollSel && selId) { scrollSel = false; const el = sheet.querySelector('.pl.sel'); if (el) { const r = el.getBoundingClientRect(), sr = sheet.getBoundingClientRect(); if (r.top < sr.top + 30 || r.bottom > sr.bottom - 120) sheet.scrollTop += r.top - sr.top - 40; } }
 }
@@ -4632,6 +6120,7 @@ function panelClick(ev) {
   if (act === 'orb') { openG = openG === ORB[i].id ? null : ORB[i].id; sheetDirty = true; }
   else if (act === 'lap') setGroupLap(i, +t.dataset.l);
   else if (act === 'pl') { if (selId === id) { selId = null; sheetDirty = true; } else { select(id, 'sheet'); audition(id); } }
+  else if (extrasAct(act, t, id)) {}
   else if (act === 'win') openWin(id);
   else if (act === 'pick') openPicker(baseOf(id));
   else if (act === 'bar') openBar(id);
@@ -4692,20 +6181,22 @@ function renderWin() {
   if (vars.length) h += '<div class="grp"><b>sound</b><span class="gv"><span data-act="pick" data-id="' + e.id + '">all samples ›</span></span></div><div class="laps vars">' + vars.map(v => '<span data-act="var" data-id="' + e.id + '" data-v="' + v + '" class="' + (E[base].variant === v ? 'on' : '') + '">' + esc(v === 'file' ? (E[base].fileName || 'file') : v) + '</span>').join('') + '</div>';
   h += '<div class="grp"><b>moons</b><span class="gv">ghost notes around each hit</span></div><div class="laps">' + [0, 1, 2, 3].map(n => '<span data-act="moons" data-id="' + e.id + '" data-n="' + n + '" class="' + ((e.moons | 0) === n ? 'on' : '') + '">' + (n ? n + (n > 1 ? ' moons' : ' moon') : 'none') + '</span>').join('') + '</div>';
   h += '<div class="grp"><b>lap</b><span class="gv">' + (membersOf(o).length > 1 ? 'whole group' : 'distance from the sun') + '</span></div>' + lapChips(i);
-  h += orbFxHTML(i, e.id) + roomHTML();
-  if (!(slDrag && wFx.contains(slDrag))) { const st = wFx.scrollTop; wFx.innerHTML = h; wFx.scrollTop = st; }
+  h += winExtrasHTML(e) + orbFxHTML(i, e.id) + roomHTML();
+  if (!(slDrag && wFx.contains(slDrag)) && !trDrag) { const st = wFx.scrollTop; wFx.innerHTML = h; wFx.scrollTop = st; }
   const chip = (k, v, label, on) => '<span data-pk="' + k + '" data-v="' + v + '" class="' + (on ? 'on' : '') + '">' + label + '</span>';
   wCtl.innerHTML = '<div class="pr"><span id="wRec" class="' + (prec ? 'on' : '') + '">' + (prec ? (prec.phase === 'count' ? 'count-in' : 'recording') : 'rec') + '</span>' + chip('od', 1, 'overdub', PAD.overdub) + '<span data-pa="undo" class="' + ((e.patUndo || []).length ? '' : 'off') + '">undo</span><span data-pa="clear" class="' + (e.pat && e.pat.length ? '' : 'off') + '">clear</span><span data-pa="wave">wave ›</span></div>'
     + '<div class="pr"><b>length</b>' + chip('len', 'lap', '1 lap', PAD.len === 'lap') + chip('len', '2', '2 bars', PAD.len === '2') + chip('len', '4', '4 bars', PAD.len === '4') + '</div>'
     + '<div class="pr"><b>quantize</b>' + chip('q', 0, 'off', PAD.q === 0) + chip('q', 0.5, '1/8', PAD.q === 0.5) + chip('q', 0.25, '1/16', PAD.q === 0.25) + chip('q', 0.125, '1/32', PAD.q === 0.125) + '</div>'
+    + '<div class="pr"><b>practice</b><span data-pa="practice" class="' + (prac && prac.id === e.id ? 'on' : '') + '">' + (prac && prac.id === e.id ? 'stop' : 'practice its part') + '</span>' + (lastPractice && lastPractice.id === e.id ? '<span class="off" id="wScore">score ' + Math.round(lastPractice.score) + '</span>' : '') + '</div>'
     + '<div class="pr"><b>velocity</b>' + chip('vel', 'pos', 'from click', PAD.vel === 'pos') + chip('vel', 'fixed', 'fixed', PAD.vel === 'fixed') + '</div>';
   wPad.querySelector('small').textContent = 'click · or keys ' + padKeys(e).join(' ').toLowerCase();
 }
-wFx.addEventListener('click', ev => { panelClick(ev); if (winId) renderWin(); });
+wFx.addEventListener('click', ev => { if (ev.target.id === 'wTrail') return; panelClick(ev); if (winId) renderWin(); }); // the trail editor keeps its canvas (double-click needs it)
 bindSliders(wFx);
 wCtl.addEventListener('click', ev => {
   const t = ev.target.closest('[data-pk],[data-pa],#wRec'); if (!t) return; const e = E[winId]; if (!e) return; initAudio();
   if (t.id === 'wRec') { prec ? endPadRec(true) : startPadRec(); }
+  else if (t.dataset.pa === 'practice') { prac ? endPractice(true) : startPractice(); }
   else if (t.dataset.pk === 'od') PAD.overdub = !PAD.overdub;
   else if (t.dataset.pk === 'len') PAD.len = t.dataset.v;
   else if (t.dataset.pk === 'q') PAD.q = +t.dataset.v;
@@ -4730,7 +6221,7 @@ wPad.addEventListener('pointerdown', ev => {
 // a live hit: sounds now through the planet's own strip (so every fx applies), low latency; recorded while armed
 function padHit(v, t) {
   const e = E[winId]; if (!e) return null; const live = t == null; t = live ? ac.currentTime + 0.004 : t;
-  const p = posAt(t), ev = hitEvent(e, p, Math.floor(p)); ev.v *= v;
+  const p = posAt(t), ev = pitchEv(e, hitEvent(e, p, Math.floor(p))); ev.v *= v; if (prac && prac.id === e.id) { pracTap(live ? t - padLat() : t); if (e.chops) ev.slice = (prac.taps.length - 1) % e.chops.length; }
   playPlanet(e, t, ev, Math.min(ev.dur, 1.2)); midiNote(e, ev, t, Math.min(ev.dur, 1.2));
   e.pulse = Math.max(e.pulse, v); visQ.push({ t, id: e.id, v });
   if (prec && prec.phase === 'rec' && playing) padRecHit(e, live ? posAt(t - padLat()) : p, v); // record where you heard it: minus output latency
@@ -4824,8 +6315,8 @@ function applyGenre(id, mode) {
 }
 // output trim per genre (db), measured at default volumes so every genre sits near -23 dbfs rms (raw spread was ~11 db)
 const GTRIM_DB = {
-  'house:sounds': 2, 'techno:sounds': 1, 'lofi:sounds': 0.9, 'trap:sounds': 0.7, 'dnb:sounds': 0.2, 'ambient:sounds': -4.8, 'dub:sounds': -4.2, 'afrobeat:sounds': 3.1, 'synthwave:sounds': 3.4, 'meditation:sounds': -6.5,
-  'house:relayout': 1.8, 'techno:relayout': 0.5, 'lofi:relayout': -0.9, 'trap:relayout': -1.1, 'dnb:relayout': 1.3, 'ambient:relayout': -3.6, 'dub:relayout': -7, 'afrobeat:relayout': 4.1, 'synthwave:relayout': 2.7, 'meditation:relayout': -4.5 };
+  'house:sounds': 2, 'techno:sounds': 1, 'lofi:sounds': 0.9, 'trap:sounds': 0.7, 'dnb:sounds': 0.4, 'psytrance:sounds': 1.5, 'hiphop:sounds': -0.2, 'ambient:sounds': -4.8, 'dub:sounds': -4.2, 'afrobeat:sounds': 3.1, 'synthwave:sounds': 3.4, 'meditation:sounds': -6.5,
+  'house:relayout': 1.8, 'techno:relayout': 0.5, 'lofi:relayout': -0.9, 'trap:relayout': -1.1, 'dnb:relayout': 0, 'psytrance:relayout': 0.7, 'hiphop:relayout': -0.8, 'ambient:relayout': -3.6, 'dub:relayout': -7, 'afrobeat:relayout': 4.1, 'synthwave:relayout': 2.7, 'meditation:relayout': -4.5 };
 function setGenreTrim(db) { GTRIM = clamp(+db || 0, -12, 6); if (gtrim) gtrim.gain.setTargetAtTime(Math.pow(10, GTRIM / 20), ac.currentTime, 0.05); }
 function relayout(lay) { // free orbits: lap (or distance) → radius band, a → angle; orbit indices ignored. same-lap planets get connected.
   const pos = posNow(), plan = {};
@@ -4897,7 +6388,7 @@ function tonalV(p, e, base) {
     e._lastF = mtof(ns[0]);
   };
 }
-function playPlanet(e, t, ev, dur) { const fn = voiceFn(e, ev); if (fn) fn(t, ev, e.in, dur); else playVoice(e.id, t, ev, e.in, dur); }
+function playPlanet(e, t, ev, dur) { if (e.chops && ev.slice != null) return playSlice(e, t, ev, e.in); const fn = voiceFn(e, ev); if (fn) fn(t, ev, e.in, dur); else playVoice(e.id, t, ev, e.in, dur); }
 
 /* ---------------- midi → ableton (OrbsBridge): notes, cc, clock master ---------------- */
 const midiEl = document.getElementById('midi');
@@ -4952,7 +6443,7 @@ function zoomFit() { // the outermost planet (plus its label) fills the view, su
 const zoom11 = () => setView(1, 0, 0);
 zoomEl.addEventListener('click', ev => { const t = ev.target.closest('[data-z]'); if (!t) return; t.dataset.z === 'fit' ? zoomFit() : zoom11(); });
 cv.addEventListener('wheel', ev => {
-  ev.preventDefault();
+  ev.preventDefault(); if (ev.shiftKey && sizeWheel(ev)) return; // shift + wheel over a planet = size = pitch
   const dy = ev.deltaY * (ev.deltaMode === 1 ? 16 : ev.deltaMode === 2 ? 400 : 1);
   zoomAt(Math.exp(-dy * (ev.ctrlKey ? 0.01 : 0.0015)), ev.clientX, ev.clientY); // ctrl+wheel = trackpad pinch
 }, { passive: false });
@@ -4997,7 +6488,7 @@ function cometSound(t0, t1) {
   s.start(t0); s.stop(t1 + 0.05);
   // crash: bright noise, long decay
   const c = ac.createBufferSource(); c.buffer = noiseBuf; c.loop = true; const hp = ac.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 4200; const cg = ac.createGain();
-  cg.gain.setValueAtTime(0, t1); cg.gain.linearRampToValueAtTime(0.22, t1 + 0.004); cg.gain.exponentialRampToValueAtTime(0.0008, t1 + 2.2);
+  cg.gain.setValueAtTime(0, t1); cg.gain.linearRampToValueAtTime(0.22, t1 + 0.012); /* softer crash attack (qa) */ cg.gain.exponentialRampToValueAtTime(0.0008, t1 + 2.2);
   c.connect(hp); hp.connect(cg); cg.connect(dest); if (room) { const sg = ac.createGain(); sg.gain.value = 0.5; cg.connect(sg); sg.connect(room); }
   c.start(t1); c.stop(t1 + 2.3);
 }
@@ -5028,6 +6519,8 @@ function shareState() { // the saved state minus recorded planets (their audio l
   drop.forEach(id => delete s.els[id]); s.order = (s.order || []).filter(id => !drop.has(id));
   s.links = (s.links || []).filter(k => !k.split('|').some(x => drop.has(x))); s.tethers = (s.tethers || []).filter(t => !drop.has(t.src) && !drop.has(t.tgt));
   for (const id in s.els) if (s.els[id].v === 'file') s.els[id].v = undefined;
+  s.scenes = { slots: JSON.parse(JSON.stringify(SCENES)), bars: SCENE_BARS }; // scenes travel with the song (recorded planets dropped from them)
+  for (const sl in s.scenes.slots) { const sc = s.scenes.slots[sl]; if (!sc || !sc.els) continue; drop.forEach(id => delete sc.els[id]); sc.links = (sc.links || []).filter(k => !k.split('|').some(x => drop.has(x))); }
   return { s, dropped: drop.size };
 }
 let lastShare = '';
@@ -5043,12 +6536,21 @@ async function shareLink() {
 async function loadShared() { // opening a share link: write the state, drop the hash, reload into it
   const m = location.hash.match(/^#s=([zj])([A-Za-z0-9_-]+)$/); if (!m) return false;
   try { const u = ub64(m[2]), js = m[1] === 'z' ? new TextDecoder().decode(await zipStr(u, true)) : new TextDecoder().decode(u); const s = JSON.parse(js); if (!s || !s.els) throw 0;
-    localStorage.setItem(LS, JSON.stringify(s)); sessionStorage.setItem('orbs-shared', '1'); location.replace(location.href.split('#')[0]); return true;
+    const mine = localStorage.getItem(LS), mineSc = localStorage.getItem('orbs-solar-scenes'); let backed = false; // the receiver's own system is backed up, not lost
+    if (mine && mine !== JSON.stringify(s)) { localStorage.setItem(LS + '-backup', mine); if (mineSc) localStorage.setItem('orbs-solar-scenes-backup', mineSc); else localStorage.removeItem('orbs-solar-scenes-backup'); backed = true; }
+    const sc = s.scenes; delete s.scenes; if (sc && sc.slots && typeof sc.slots === 'object') localStorage.setItem('orbs-solar-scenes', JSON.stringify({ slots: sc.slots, bars: [0, 1, 2, 4, 8].includes(sc.bars) ? sc.bars : 4 })); else localStorage.removeItem('orbs-solar-scenes');
+    localStorage.setItem(LS, JSON.stringify(s)); sessionStorage.setItem('orbs-shared', backed ? '2' : '1'); location.replace(location.href.split('#')[0]); return true;
   } catch (x) { recMsg('that share link could not be read'); history.replaceState(null, '', location.href.split('#')[0]); return false; }
 }
 if (/^#s=/.test(location.hash)) { window.__orbsShareLoading = true; loadShared().then(ok => { if (!ok) window.__orbsShareLoading = false; }); }
 addEventListener('hashchange', () => { if (/^#s=/.test(location.hash)) { window.__orbsShareLoading = true; loadShared().then(ok => { if (!ok) window.__orbsShareLoading = false; }); } });
-try { if (sessionStorage.getItem('orbs-shared')) { sessionStorage.removeItem('orbs-shared'); setTimeout(() => recMsg('shared system loaded · recordings are not part of links'), 300); } } catch (x) {}
+try { const sh = sessionStorage.getItem('orbs-shared'); if (sh) { sessionStorage.removeItem('orbs-shared'); setTimeout(() => recMsg('shared system loaded' + (sh === '2' ? ' · yours is backed up: more › back to my system' : '') + ' · recordings are not part of links'), 300); } } catch (x) {}
+const hasBackup = () => { try { return !!localStorage.getItem(LS + '-backup'); } catch (x) { return false; } };
+function restoreBackup() { // back to the system you had before opening a share link
+  try { const b = localStorage.getItem(LS + '-backup'); if (!b) return false; const bs = localStorage.getItem('orbs-solar-scenes-backup'); window.__orbsShareLoading = true;
+    localStorage.setItem(LS, b); if (bs) localStorage.setItem('orbs-solar-scenes', bs); else localStorage.removeItem('orbs-solar-scenes'); localStorage.removeItem(LS + '-backup'); localStorage.removeItem('orbs-solar-scenes-backup');
+    sessionStorage.setItem('orbs-restored', '1'); location.reload(); return true; } catch (x) { return false; } }
+try { if (sessionStorage.getItem('orbs-restored')) { sessionStorage.removeItem('orbs-restored'); setTimeout(() => recMsg('back to your own system'), 300); } } catch (x) {}
 
 /* ---------------- more menu: the extra toggles, so the top bar stays small ---------------- */
 const moreEl = document.getElementById('more'), mmenu = document.getElementById('mmenu');
@@ -5061,7 +6563,13 @@ function renderMore() {
     + '<div class="mn">click a saved scene to morph to it · morph runs over the chosen bars from the next downbeat</div><div class="ms"></div>'
     + '<div class="mi" data-m="mutate"><i class="ck" style="border-style:dotted"></i><b>mutate</b>' + (MUT_UNDO.length ? ch('mundo', 1, false, 'undo') : '') + '</div><div class="mn">a variation of the groove · kick and bass stay</div>'
     + '<div class="mi' + (JAM ? ' on' : '') + '" data-m="jam"><i class="ck"></i><b>jam keys</b></div><div class="mn">1–9 play planets · ← → nudge the selected planet a 16th (none selected: the transport)</div><div class="ms"></div>'
-    + '<div class="mi" data-m="share"><i class="ck" style="border-style:dashed"></i><b>share link</b></div><div class="mn">copies a link with the whole system · recordings are not included</div>' + (lastShare ? '<div class="mn"><input readonly value="' + esc(lastShare) + '" style="width:100%;background:#000;color:#fff;border:0;border-bottom:1px solid rgba(255,255,255,.3);font:inherit;font-size:10px;padding:3px 0;opacity:.8"></div>' : '');
+    + '<div class="mi" style="cursor:default;opacity:.8"><b>export</b><span style="opacity:.3">bars</span>' + [4, 8, 16].map(b => ch('xbars', b, XS.xbars === b, b + '')).join('') + '</div>'
+    + '<div class="mi" style="cursor:default"><i class="ck" style="border-style:dotted"></i>' + ch('xmid', 1, false, '.mid') + ch('xwav', 'mix', false, 'wav mix') + ch('xwav', 'stems', false, 'wav stems') + '</div><div class="mn">the loop as midi (one track per planet) or audio · stems = one wav per planet + the mix</div><div class="ms"></div>'
+    + '<div class="mi' + (XS.binaural ? ' on' : '') + '" data-m="xs" data-k="binaural"><i class="ck"></i><b>binaural</b></div><div class="mn">3d sound on headphones · planets circle around your head</div>'
+    + '<div class="mi' + (XS.eclipse ? ' on' : '') + '" data-m="xs" data-k="eclipse"><i class="ck"></i><b>eclipses</b></div><div class="mn">a planet passing behind another (seen from the sun) dips and darkens</div>'
+    + '<div class="mi' + (XS.gravity ? ' on' : '') + '" data-m="xs" data-k="gravity"><i class="ck"></i><b>gravity</b></div><div class="mn">while playing, a slow drag toward the sun speeds the lap up over bars like a build</div>'
+    + '<div class="mi' + (XS.mood ? ' on' : '') + '" data-m="xs" data-k="mood"><i class="ck"></i><b>mood light</b></div><div class="mn">the dark tints with the genre and the energy of the mix</div><div class="ms"></div>'
+    + '<div class="mi" data-m="share"><i class="ck" style="border-style:dashed"></i><b>share link</b></div><div class="mn">copies a link with the whole system and its scenes · recordings are not included</div>' + (hasBackup() ? '<div class="mi" data-m="restore"><i class="ck" style="border-style:dashed"></i><b>back to my system</b></div><div class="mn">undo opening a share link</div>' : '') + (lastShare ? '<div class="mn"><input readonly value="' + esc(lastShare) + '" style="width:100%;background:#000;color:#fff;border:0;border-bottom:1px solid rgba(255,255,255,.3);font:inherit;font-size:10px;padding:3px 0;opacity:.8"></div>' : '');
 }
 moreEl.addEventListener('click', ev => { ev.stopPropagation(); renderMore(); const r = moreEl.getBoundingClientRect(); mmenu.style.left = Math.max(8, Math.min(innerWidth - 230, r.right - 200)) + 'px'; mmenu.style.top = (r.bottom + 4) + 'px'; mmenu.classList.toggle('open'); gmenu.classList.remove('open'); });
 mmenu.addEventListener('click', ev => { ev.stopPropagation(); const k = ev.target.closest('[data-mk]'), m = ev.target.closest('[data-m]');
@@ -5070,12 +6578,17 @@ mmenu.addEventListener('click', ev => { ev.stopPropagation(); const k = ev.targe
     else if (k.dataset.mk === 'sbars') { SCENE_BARS = +v; saveScenes(); renderMore(); }
     else if (k.dataset.mk === 'sstore') storeScene(v);
     else if (k.dataset.mk === 'mundo') undoMutate();
+    else if (k.dataset.mk === 'xbars') setXS('xbars', +v);
+    else if (k.dataset.mk === 'xmid') exportMidi();
+    else if (k.dataset.mk === 'xwav') exportWav(v);
     return; }
   if (!m) return; initAudio();
   if (m.dataset.m === 'comet') setComet({ on: !COMET.on });
   else if (m.dataset.m === 'scene') { const sl = m.dataset.s; if (SCENES[sl]) gotoScene(sl); else storeScene(sl); }
   else if (m.dataset.m === 'mutate') mutate();
   else if (m.dataset.m === 'jam') setJam(!JAM);
+  else if (m.dataset.m === 'xs') setXS(m.dataset.k, !XS[m.dataset.k]);
+  else if (m.dataset.m === 'restore') restoreBackup();
   else if (m.dataset.m === 'share') { mmenu.classList.remove('open'); shareLink(); } });
 addEventListener('pointerdown', ev => { if (!ev.target.closest('#mmenu,#more')) mmenu.classList.remove('open'); });
 
@@ -5083,13 +6596,18 @@ addEventListener('pointerdown', ev => { if (!ev.target.closest('#mmenu,#more')) 
 const SNAP_KEYS = ['rad', 'a', 'vol', 'pn', 'cut', 'verb', 'echo', 'muted', 'inHole', 'moons', 'prob', 'drift'];
 function sysSnap() {
   const els = {}; IDS.forEach(id => { const e = E[id], o = {}; SNAP_KEYS.forEach(k => { o[k] = e[k] === undefined ? null : e[k]; }); o.pat = (e.pat || []).map(h => Object.assign({}, h)); o.lap = lapOf(e); els[id] = o; });
-  return { els, links: [...links] };
+  const groups = ORB.map(o => ({ ids: membersOf(o).map(e => e.id), st: { gainDb: o.st.gainDb, pan: o.st.pan, muted: o.st.muted, filterType: o.st.filterType, cutoff: o.st.cutoff, q: o.st.q }, t2: Object.assign({}, o.t2) })); // group fx too (qa)
+  return { els, links: [...links], groups };
 }
-function applyDiscrete(s) { // links → groups → laps, then every planet's place, pattern and settings
+function applyDiscrete(s, skip) { // links → groups → laps, then every planet's place, pattern and settings
   if (!s || !s.els) return; links.clear(); s.links.forEach(k => { const [a, b] = k.split('|'); if (E[a] && E[b]) links.add(k); }); regroup();
   ORB.forEach((o, i) => { const m = membersOf(o).map(e => s.els[e.id]).find(Boolean); if (m && m.lap && m.lap !== o.lap) setGroupLap(i, m.lap); });
-  for (const id in s.els) { const e = E[id], o = s.els[id]; if (!e) continue; SNAP_KEYS.forEach(k => { if (o[k] === null) delete e[k]; else if (o[k] !== undefined) e[k] = o[k]; }); e.pat = (o.pat || []).map(h => Object.assign({}, h)); }
-  sheetDirty = true; save(); if (winId) renderWin();
+  for (const id in s.els) { const e = E[id], o = s.els[id]; if (!e) continue; SNAP_KEYS.forEach(k => { if (skip && (skip.has(id + '.' + k) || (k === 'muted' && skip.has(id + '.vol')))) return; if (o[k] === null) delete e[k]; else if (o[k] !== undefined) e[k] = o[k]; }); e.pat = (o.pat || []).map(h => Object.assign({}, h)); }
+  if (Array.isArray(s.groups) && fx) ORB.forEach(o => { const g2 = s.groups.find(x => membersOf(o).some(e => x.ids.includes(e.id))); if (!g2) return; const id = o.id, st = g2.st, t2 = g2.t2 || {};
+    try { if (st.gainDb !== o.st.gainDb) fx.setGain(id, st.gainDb); if (st.pan !== o.st.pan) fx.setPan(id, st.pan); if (!!st.muted !== !!o.st.muted) fx.setMute(id, !!st.muted);
+      if (st.filterType !== o.st.filterType || st.cutoff !== o.st.cutoff || st.q !== o.st.q) fx.setFilter(id, { type: st.filterType, cutoff: st.cutoff, q: st.q }); o.st = stState(fx.getOrbit(id)); o.lap = o.poly || o.st.lap * 4;
+      if (fx2) { fx2.setEq(id, { lo: t2.lo, mid: t2.mid, hi: t2.hi }); fx2.setSat(id, { drive: t2.drive, out: t2.out, curve: t2.curve }); fx2.setDelay(id, { delayBeats: t2.delayBeats, feedback: t2.feedback, send: t2.send, sync: t2.sync }); o.t2 = t2State(fx2.getOrbit(id)); } } catch (x) {} });
+  sheetDirty = true; save(); if (winId) renderWin(); updateMix();
 }
 
 /* ---------------- scenes: constellations in slots, morphing over n bars ---------------- */
@@ -5102,19 +6620,20 @@ function gotoScene(slot, bars) {
   const to = SCENES[slot]; if (!to) return false; bars = bars == null ? SCENE_BARS : bars; sceneOn = slot; renderMore();
   if (!playing || bars <= 0) { MORPH = null; applyDiscrete(to); recMsg('→ ' + slot); return true; }
   const p = posNow(), p0 = Math.ceil(p / 4 - 1e-6) * 4, from = sysSnap();
-  for (const id in to.els) { const e = E[id], t = to.els[id]; if (e && e.muted && !t.muted) { e.muted = false; e.inHole = false; from.els[id].vol = 0; } } // coming in: fade up from silence
-  MORPH = { slot, to, from, p0, p1: p0 + bars * 4 }; recMsg('morphing to ' + slot + ' over ' + bars + (bars > 1 ? ' bars' : ' bar'));
+  for (const id in to.els) { const e = E[id], t = to.els[id]; if (e && e.muted && !t.muted) { e.muted = false; e.inHole = false; from.els[id].vol = 0; e.vol = 0; } } /* and silent now, not only in the snapshot (qa 2) */ // coming in: fade up from silence
+  MORPH = { slot, to, from, p0, p1: p0 + bars * 4, last: {}, touched: new Set() }; recMsg('morphing to ' + slot + ' over ' + bars + (bars > 1 ? ' bars' : ' bar'));
   return true;
 }
 function morphTick() {
-  if (!MORPH) return; if (!playing) { const m = MORPH; MORPH = null; applyDiscrete(m.to); return; }
+  if (!MORPH) return; if (!playing) { const m = MORPH; MORPH = null; applyDiscrete(m.to, m.touched); return; }
   const u = (posNow() - MORPH.p0) / (MORPH.p1 - MORPH.p0); if (u < 0) return;
-  if (u >= 1) { const m = MORPH; MORPH = null; applyDiscrete(m.to); return; }
+  if (u >= 1) { const m = MORPH; MORPH = null; applyDiscrete(m.to, m.touched); return; }
   const k = u * u * (3 - 2 * u);
-  for (const id in MORPH.to.els) { const e = E[id], a = MORPH.from.els[id], b = MORPH.to.els[id]; if (!e || !a) continue;
-    ['pn', 'cut', 'verb', 'echo'].forEach(q => { if (isFinite(a[q]) && isFinite(b[q])) e[q] = a[q] + (b[q] - a[q]) * k; });
-    const vb = b.muted ? 0 : b.vol; if (isFinite(a.vol) && isFinite(vb)) e.vol = a.vol + (vb - a.vol) * k; // leaving: fade out, muted at the end
-    if (bandOf(a.rad) === bandOf(b.rad) && grpOf(e) && bandOfLap(lapOf(e)) === bandOf(b.rad)) e.rad = a.rad + (b.rad - a.rad) * k; }
+  const M = MORPH, put = (e, q, v) => { const key = e.id + '.' + q; if (M.touched.has(key)) return; if (M.last[key] !== undefined && Math.abs(e[q] - M.last[key]) > 1e-9) { M.touched.add(key); return; } e[q] = v; M.last[key] = v; }; // a param the user moves during the morph is theirs (qa #4)
+  for (const id in M.to.els) { const e = E[id], a = M.from.els[id], b = M.to.els[id]; if (!e || !a) continue;
+    ['pn', 'cut', 'verb', 'echo'].forEach(q => { if (isFinite(a[q]) && isFinite(b[q])) put(e, q, a[q] + (b[q] - a[q]) * k); });
+    const vb = b.muted ? 0 : b.vol; if (isFinite(a.vol) && isFinite(vb)) put(e, 'vol', a.vol + (vb - a.vol) * k); // leaving: fade out, muted at the end
+    if (bandOf(a.rad) === bandOf(b.rad) && grpOf(e) && bandOfLap(lapOf(e)) === bandOf(b.rad)) put(e, 'rad', a.rad + (b.rad - a.rad) * k); }
 }
 
 /* ---------------- mutate: a variation of the groove that keeps kick and bass (undoable) ---------------- */
@@ -5161,7 +6680,7 @@ function jamKey(ev) {
 /* ---------------- drift: per planet, its hits wander a little each lap (seeded value noise, bounded) ---------------- */
 function driftOff(e, k, j) { // beats; at drift 1 at most ±0.09 beat (about a third of a 16th)
   if (!e.drift) return 0; const s = (e.seed | 0) * 31 + (j | 0) * 13, x = k / 3, i = Math.floor(x), f = x - i, sm = f * f * (3 - 2 * f);
-  const r = q => rng(s + q * 977)() * 2 - 1; return e.drift * 0.09 * (r(i) + (r(i + 1) - r(i)) * sm);
+  const r = q => rng(s + q * 977)() * 2 - 1; return clamp(e.drift, 0, 1) * clamp(0.09 * (r(i) + (r(i + 1) - r(i)) * sm), -0.09, 0.09);
 }
 
 /* ---------------- black hole: drop a planet in, it falls silent with a reverb tail; drag it back out to play ---------------- */
@@ -5170,10 +6689,10 @@ function placeHole() { HOLE = { x: SA.x + Math.max(44, 40 * DS), y: SA.y + SA.h 
 const inHoleZone = (x, y) => Math.hypot(x - HOLE.x, y - HOLE.y) < HOLE.r + 16;
 function swallow(e) {
   e.inHole = true; e.muted = true;
-  if (ac && e.vg) { const t = ac.currentTime, o = grpOf(e), og = o && o.st && !o.st.muted ? OrbsFX.dbToGain(o.st.gainDb) : 1, v0 = Math.pow(e.vol, 1.3) * e.lvl;
+  if (ac && e.vg) { const t = ac.currentTime, o = grpOf(e), og = o && o.st ? (o.st.muted ? 0 : OrbsFX.dbToGain(o.st.gainDb)) : 1, v0 = Math.pow(e.vol, 1.3) * e.lvl;
     e._mix.v = 0; e.vg.gain.cancelScheduledValues(t); e.vg.gain.setValueAtTime(v0, t); e.vg.gain.linearRampToValueAtTime(0, t + 0.7); // a last hit falls in: dry fades, the room keeps its tail
     e.sg.gain.cancelScheduledValues(t); e.sg.gain.setValueAtTime(Math.max(0.9, e.verb) * og, t); e.sg.gain.setTargetAtTime(e.verb * og, t + 1.2, 0.6);
-    const p = posAt(t), ev = hitEvent(e, p, 4242); playPlanet(e, t + 0.01, ev, Math.min(ev.dur, 0.8)); }
+    if (og > 0) { const p = posAt(t), ev = hitEvent(e, p, 4242); playPlanet(e, t + 0.01, ev, Math.min(ev.dur, 0.8)); } } // a muted group swallows silently (qa)
   recMsg((e.label || e.id) + ' fell into the black hole · drag it out to play');
 }
 function holeLayout(T) { const hs = IDS.filter(id => E[id].inHole); hs.forEach((id, k) => { const e = E[id], an = T * 0.35 + k * TAU / hs.length, rr = HOLE.r * 0.62; e.r *= 0.45; if (drag && drag.e === e && drag.moved) return; e.x = HOLE.x + rr * Math.sin(an); e.y = HOLE.y - rr * Math.cos(an); }); }
@@ -5197,6 +6716,232 @@ function sunTap() {
 let sunFlash = 0;
 cv.addEventListener('pointerup', () => clearTimeout(sunHoldT)); cv.addEventListener('pointercancel', () => clearTimeout(sunHoldT));
 function drawSunChord() { if (CHORD.held == null) return; g.font = LABEL_FONT; g.textAlign = 'center'; g.textBaseline = 'middle'; g.globalAlpha = 0.5 + 0.4 * sunFlash; g.fillText(chordName(PROG[CHORD.held]), CX, CY + SUNR + 20); }
+
+/* ================= batch C: vmorphs' OrbsExtras (fx/extras-io.js + fx/extras-space.js) wired in ================= */
+const X = window.OrbsExtras || {};
+let XS = { binaural: false, eclipse: false, gravity: true, mood: false, xbars: 4 };
+try { const v = JSON.parse(localStorage.getItem('orbs-solar-extras') || 'null'); if (v && typeof v === 'object') XS = Object.assign(XS, v); } catch (x) {}
+const saveXS = () => { try { localStorage.setItem('orbs-solar-extras', JSON.stringify(XS)); } catch (x) {} };
+function setXS(k, v) { XS[k] = v; saveXS(); if (k === 'binaural') binauralOn(v); renderMore(); sheetDirty = true; }
+
+/* ---- the scheduler's hits, without audio: used by export (midi + wav) and practice ---- */
+function hitsIn(e, b0, b1) { // [{ p (beats), t (s from b0), ev, j }] for planet e between beats b0 and b1 (chance, moons, drift, swing honoured)
+  const out = [], L = lapOf(e), a0 = aEff(e), hs = hitsOf(e), bd = 60 / bpm, sd = bd / 4;
+  const push = (p, k, v, j, hh) => { if (!chanceOk(e, hh, k, j)) return; const ev = decorate(e, hitEvent(e, p, k + j * 101), j); ev.v *= v; if (j >= 100) { ev.dur = Math.min(ev.dur, 0.12); ev.roll = null; } ev.j = j;
+    out.push({ p, t: (p - b0) * bd + swingAt(p, sd) + driftOff(e, k, j) * bd, ev, j }); };
+  for (let j = 0; j < hs.length; j++) { let pb = b0; for (let g2 = 0; g2 < 512; g2++) { const h = nextHitA(L, a0 - hs[j].o, pb); if (h.p >= b1 - 1e-9) break; push(h.p, h.k, hs[j].v, j, hs[j]); pb = h.p + 1e-6; } }
+  for (let m = 0; m < (e.moons | 0); m++) { const d = MOON_OFF[m]; for (let j = 0; j < hs.length; j++) { let pb = b0 - d; for (let g2 = 0; g2 < 512; g2++) { const h = nextHitA(L, a0 - hs[j].o, pb), gp = h.p + d; if (gp >= b1 - 1e-9) break; if (gp >= b0 - 1e-9 && !hitAtP(e, gp)) push(gp, h.k, hs[j].v * MOON_V[m], 100 + m, hs[j]); pb = h.p + 1e-6; } } }
+  return out.sort((x, y) => x.p - y.p);
+}
+const exportable = e => e && !e.muted && !e.inHole;
+
+/* ---- export: .mid (all planets or one) ---- */
+function midiFor(ids, beats) {
+  const planets = ids.map(id => { const e = E[id]; return { id, name: e.label || id, channel: e.ch, hits: hitsIn(e, 0, beats).map(h => ({ beat: h.p, vel: clamp(h.ev.v * e.vol, 0.01, 1), note: h.ev.n, dur: Math.max(0.05, h.ev.dur * bpm / 60) })) }; });
+  return X.toMidi(planets, { bpm, loopBeats: beats, names: { conductor: 'orbs ' + bpm + ' bpm' } });
+}
+function exportMidi(id) {
+  if (!X.toMidi) { recMsg('export module missing'); return null; }
+  const ids = id ? [id] : IDS.filter(x => exportable(E[x])), beats = id ? Math.max(4, Math.ceil(lapOf(E[id]) / 4) * 4) : XS.xbars * 4;
+  const data = midiFor(ids, beats); X.downloadMidi(data, id ? 'orbs-' + (E[id].label || id).replace(/\W+/g, '-') + '.mid' : 'orbs.mid');
+  recMsg('exported ' + (id ? (E[id].label || id) : ids.length + ' planets') + ' · ' + beats / 4 + (beats > 4 ? ' bars' : ' bar') + ' .mid'); return data;
+}
+/* ---- export: wav (offline render: each planet's own voice → vol / filter / pan → a small room) ---- */
+function renderInto(ctx, dest, opt, beats) {
+  const real = ac; ac = ctx; rendering = true;
+  try {
+    const room = ctx.createConvolver(), len = Math.floor(ctx.sampleRate * Math.min(4, ROOM.size)), ir = ctx.createBuffer(2, len, ctx.sampleRate);
+    for (let c = 0; c < 2; c++) { const d = ir.getChannelData(c); let lp = 0; for (let i = 0; i < len; i++) { lp += 0.35 * ((Math.random() * 2 - 1) - lp); d[i] = lp * Math.pow(1 - i / len, 2.6); } }
+    room.buffer = ir; const rw = ctx.createGain(); rw.gain.value = 0.5 * ROOM.wet; room.connect(rw); rw.connect(dest);
+    for (const id of IDS) { const e = E[id]; if (!exportable(e) || (opt && opt.solo && opt.solo !== id)) continue; const o = grpOf(e), og = o && o.st.muted ? 0 : o ? OrbsFX.dbToGain(o.st.gainDb) : 1;
+      const inp = ctx.createGain(), fl = ctx.createBiquadFilter(), vg = ctx.createGain(), pn = ctx.createStereoPanner(), sg = ctx.createGain();
+      fl.type = 'lowpass'; fl.Q.value = 0.7; fl.frequency.value = cutHz(e.cut); vg.gain.value = Math.pow(e.vol, 1.3) * e.lvl * og * 0.8; pn.pan.value = clamp(e.pn, -1, 1) * 0.9; sg.gain.value = e.verb;
+      inp.connect(fl); fl.connect(vg); vg.connect(pn); pn.connect(dest); pn.connect(sg); sg.connect(room);
+      for (const h of hitsIn(e, 0, beats)) { const t = Math.max(0, h.t) + 0.002, dur = h.ev.dur; try { const fn = voiceFn(e, h.ev); if (fn) fn(t, h.ev, inp, dur); else if (e.chops && h.ev.slice) playSlice(e, t, h.ev, inp); else playVoice(e.id, t, h.ev, inp, dur); } catch (x) {} } }
+  } finally { ac = real; rendering = false; }
+}
+async function exportWav(kind, id) { // kind: 'mix' | 'stems' | 'stem'
+  if (!X.renderWav) { recMsg('export module missing'); return null; } initAudio();
+  const beats = id ? Math.max(4, Math.ceil(lapOf(E[id]) / 4) * 4) : XS.xbars * 4, duration = beats * 60 / bpm + Math.min(4, ROOM.size) + 0.3, base = 'orbs-' + bpm + 'bpm';
+  recMsg('rendering ' + (kind === 'mix' ? 'mix' : kind === 'stem' ? (E[id].label || id) : 'stems') + '…');
+  const dl = (blob, name) => { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.style.display = 'none'; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000); };
+  const out = {};
+  if (kind === 'mix') { const r = await X.renderWav({ duration, render: (c, d) => renderInto(c, d, { solo: null }, beats) }); dl(r.wav, base + '-mix.wav'); out.mix = r; }
+  else if (kind === 'stem') { const r = await X.renderWav({ duration, render: (c, d) => renderInto(c, d, { solo: id }, beats) }); dl(r.wav, base + '-' + (E[id].label || id).replace(/\W+/g, '-') + '.wav'); out[id] = r; }
+  else { const ids = IDS.filter(x => exportable(E[x])), r = await X.renderStems(ids, (c, d, o) => renderInto(c, d, o, beats), { duration });
+    let k = 0; for (const sid of ids) { setTimeout(() => dl(r.stems[sid].wav, base + '-' + (E[sid].label || sid).replace(/\W+/g, '-') + '.wav'), 250 * k++); } setTimeout(() => dl(r.mix.wav, base + '-mix.wav'), 250 * k); Object.assign(out, r.stems, { mix: r.mix }); }
+  recMsg('wav ready · ' + beats / 4 + ' bars at ' + bpm + ' bpm' + (kind === 'stems' ? ' · ' + (Object.keys(out).length - 1) + ' stems + mix' : '')); return out;
+}
+
+/* ---- binaural: planets pan in 3d (hrtf) by their place on the orbit ---- */
+let bin = null;
+function binauralOn(v) {
+  if (!ac && v) initAudio(); if (!ac) return;
+  if (!bin && v) { if (!X.binaural) return; bin = X.binaural(ac, { enabled: false, scale: 3 }); }
+  if (!bin) return;
+  for (const id of IDS) { const e = E[id]; if (e.vg && !e._bin) { try { e.vg.disconnect(e.pan); } catch (x) {} bin.attach(e.id, e.vg, e.pan); e._bin = true; } }
+  bin.setEnabled(!!v);
+}
+function binTick() { if (!bin || !XS.binaural) return; for (const id of IDS) { const e = E[id]; if (!e.vg) continue; if (!e._bin) { try { e.vg.disconnect(e.pan); } catch (x) {} bin.attach(e.id, e.vg, e.pan); e._bin = true; } bin.update(e.id, e.ang * TAU, e.rad); } }
+
+/* ---- eclipses: a planet lined up behind another (seen from the sun) is ducked and darkened ---- */
+let eclSm = null, ECL = {};
+function eclTick(dt) {
+  if (!XS.eclipse || !X.eclipses) { if (Object.keys(ECL).length) { ECL = {}; IDS.forEach(id => { const e = E[id]; e.eclCut = null; if (e.duck && ac) e.duck.gain.setTargetAtTime(1, ac.currentTime, 0.05); }); } return; }
+  eclSm = eclSm || X.eclipseSmoother({ maxDuckDb: -9, minCutoff: 700 });
+  const list = IDS.filter(id => !E[id].muted && !E[id].inHole).map(id => ({ id, a: E[id].ang * TAU, r: E[id].rad }));
+  const raw = X.eclipses(list, { tolerance: 0.09, minGap: 0.04 }); ECL = eclSm.update(raw, dt); ECL._pairs = raw;
+  for (const id of IDS) { const e = E[id], m = ECL[id]; if (!e.duck || !ac) continue; const on = m && m.amount > 0.002; e.eclCut = on ? m.cutoff : null; e.duck.gain.setTargetAtTime(on ? Math.pow(10, m.duckDb / 20) : 1, ac.currentTime, 0.03); }
+}
+function drawEclipses() {
+  if (!XS.eclipse || !ECL._pairs) return; g.lineWidth = 0.7;
+  for (const pr of ECL._pairs) { const A = E[pr.front], B = E[pr.behind], m = ECL[pr.behind]; if (!A || !B || !m || m.amount < 0.02) continue;
+    g.globalAlpha = 0.25 * m.amount; g.setLineDash([1, 3]); g.beginPath(); g.moveTo(A.x, A.y); g.lineTo(B.x, B.y); g.stroke(); g.setLineDash([]);
+    g.globalAlpha = 0.7 * m.amount; g.fillStyle = '#000'; const dx = B.x - CX, dy = B.y - CY, l = Math.hypot(dx, dy) || 1; g.beginPath(); g.arc(B.x - dx / l * B.r * 0.45, B.y - dy / l * B.r * 0.45, B.r * 0.92, 0, TAU); g.fill(); g.fillStyle = '#fff'; } // a shadow bite on the side facing the sun
+}
+
+/* ---- gravity: drag a planet slowly toward the sun (while playing) and its group's lap speeds up gradually, like a build ---- */
+const GRAV = {};
+function gravGesture(d, t, i) { // slow (> 1.2 s) drag inward, while playing, gravity on, same group: ease the lap in over 2 bars per band
+  const o = ORB[i]; if (!XS.gravity || !playing || !o || o.poly || POLY.includes(t.lap) || (t.breaks && t.breaks.length) || !d.t0 || performance.now() - d.t0 < 1200 || !(t.lap < o.lap)) return false;
+  const bands = Math.max(1, Math.round(Math.log2(o.lap / t.lap))); return !!startGravity(i, OrbsFX.snapLap(t.lap / 4) * 4, Math.min(16, 2 * bands));
+}
+function startGravity(i, toLap, bars) {
+  const o = ORB[i]; if (!o || !X.gravity || toLap === o.lap) return null; const gr = X.gravity({ id: o.id }, { fromLap: o.lap, toLap, bars, laps: BANDS });
+  gr.start(posNow() / 4); GRAV[o.id] = gr; recMsg('build: ' + lapTxt(o.lap) + ' → ' + lapTxt(toLap) + ' over ' + bars + ' bars'); sheetDirty = true; return gr;
+}
+function gravTick() {
+  for (const gid in GRAV) { const gr = GRAV[gid], i = orbIdx(gid); if (i < 0) { delete GRAV[gid]; continue; } if (!playing) { setGroupLap(i, gr.toLap); delete GRAV[gid]; continue; }
+    const L = gr.lapAt(posNow() / 4); if (L !== ORB[i].lap) setGroupLap(i, L); if (!gr.running) delete GRAV[gid]; }
+}
+
+/* ---- size as pitch: shift + wheel over a planet; bigger = lower ---- */
+function sizeSemis(e) { if (e.size == null || Math.abs(e.size - 0.5) < 1e-3 || !X.sizeToPitch) return 0; return Math.round(X.sizeToPitch(e.size, { min: 0, max: 1, rangeSemis: 24 }).semis); }
+function sizeWheel(ev) {
+  const h = hitDot(ev.clientX, ev.clientY, 8); if (!h) return false; const e = h.e, dy = ev.deltaY || ev.deltaX;
+  e.size = clamp((e.size == null ? 0.5 : e.size) + (dy < 0 ? 1 : -1) / 24, 0, 1); const s = sizeSemis(e);
+  recMsg((e.label || e.id) + ' · ' + (s === 0 ? 'original pitch' : (s > 0 ? '+' : '') + s + ' semitones') + ' · bigger is lower'); save(); sheetDirty = true; return true;
+}
+const sizeScale = e => (e.size == null ? 1 : 0.7 + 0.6 * e.size);
+function pitchEv(e, ev) { const s = sizeSemis(e); if (s) ev.n = Array.isArray(ev.n) ? ev.n.map(n => n + s) : ev.n + s; if (s) { ev.tune = Math.pow(2, s / 12); if (e.variant === 'file' || e.chops) ev.rate = ev.tune; } return ev; }
+
+/* ---- mood light: a nearly black tint from the genre and the energy of the mix ---- */
+let moodAn = null, moodEn = null, moodBuf = null, MOODCSS = '#000';
+function moodTick(dt) {
+  if (!XS.mood || !X.moodColor) { MOODCSS = '#000'; return; } if (!ac) return;
+  if (!moodAn) { moodAn = ac.createAnalyser(); moodAn.fftSize = 1024; moodBuf = new Float32Array(moodAn.fftSize); try { clipper.connect(moodAn); } catch (x) {} moodEn = X.moodEnergy(); }
+  moodAn.getFloatTimeDomainData(moodBuf); let s = 0; for (let i = 0; i < moodBuf.length; i++) s += moodBuf[i] * moodBuf[i];
+  const rms = Math.sqrt(s / moodBuf.length), en = moodEn.update(clamp(rms * 5, 0, 1), dt); MOODCSS = X.moodColor(GENRE || 'ambient', 0.3 + 0.7 * en, { maxLuma: 0.085, sat: 0.55 }).css;
+}
+
+/* ---- trail automation: a curve over the planet's lap drives its filter or volume; edit it in the planet window ---- */
+const trailOf = e => (e.trail && X.trail ? (e._trObj && e._trSrc === e.trail ? e._trObj : (e._trSrc = e.trail, e._trObj = X.trail({ points: e.trail.points }))) : null);
+function trailPhase(e, pos) { return frac(pos / lapOf(e) + aEff(e)); } // 0 = the planet's own crossing
+function trailMix(e) { // multipliers used by updateMix
+  const tr = trailOf(e); if (!tr || !e.trail.kind) return null; const v = clamp(tr.valueAt(trailPhase(e, posNow())), 0, 1);
+  return e.trail.kind === 'vol' ? { vol: v } : { cut: v };
+}
+function setTrailKind(e, kind) {
+  if (kind === 'off') { e.trail = null; } else { const pts = e.trail && e.trail.points ? e.trail.points : [{ phase: 0, value: kind === 'vol' ? 1 : 0.9, bend: 0 }, { phase: 0.5, value: kind === 'vol' ? 0.35 : 0.3, bend: 0 }]; e.trail = { kind, points: pts.map(p => Object.assign({}, p)) }; }
+  e._trObj = null; save(); sheetDirty = true;
+}
+let trDrag = null, trLast = { t: 0, x: 0, y: 0 };
+function drawTrailEd() {
+  const cvs = document.getElementById('wTrail'), e = E[winId]; if (!cvs || !e || !e.trail) return; const r = cvs.getBoundingClientRect(); if (!r.width) return;
+  if (cvs.width !== Math.round(r.width * DPR)) { cvs.width = Math.round(r.width * DPR); cvs.height = Math.round(r.height * DPR); }
+  const c = cvs.getContext('2d'), w = r.width, h = r.height, tr = trailOf(e); c.setTransform(DPR, 0, 0, DPR, 0, 0); c.clearRect(0, 0, w, h); c.strokeStyle = c.fillStyle = '#fff';
+  c.globalAlpha = 0.12; c.lineWidth = 0.7; c.strokeRect(0.5, 0.5, w - 1, h - 1); for (let q = 1; q < 4; q++) { c.beginPath(); c.moveTo(w * q / 4, 0); c.lineTo(w * q / 4, h); c.stroke(); }
+  c.globalAlpha = 0.8; c.lineWidth = 1; c.beginPath(); for (let i = 0; i <= 120; i++) { const x = i / 120 * w, y = h - 4 - tr.valueAt(i / 120) * (h - 8); i ? c.lineTo(x, y) : c.moveTo(x, y); } c.stroke();
+  tr.points.forEach(p => { c.globalAlpha = 0.95; c.beginPath(); c.arc(p.phase * w, h - 4 - p.value * (h - 8), 2.6, 0, TAU); c.fill(); });
+  const ph = trailPhase(e, posNow()); c.globalAlpha = 0.4; c.beginPath(); c.moveTo(ph * w, 0); c.lineTo(ph * w, h); c.stroke();
+}
+function trailPtr(ev, phase) {
+  const cvs = document.getElementById('wTrail'), e = E[winId]; if (!cvs || !e || !e.trail) return; const r = cvs.getBoundingClientRect(), tr = trailOf(e);
+  const px = clamp((ev.clientX - r.left) / r.width, 0, 0.999), pv = clamp(1 - (ev.clientY - r.top - 4) / (r.height - 8), 0, 1);
+  if (phase === 'down') { let k = -1, bd = 12; tr.points.forEach((p, i) => { const d = Math.hypot((p.phase - px) * r.width, (1 - p.value - (1 - pv)) * r.height); if (d < bd) { bd = d; k = i; } });
+    const dbl = trLast.k >= 0 && k >= 0 && performance.now() - trLast.t < 380 && Math.hypot(ev.clientX - trLast.x, ev.clientY - trLast.y) < 8; trLast = { t: performance.now(), x: ev.clientX, y: ev.clientY, k };
+    if (k >= 0 && dbl && tr.points.length > 2) { tr.remove(k); trLast.t = 0; e.trail.points = tr.points; e._trSrc = e.trail; save(); return; } // double-click removes (two stay)
+    if (k < 0) { tr.add(px, pv, 0); k = tr.points.findIndex(p => Math.abs(p.phase - px) < 1e-6); }
+    trDrag = { k, x: ev.clientX, y: ev.clientY, b0: (tr.points[k] || {}).bend || 0 }; cvs.setPointerCapture(ev.pointerId); }
+  else if (phase === 'move' && trDrag && trDrag.k >= 0) { if (ev.shiftKey) tr.move(trDrag.k, { bend: clamp(trDrag.b0 + (ev.clientY - trDrag.y) / 60, -1, 1) }); else { tr.move(trDrag.k, { phase: px, value: pv }); const pts = tr.points; trDrag.k = pts.findIndex(p => Math.abs(p.phase - px) < 1e-6 && Math.abs(p.value - pv) < 1e-6); } }
+  else if (phase === 'up') { trDrag = null; }
+  e.trail.points = tr.points; e._trSrc = e.trail; save();
+}
+wFx.addEventListener('pointerdown', ev => { if (ev.target.id === 'wTrail') { ev.preventDefault(); trailPtr(ev, 'down'); } });
+wFx.addEventListener('pointermove', ev => { if (trDrag) trailPtr(ev, 'move'); });
+wFx.addEventListener('pointerup', ev => { if (trDrag) { trailPtr(ev, 'up'); sheetDirty = true; } });
+function drawTrails() { // the curve, faintly, along the planet's orbit (outside its ring)
+  for (const id of IDS) { const e = E[id], tr = trailOf(e); if (!tr || !e.trail.kind || e.muted || e.inHole) continue; const R = e.rad * RMAX, L = lapOf(e);
+    g.globalAlpha = 0.14; g.lineWidth = 0.6; g.beginPath();
+    for (let i = 0; i <= 96; i++) { const ph = i / 96, an = still ? frac(e.ang + ph) : frac(e.ang - ph), rr = R + 4 + tr.valueAt(ph) * 9, s = Math.sin(an * TAU), c = Math.cos(an * TAU), x = CX + rr * s, y = CY - rr * K * c; i ? g.lineTo(x, y) : g.moveTo(x, y); }
+    g.stroke(); }
+}
+
+/* ---- field chop: a mic recording is cut at its transients; the slices become hits spread over the lap ---- */
+function chopPlanet(id) {
+  const e = E[id]; if (!e || !e.buf || !X.chop) { recMsg('nothing to chop · record something first'); return 0; }
+  const ons = X.chop(e.buf, { maxHits: 16 }); if (!ons.length) { recMsg('no transients found'); return 0; }
+  const spb = 60 / (e.recBpm || bpm), L = lapOf(e), b0 = ons[0].start / spb, pk = Math.max(...ons.map(o => o.peak)) || 1; pushPat(e);
+  e.chops = ons.map(o => ({ start: o.start, end: o.end, peak: o.peak })); e.loop = false;
+  e.pat = ons.map((o, s) => ({ o: +frac((o.start / spb - b0) / L).toFixed(6), v: +clamp(0.35 + 0.65 * o.peak / pk, 0.2, 1).toFixed(3), s })).sort((x, y) => x.o - y.o)
+    .filter((h, i, a) => i === 0 || h.o - a[i - 1].o > 1e-4);
+  save(); sheetDirty = true; recMsg('chopped into ' + e.pat.length + ' hits across the lap'); return e.pat.length;
+}
+function playSlice(e, t, ev, dest) {
+  const c = e.chops[ev.slice | 0]; if (!c || !e.buf) return; const s = ac.createBufferSource(), gn = ac.createGain(), d = Math.max(0.02, Math.min(c.end - c.start, 1.5));
+  s.buffer = e.buf; if (ev.rate) s.playbackRate.value = ev.rate; gn.gain.setValueAtTime(0, t); gn.gain.linearRampToValueAtTime(ev.v * 0.9, t + 0.003); gn.gain.setValueAtTime(ev.v * 0.9, t + d - 0.012); gn.gain.linearRampToValueAtTime(0, t + d);
+  s.connect(gn); gn.connect(dest); s.start(t, c.start, d + 0.01);
+}
+
+/* ---- practice: the planet turns into a ghost for one round; you play its hits on the pad and get scored ---- */
+let prac = null;
+function startPractice() {
+  const e = E[winId]; if (!e || !X.score) return; if (!playing) play(); const L = lapOf(e), len = Math.max(4, Math.ceil(L / 4) * 4);
+  const now = ac.currentTime + 0.05, p0 = stepTimes.length ? posAt(now) : 0, cs = Math.ceil(p0 / 4 + 1e-6) * 4, start = cs + 4;
+  const targets = hitsIn(e, start, start + len).filter(h => h.j < 100).map(h => h.p - start);
+  prac = { id: e.id, cs, start, end: start + len, len, targets, taps: [], phase: 'count', t0: timeAtPos(start) };
+  for (let b = 0; b < 4; b++) click(timeAtPos(cs + b), b === 0); e._ghost = true; renderWin(); return prac;
+}
+function pracTap(t) { if (prac && t != null) prac.taps.push(t); }
+function pracTick() {
+  if (!prac) return; const e = E[prac.id]; if (!e || !playing) { endPractice(true); return; } const p = posNow();
+  if (prac.phase === 'count' && p >= prac.start - 1 / 64) { prac.phase = 'play'; prac.t0 = timeAtPos(prac.start); }
+  if (winId === prac.id) wNote.textContent = prac.phase === 'count' ? 'practice · count-in ' + Math.max(1, Math.ceil(prac.start - p)) : 'practice · play its ' + prac.targets.length + ' hits on the pad · ' + Math.max(0, Math.ceil(prac.end - p)) + ' beats left';
+  if (prac.phase === 'play' && p >= prac.end + 0.2) endPractice();
+}
+function endPractice(abort) {
+  const r = prac; prac = null; if (!r) return null; const e = E[r.id]; if (e) e._ghost = false; if (abort) { if (winId) renderWin(); return null; }
+  const sc = X.score(r.targets, r.taps, { bpm, startTime: r.t0, toleranceMs: 70 }); r.result = sc; lastPractice = Object.assign({ id: r.id, targets: r.targets, taps: r.taps.map(t => (t - r.t0) * bpm / 60) }, sc);
+  const off = isFinite(sc.meanOffsetMs) ? ' · ' + (Math.abs(sc.meanOffsetMs) < 4 ? 'on time' : Math.round(Math.abs(sc.meanOffsetMs)) + ' ms ' + (sc.meanOffsetMs > 0 ? 'late' : 'early')) : '';
+  const hitN = Array.isArray(sc.hits) ? sc.hits.length : sc.hits;
+  if (winId === r.id) wNote.textContent = 'score ' + Math.round(sc.score) + ' · ' + hitN + ' / ' + r.targets.length + ' hits' + off + (sc.extras ? ' · ' + sc.extras + ' extra' : '');
+  if (winId) renderWin(); return sc;
+}
+let lastPractice = null;
+
+/* ---- window rows (fx side: trail · build · export · chop; play side: practice) ---- */
+function winExtrasHTML(e) {
+  const i = e.orbit, o = ORB[i], k = e.trail ? e.trail.kind : 'off';
+  let h = '<div class="grp"><b>trail</b><span class="gv">a curve over its lap · drag points, double-click removes, shift-drag bends</span></div><div class="laps">' + ['off', 'cut', 'vol'].map(v => '<span data-act="trail" data-id="' + e.id + '" data-v="' + v + '" class="' + (k === v ? 'on' : '') + '">' + (v === 'cut' ? 'filter' : v === 'vol' ? 'volume' : 'off') + '</span>').join('') + '</div>';
+  if (e.trail) h += '<canvas id="wTrail" style="width:100%;height:58px;display:block;margin:4px 0 10px;cursor:crosshair;touch-action:none"></canvas>';
+  const gr = o && GRAV[o.id], tl = o ? BANDS.filter(L => L < o.lap) : [];
+  h += '<div class="grp"><b>build</b><span class="gv">' + (gr ? 'pulling in · ' + lapTxt(Math.round(gr.lap)) : 'gravity: the lap speeds up over bars') + '</span></div><div class="laps">' + (gr ? '<span data-act="gstop" data-i="' + i + '">stop</span>' : tl.length ? [4, 8].map(b => '<span data-act="build" data-i="' + i + '" data-b="' + b + '">to ' + lapTxt(tl[0]) + ' · ' + b + ' bars</span>').join('') : '<span class="off">already fastest</span>') + '</div>';
+  h += '<div class="grp"><b>export</b><span class="gv">its pattern</span></div><div class="laps"><span data-act="xmid" data-id="' + e.id + '">.mid clip</span><span data-act="xstem" data-id="' + e.id + '">stem .wav</span></div>';
+  if (e.side === 'rec' || e.variant === 'file') h += '<div class="grp"><b>chop</b><span class="gv">' + (e.chops ? e.chops.length + ' slices' : 'cut the recording at its transients') + '</span></div><div class="laps"><span data-act="chop" data-id="' + e.id + '" class="' + (e.buf ? '' : 'off') + '">chop into hits</span></div>';
+  h += '<div class="grp"><b>size</b><span class="gv">shift + wheel over the planet · ' + (sizeSemis(e) ? (sizeSemis(e) > 0 ? '+' : '') + sizeSemis(e) + ' st' : 'original pitch') + '</span></div>';
+  return h;
+}
+function extrasAct(act, t, id) {
+  const e = E[id];
+  if (act === 'trail') { setTrailKind(e, t.dataset.v); return true; }
+  if (act === 'build') { const o = ORB[+t.dataset.i], tl = BANDS.filter(L => L < o.lap); if (!playing) play(); startGravity(+t.dataset.i, tl[0], +t.dataset.b); return true; }
+  if (act === 'gstop') { const o = ORB[+t.dataset.i]; if (o) delete GRAV[o.id]; sheetDirty = true; return true; }
+  if (act === 'xmid') { exportMidi(id); return true; }
+  if (act === 'xstem') { exportWav('stem', id); return true; }
+  if (act === 'chop') { chopPlanet(id); return true; }
+  return false;
+}
+function extrasTick(dt) { gravTick(); binTick(); eclTick(dt); moodTick(dt); pracTick(); if (winId) drawTrailEd(); }
 
 
 /* ---------------- sample picker ---------------- */
@@ -5547,7 +7292,8 @@ window.SS = { E, get ORB() { return ORB; }, IDS, links, get TETH() { return TETH
   get fx() { return fx; }, get fx2() { return fx2; }, orb2Set, orbSet, setSwing, labelOverlaps, layoutLabels, get swing() { return swing; }, setStill, get still() { return still; }, aEff,
   geom: () => ({ CX, CY, K, RMAX, SA }),
   get VIEW() { return VIEW; }, zoomAt, setView, zoomFit, zoom11, get COMET() { return COMET; }, setComet, comets, shareLink, shareState, chanceOk, MOON_OFF, POLY, renderMore, get spaceDown() { return spaceDown; },
-  sysSnap, applyDiscrete, storeScene, gotoScene, get SCENES() { return SCENES; }, get MORPH() { return MORPH; }, set SCENE_BARS(v) { SCENE_BARS = v; }, mutate, undoMutate, MUT_UNDO, setJam, get JAM() { return JAM; }, jamHit, jamNudge, driftOff, swallow, get HOLE() { return HOLE; }, sunTap, get CHORD() { return CHORD; }, chordIdx, chordName, hitEvent };
+  sysSnap, applyDiscrete, storeScene, gotoScene, get SCENES() { return SCENES; }, get MORPH() { return MORPH; }, set SCENE_BARS(v) { SCENE_BARS = v; }, mutate, undoMutate, MUT_UNDO, setJam, get JAM() { return JAM; }, jamHit, jamNudge, driftOff, swallow, get HOLE() { return HOLE; }, sunTap, get CHORD() { return CHORD; }, chordIdx, chordName, hitEvent,
+  get XS() { return XS; }, setXS, hitsIn, midiFor, exportMidi, exportWav, renderInto, get bin() { return bin; }, binauralOn, get ECL() { return ECL; }, GRAV, startGravity, sizeSemis, sizeWheel, get MOODCSS() { return MOODCSS; }, setTrailKind, trailOf, trailMix, chopPlanet, playSlice, startPractice, endPractice, pracTap, get prac() { return prac; }, get lastPractice() { return lastPractice; }, gravGesture, X, save };
 })();
 </script>
 </body>
