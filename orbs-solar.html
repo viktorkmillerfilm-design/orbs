@@ -109,9 +109,9 @@
   .laps.poly .pt{opacity:.25;cursor:default;border:0!important}
   #mmenu{z-index:8;background:rgba(0,0,0,.96);border:1px solid rgba(255,255,255,.2);padding:8px 0;min-width:190px;display:none;font-size:11px;max-height:calc(100vh - 56px);overflow-y:auto}
   #mmenu.open{display:block}
-  #mmenu .mi{display:flex;align-items:center;gap:10px;padding:7px 16px;cursor:pointer;opacity:.55} #mmenu .mi:hover{opacity:1} #mmenu .mi.on{opacity:1}
+  #mmenu .mi{display:flex;align-items:center;gap:10px;padding:7px 16px;cursor:pointer;opacity:.75} #mmenu .mi:hover{opacity:1} #mmenu .mi.on{opacity:1}
   #mmenu .mi b{font-weight:500;flex:1} #mmenu .mi .ck{width:7px;height:7px;border:1px solid #fff;border-radius:50%;opacity:.7} #mmenu .mi.on .ck{background:#fff}
-  #mmenu .mi .ch{opacity:.4;cursor:pointer;padding:0 2px} #mmenu .mi .ch.on{opacity:1;border-bottom:1px solid rgba(255,255,255,.6)}
+  #mmenu .mi .ch{opacity:.65;cursor:pointer;padding:0 2px} #mmenu .mi .ch.on{opacity:1;border-bottom:1px solid rgba(255,255,255,.6)}
   #mmenu .ms{height:1px;background:rgba(255,255,255,.1);margin:6px 0} #mmenu .mn{padding:2px 16px 6px;opacity:.3;font-size:10px;line-height:1.5;white-space:normal;max-width:210px}
   #gmenu{z-index:8;background:rgba(0,0,0,.96);border:1px solid rgba(255,255,255,.2);padding:10px 0;min-width:150px;display:none;font-size:11px}
   #gmenu.open{display:block}
@@ -214,16 +214,26 @@
   #wFx .pr{display:flex;flex-wrap:wrap;gap:4px 16px;align-items:center;min-height:var(--row)} #wFx .pr b{font-weight:400;min-width:72px;opacity:.45;font-size:11px}
   #wFx .pr span{cursor:pointer;opacity:.4;padding:4px 0;border-bottom:1px solid transparent} #wFx .pr span:hover{opacity:.95} #wFx .pr span.on{opacity:.95;border-bottom-color:#fff} #wFx .pr span.off{opacity:.3;pointer-events:none}
   @media (max-width:819px){#wTabs .hint{display:none}}
+  #hideUi{font-size:13px;opacity:.35} #hideUi:hover{opacity:.9}
+  body.clean .ui{display:none!important} body.clean{cursor:default}
+  #skinName{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);font-size:11px;letter-spacing:.18em;opacity:0;pointer-events:none;z-index:20}
+  #skinName.show{animation:skinfade 1.6s ease-out forwards} @keyframes skinfade{0%{opacity:0}15%{opacity:.6}70%{opacity:.6}100%{opacity:0}}
+  #cleanHint{position:fixed;top:8px;left:50%;transform:translateX(-50%);font-size:10px;letter-spacing:.06em;opacity:0;pointer-events:none;transition:opacity .4s;z-index:20;white-space:nowrap;cursor:pointer}
+  body.clean #cleanHint.show{opacity:.32;pointer-events:auto} body.clean #cleanHint.show:hover{opacity:.8}
+  body.clean .orbs-pad9{display:none!important}
+  /* qa cd readability: hints and values ≥ 3:1 on black */
+  .gv,.hint,.wt,.sec-h .sum,.sec-h .chev,#wTabs .hint{opacity:.48} #wPad small{opacity:.5;font-size:10px} #wCtl span.off{opacity:.3}
   body.win-open #sheet{visibility:hidden}
   @media (min-width:820px) and (min-aspect-ratio:1/1){
     #sheet{top:var(--tb,48px)!important;width:var(--sw,300px)!important;padding:0!important;background:#000;border-left:1px solid rgba(255,255,255,.18)!important}
     #sHead{padding:0 6px 0 14px} #sBody{padding:8px 16px 24px}
     #sResize{display:block;position:absolute;left:-5px;top:0;bottom:0;width:10px;cursor:ew-resize;z-index:2}
-    #sheet.collapsed{width:36px!important;bottom:0;height:auto} #sheet.collapsed #sHead{padding:0;justify-content:center;border-bottom:0} #sheet.collapsed .ttl,#sheet.collapsed #sMeta,#sheet.collapsed .grip{display:none}
+    #sheet.collapsed{width:36px!important;top:var(--tb,48px)!important;bottom:0!important;height:auto!important;cursor:pointer} #sheet.collapsed #sCol{opacity:.8;font-size:15px} #sheet.collapsed #sHead{align-items:flex-start;padding-top:6px!important} #sheet.collapsed #sHead{padding:0;justify-content:center;border-bottom:0} #sheet.collapsed .ttl,#sheet.collapsed #sMeta,#sheet.collapsed .grip{display:none}
     body.more-open #sheet{visibility:hidden}
     #mmenu.panel{left:auto!important;right:0!important;top:var(--tb,48px)!important;bottom:0;width:var(--sw,300px);max-width:none;max-height:none;border:0;border-left:1px solid rgba(255,255,255,.28);background:#000;padding:0 0 16px}
     #mmenu.panel .mn{max-width:none}
   }
+  /* qa cd: window labels ≥ 3:1 on black */ #win .gv,#win .grp .gv,#win .wt,#win .laps .pt,#win .laps .lb,#win .hint{opacity:.5} #win #wCtl span{opacity:.62} #win #wCtl span.on,#win #wCtl span:hover{opacity:.95} #win #wCtl span.off{opacity:.45}
 </style>
 </head>
 <body>
@@ -241,12 +251,15 @@
   <span id="snap" class="on" title="snap planets to the 1/16 grid">snap 1/16</span>
   <span id="midi" title="send midi to ableton (ch 1–8)">midi</span>
   <span id="zoom" title="zoom: wheel or pinch around the cursor · + / − keys · space-drag or middle-drag to pan"><em data-z="fit">fit</em><em data-z="1">1:1</em></span>
-  <span id="more" title="more: comets, scenes, export, binaural, eclipses, gravity, mood light, share link …">more</span>
+  <span id="more" title="more: comets, scenes, export, binaural, eclipses, gravity, mood light, skins, share link …">more</span>
+  <span id="pad9Btn" title="3x3 sample pad · keys q w e / a s d / z x c while open">pad</span>
+  <span id="hideUi" title="clean view: hide the interface (h) · f full screen · [ ] skins">⤢</span>
 </div>
 <div id="sheet" class="ui"><div id="sResize" title="drag to resize"></div><div id="sHead"><i class="grip"></i><span class="ttl">groups</span><span id="sMeta"></span><span id="sCol" class="ib" title="collapse (esc)" aria-label="collapse">–</span></div><div id="sBody"></div></div>
 <div id="gmenu" class="ui"></div>
 <div id="mmenu" class="ui"></div>
 <div id="toast" class="ui"></div>
+<div id="skinName"></div><div id="cleanHint">h or esc · show interface &nbsp; [ ] skins &nbsp; f full screen &nbsp; l labels</div>
 <div id="picker" class="ui"><div class="ph"><span>samples</span><span id="pkClose">close</span></div><div id="pkTabs"></div><div id="pkList"></div><label class="pkfile"><i></i><span>load file…</span><input id="pkFile" type="file" accept="audio/*" hidden></label><div class="pkfile" id="pkRec"><i></i><span>record a bar…</span></div><div class="pkfile" id="pkBar"><i></i><span>bar view ›</span></div><div id="pkNote"></div></div>
 <div id="bar" class="ui"><div class="bh"><input id="barName" maxlength="14" spellcheck="false" autocomplete="off"><span id="barInfo"></span><span id="barClose">close</span></div><canvas id="barCv"></canvas><div class="bc"><span id="bRec">rec</span><span id="bBars">1 bar</span><span id="bPlay">play</span><span id="bLoop">loop</span><span id="bRev">reverse</span><span id="bUndo">undo</span><span id="bDel">remove</span></div><div id="barNote"></div></div>
 <div id="win" class="ui"><div class="wbox"><div class="wh"><span id="wName"></span><span id="wInfo"></span><span id="wTap" title="tap tempo (t)">tap</span><span id="wClose" title="close (esc · click outside)" aria-label="close">×</span></div><div id="wTabs"><span data-tab="sound">sound</span><span data-tab="fx">fx</span><span data-tab="pattern">pattern</span><span data-tab="moons">moons</span><span class="hint">esc · click outside to close</span></div><div class="wb"><div class="wl"><div id="wFx"></div></div><div class="wr"><div class="wt">play</div><canvas id="wRing"></canvas><div id="wPad"><span>hit</span><small></small></div><div id="wCtl"></div><div id="wNote"></div></div></div></div></div>
@@ -4467,6 +4480,1317 @@
 
 </script>
 <script>
+/* ===== orbs 3x3 pad (inlined from fx/pad9.js, by vmorphs) ===== */
+/* orbs solar — 3x3 sample pad (standalone, no deps)
+   window.OrbsPad9 + CJS
+*/
+(function (root, factory) {
+  var api = factory();
+  if (typeof module === 'object' && module.exports) module.exports = api;
+  if (typeof window !== 'undefined') window.OrbsPad9 = api;
+})(typeof globalThis !== 'undefined' ? globalThis : this, function () {
+  'use strict';
+
+  var KEYS = ['q', 'w', 'e', 'a', 's', 'd', 'z', 'x', 'c'];
+  var KEY_MAP = { q: 0, w: 1, e: 2, a: 3, s: 4, d: 5, z: 6, x: 7, c: 8 };
+  var CODE_MAP = {
+    KeyQ: 0, KeyW: 1, KeyE: 2,
+    KeyA: 3, KeyS: 4, KeyD: 5,
+    KeyZ: 6, KeyX: 7, KeyC: 8
+  };
+  var SNAP = 0.25;
+  var CHOKE_FADE = 0.012;
+  var CSS_ID = 'orbs-pad9-css';
+  var INSTANCES = 0;
+  var MEM = {}; // in-memory sample store (also written to IndexedDB)
+
+  function clamp(n, a, b) { return n < a ? a : n > b ? b : n; }
+  function frac(n) { return n - Math.floor(n); }
+  function nowMs() { return (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now(); }
+
+  function typingIn(el) {
+    var t = el;
+    if (!t && typeof document !== 'undefined') t = document.activeElement;
+    if (!t) return false;
+    if (t.isContentEditable) return true;
+    var tag = t.tagName || '';
+    return /^(INPUT|SELECT|TEXTAREA|BUTTON)$/.test(tag);
+  }
+
+  function velFromY(y, h) {
+    if (!h) return 1;
+    return clamp(1 - y / h, 0.05, 1);
+  }
+
+  function quantize(beat, step) {
+    step = step == null ? SNAP : step;
+    if (!step) return beat;
+    return Math.round(beat / step) * step;
+  }
+
+  function padIndex(id) {
+    if (id == null || id === '') return 0;
+    if (typeof id === 'number' && isFinite(id)) return clamp(id | 0, 0, 8);
+    var s = String(id).toLowerCase();
+    if (Object.prototype.hasOwnProperty.call(KEY_MAP, s)) return KEY_MAP[s];
+    var n = parseInt(s, 10);
+    if (s === String(n) && n >= 0 && n <= 8) return n;
+    return 0;
+  }
+
+  function copyPat(p) {
+    return (p || []).map(function (h) { return { o: h.o, v: h.v }; });
+  }
+
+  function wrapBeats(o, lap) {
+    if (!lap) return 0;
+    var x = o % lap;
+    if (x < 0) x += lap;
+    if (Math.abs(x - lap) < 1e-9) x = 0;
+    return +x.toFixed(6);
+  }
+
+  function srcJSON(src) {
+    if (!src || src.type === 'empty') return { type: 'empty' };
+    if (src.type === 'planet') return { type: 'planet', planetId: src.planetId };
+    if (src.type === 'sample') return { type: 'sample', id: src.id || null, name: src.name || 'sample' };
+    return { type: 'empty' };
+  }
+
+  function srcLabel(src) {
+    if (!src || src.type === 'empty') return '';
+    if (src.type === 'planet') return src.planetId || src.label || '';
+    if (src.type === 'sample') return src.name || src.id || 'sample';
+    return '';
+  }
+
+  /* ---------- silence trim ---------- */
+  function trimExtents(data, sr, opts) {
+    opts = opts || {};
+    var th = opts.threshold == null ? 0.01 : opts.threshold;
+    var pad = opts.pad == null ? 0.006 : opts.pad;
+    var n = data.length;
+    var peak = 0;
+    for (var i = 0; i < n; i++) {
+      var a = Math.abs(data[i]);
+      if (a > peak) peak = a;
+    }
+    var t = Math.max(th, peak * 0.02);
+    var start = 0, end = n - 1;
+    while (start < n && Math.abs(data[start]) < t) start++;
+    while (end > start && Math.abs(data[end]) < t) end--;
+    start = Math.max(0, start - Math.round(pad * sr));
+    end = Math.min(n - 1, end + Math.round(pad * sr));
+    if (end < start) { start = 0; end = n - 1; }
+    return { start: start, end: end, peak: peak };
+  }
+
+  function trimSilence(buffer, ctx, opts) {
+    if (!buffer) return buffer;
+    var sr = buffer.sampleRate || (opts && opts.sampleRate) || 44100;
+    var ch = buffer.numberOfChannels || 1;
+    var data0 = buffer.getChannelData ? buffer.getChannelData(0) : buffer;
+    if (!data0 || !data0.length) return buffer;
+    var ext = trimExtents(data0, sr, opts);
+    var len = ext.end - ext.start + 1;
+    if (len >= data0.length && ext.start === 0) return buffer;
+    if (ctx && typeof ctx.createBuffer === 'function') {
+      var out = ctx.createBuffer(ch, len, sr);
+      for (var c = 0; c < ch; c++) {
+        var src = buffer.getChannelData ? buffer.getChannelData(Math.min(c, buffer.numberOfChannels - 1)) : data0;
+        out.getChannelData(c).set(src.subarray(ext.start, ext.end + 1));
+      }
+      return out;
+    }
+    return {
+      sampleRate: sr,
+      numberOfChannels: 1,
+      length: len,
+      duration: len / sr,
+      start: ext.start,
+      end: ext.end,
+      getChannelData: function () { return data0.subarray(ext.start, ext.end + 1); }
+    };
+  }
+
+  /* ---------- wav helpers (16-bit PCM) ---------- */
+  function encodeWav(buffer) {
+    var ch = buffer.numberOfChannels || 1;
+    var sr = buffer.sampleRate;
+    var n = buffer.length;
+    var dataLen = n * ch * 2;
+    var buf = new ArrayBuffer(44 + dataLen);
+    var v = new DataView(buf);
+    function str(o, s) { for (var i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); }
+    str(0, 'RIFF'); v.setUint32(4, 36 + dataLen, true); str(8, 'WAVE');
+    str(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true);
+    v.setUint16(22, ch, true); v.setUint32(24, sr, true);
+    v.setUint32(28, sr * ch * 2, true); v.setUint16(32, ch * 2, true); v.setUint16(34, 16, true);
+    str(36, 'data'); v.setUint32(40, dataLen, true);
+    var o = 44;
+    for (var i = 0; i < n; i++) {
+      for (var c = 0; c < ch; c++) {
+        var x = buffer.getChannelData(c)[i];
+        x = x < -1 ? -1 : x > 1 ? 1 : x;
+        v.setInt16(o, x < 0 ? x * 0x8000 : x * 0x7fff, true);
+        o += 2;
+      }
+    }
+    return buf;
+  }
+
+  /* ---------- IndexedDB (with memory fallback) ---------- */
+  var DB_NAME = 'orbs-pad9-samples';
+  var DB_STORE = 'samples';
+
+  function idbOpen() {
+    return new Promise(function (resolve, reject) {
+      if (typeof indexedDB === 'undefined') return resolve(null);
+      var req = indexedDB.open(DB_NAME, 1);
+      req.onupgradeneeded = function () {
+        var db = req.result;
+        if (!db.objectStoreNames.contains(DB_STORE)) db.createObjectStore(DB_STORE, { keyPath: 'id' });
+      };
+      req.onsuccess = function () { resolve(req.result); };
+      req.onerror = function () { resolve(null); };
+    });
+  }
+
+  function bufferToRec(id, name, buffer) {
+    var ch = buffer.numberOfChannels || 1;
+    var chans = [];
+    for (var c = 0; c < ch; c++) chans.push(new Float32Array(buffer.getChannelData(c)));
+    return { id: id, name: name || 'sample', sr: buffer.sampleRate, ch: ch, data: chans };
+  }
+
+  function recToBuffer(rec, ctx) {
+    if (!rec || !ctx) return null;
+    var n = rec.data[0].length;
+    var buf = ctx.createBuffer(rec.ch || rec.data.length, n, rec.sr);
+    for (var c = 0; c < buf.numberOfChannels; c++) {
+      buf.getChannelData(c).set(rec.data[Math.min(c, rec.data.length - 1)]);
+    }
+    return buf;
+  }
+
+  function idbPut(rec) {
+    MEM[rec.id] = rec;
+    return idbOpen().then(function (db) {
+      if (!db) return rec.id;
+      return new Promise(function (resolve) {
+        try {
+          var tx = db.transaction(DB_STORE, 'readwrite');
+          tx.objectStore(DB_STORE).put(rec);
+          tx.oncomplete = function () { resolve(rec.id); };
+          tx.onerror = function () { resolve(rec.id); };
+        } catch (e) { resolve(rec.id); }
+      });
+    });
+  }
+
+  function idbGet(id) {
+    if (MEM[id]) return Promise.resolve(MEM[id]);
+    return idbOpen().then(function (db) {
+      if (!db) return null;
+      return new Promise(function (resolve) {
+        try {
+          var tx = db.transaction(DB_STORE, 'readonly');
+          var req = tx.objectStore(DB_STORE).get(id);
+          req.onsuccess = function () {
+            var rec = req.result;
+            if (rec) MEM[id] = rec;
+            resolve(rec || null);
+          };
+          req.onerror = function () { resolve(null); };
+        } catch (e) { resolve(null); }
+      });
+    });
+  }
+
+  function idbByName(name) {
+    for (var k in MEM) {
+      if (MEM[k] && MEM[k].name === name) return Promise.resolve(MEM[k]);
+    }
+    return idbOpen().then(function (db) {
+      if (!db) return null;
+      return new Promise(function (resolve) {
+        try {
+          var tx = db.transaction(DB_STORE, 'readonly');
+          var req = tx.objectStore(DB_STORE).getAll();
+          req.onsuccess = function () {
+            var all = req.result || [];
+            for (var i = 0; i < all.length; i++) {
+              MEM[all[i].id] = all[i];
+              if (all[i].name === name) return resolve(all[i]);
+            }
+            resolve(null);
+          };
+          req.onerror = function () { resolve(null); };
+        } catch (e) { resolve(null); }
+      });
+    });
+  }
+
+  /* ---------- CSS ---------- */
+  function ensureCSS() {
+    if (typeof document === 'undefined') return;
+    if (document.getElementById(CSS_ID)) return;
+    var s = document.createElement('style');
+    s.id = CSS_ID;
+    s.textContent = [
+      '.orbs-pad9{--line:rgba(255,255,255,.18);--line-strong:rgba(255,255,255,.28);--mute:rgba(255,255,255,.4);',
+      'position:fixed;z-index:80;width:280px;background:#000;color:#fff;',
+      'border:1px solid var(--line-strong);box-sizing:border-box;',
+      'font:11px/1.4 ui-monospace,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;',
+      'user-select:none;-webkit-user-select:none;}',
+      '.orbs-pad9,.orbs-pad9 *{box-sizing:border-box;}',
+      '.orbs-pad9 button{font:inherit;color:#fff;background:transparent;border:0;padding:0;cursor:pointer;}',
+      '.p9-head{display:flex;align-items:center;gap:8px;min-height:36px;padding:0 6px 0 14px;',
+      'border-bottom:1px solid var(--line);cursor:grab;}',
+      '.p9-head.grabbing{cursor:grabbing;}',
+      '.p9-ttl{opacity:.85;letter-spacing:.02em;}',
+      '.p9-hint{margin-left:auto;opacity:.35;font-size:10px;white-space:nowrap;}',
+      '.p9-x{width:32px;height:32px;flex:0 0 32px;opacity:.55;font-size:16px;line-height:32px;text-align:center;}',
+      '.p9-x:hover{opacity:1;}',
+      '.p9-grid{display:grid;grid-template-columns:repeat(3,72px);grid-template-rows:repeat(3,72px);',
+      'gap:2px;padding:12px;justify-content:center;}',
+      '.p9-cell{min-width:32px;min-height:32px;width:72px;height:72px;border:1px solid var(--line);',
+      'position:relative;cursor:pointer;overflow:hidden;display:flex;flex-direction:column;',
+      'justify-content:flex-end;padding:6px 7px;touch-action:none;}',
+      '.p9-cell:hover{border-color:var(--line-strong);}',
+      '.p9-cell.on{border-color:rgba(255,255,255,.55);}',
+      '.p9-cell.hit{background:rgba(255,255,255,.1);border-color:#fff;}',
+      '.p9-cell.drop{border-color:#fff;background:rgba(255,255,255,.06);}',
+      '.p9-key{position:absolute;top:5px;left:7px;opacity:.35;font-size:10px;}',
+      '.p9-name{opacity:.7;font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;}',
+      '.p9-ripple{position:absolute;width:10px;height:10px;margin:-5px 0 0 -5px;border:1px solid rgba(255,255,255,.75);',
+      'border-radius:50%;opacity:0;pointer-events:none;left:50%;top:50%;}',
+      '.p9-cell.hit .p9-ripple{animation:p9rip .32s ease-out;}',
+      '@keyframes p9rip{from{transform:scale(1);opacity:.8;}to{transform:scale(7);opacity:0;}}',
+      '.p9-sec{border-top:1px solid var(--line);padding:6px 12px 8px;}',
+      '.p9-row{display:grid;grid-template-columns:48px 1fr 36px;gap:8px;align-items:center;min-height:28px;}',
+      '.p9-row b{font-weight:400;opacity:.5;}',
+      '.p9-val{opacity:.45;text-align:right;font-variant-numeric:tabular-nums;}',
+      '.p9-kn{position:relative;height:18px;cursor:ew-resize;touch-action:none;}',
+      '.p9-kn i{position:absolute;left:0;right:0;top:50%;height:1px;background:var(--line);}',
+      '.p9-kn u{position:absolute;width:7px;height:7px;border:1px solid #fff;border-radius:50%;',
+      'top:50%;transform:translate(-50%,-50%);background:#000;pointer-events:none;}',
+      '.p9-chips{display:flex;flex-wrap:wrap;gap:2px 0;align-items:center;min-height:28px;}',
+      '.p9-chips b{font-weight:400;opacity:.5;margin-right:8px;min-width:48px;}',
+      '.p9-chips span{padding:3px 7px;border:1px solid transparent;cursor:pointer;opacity:.45;}',
+      '.p9-chips span:hover{opacity:.85;}',
+      '.p9-chips span.on{opacity:1;border-color:var(--line-strong);}',
+      '.p9-chips span.off{opacity:.25;pointer-events:none;}',
+      '.p9-acts{display:flex;flex-wrap:wrap;gap:4px 2px;align-items:center;padding:2px 0;}',
+      '.p9-acts span{padding:3px 7px;border:1px solid transparent;cursor:pointer;opacity:.5;}',
+      '.p9-acts span:hover{opacity:.9;}',
+      '.p9-acts span.on{opacity:1;border-color:var(--line-strong);}',
+      '.p9-acts span.live{opacity:1;border-color:#fff;}',
+      '.p9-menu{position:absolute;z-index:81;min-width:140px;max-height:220px;overflow:auto;',
+      'background:#000;border:1px solid var(--line-strong);padding:4px 0;font:inherit;color:#fff;}',
+      '.p9-menu div{padding:5px 12px;cursor:pointer;opacity:.7;}',
+      '.p9-menu div:hover{opacity:1;background:rgba(255,255,255,.06);}',
+      '.p9-status{padding:0 14px 10px;opacity:.35;font-size:10px;min-height:14px;}'
+    ].join('');
+    document.head.appendChild(s);
+  }
+
+  function el(tag, cls, text) {
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text != null) n.textContent = text;
+    return n;
+  }
+
+  /* ---------- create ---------- */
+  function create(opts) {
+    opts = opts || {};
+    var ctx = opts.ctx || opts.context || null;
+    var dest = opts.dest || (ctx && ctx.destination);
+    var storageKey = opts.storageKey || null;
+    var getBeat = opts.getBeat || function () { return 0; };
+    var getBpm = typeof opts.getBpm === 'function' ? opts.getBpm
+      : function () { return opts.bpm == null ? 120 : opts.bpm; };
+    var getPlanets = opts.getPlanets || function () { return []; };
+    var playPlanetSound = opts.playPlanetSound || function () {};
+    var pickSample = opts.pickSample || null;
+    var onHit = opts.onHit || function () {};
+    var onCommit = opts.onCommit || function () {};
+
+    var open_ = false;
+    var armed = false;
+    var bars = 1;
+    var lapBeats = 4;
+    var origin = 0;
+    var selected = 0;
+    var left = opts.left != null ? opts.left : 48;
+    var top = opts.top != null ? opts.top : 72;
+    var patterns = [[], [], [], [], [], [], [], [], []];
+    var undoStack = [];
+    var voices = [];
+    var micCtl = null;
+    var lastHit = null;
+    var disposed = false;
+
+    var pads = [];
+    for (var i = 0; i < 9; i++) {
+      pads.push({
+        id: i,
+        key: KEYS[i],
+        vol: 1,
+        pitch: 0,
+        choke: 0,
+        src: { type: 'empty' },
+        name: '',
+        lastVel: 0,
+        lastRate: 1,
+        lastGain: null,
+        choked: false
+      });
+    }
+
+    var state = {
+      open: false,
+      armed: false,
+      bars: bars,
+      lapBeats: lapBeats,
+      selected: 0,
+      pads: pads,
+      pos: { left: left, top: top },
+      lastHit: null
+    };
+
+    function syncState() {
+      state.open = open_;
+      state.armed = armed;
+      state.bars = bars;
+      state.lapBeats = lapBeats;
+      state.selected = selected;
+      state.pos.left = left;
+      state.pos.top = top;
+      state.lastHit = lastHit;
+    }
+
+    function beatAt(time) {
+      try {
+        if (getBeat.length) return +getBeat(time) || 0;
+        return +getBeat() || 0;
+      } catch (e) { return 0; }
+    }
+
+    function fadeStop(v, time, fade) {
+      fade = fade == null ? CHOKE_FADE : fade;
+      try {
+        var t0 = ctx ? Math.max(time, ctx.currentTime) : time;
+        var p = v.gain.gain;
+        var cur = p.value;
+        p.cancelScheduledValues(t0);
+        p.setValueAtTime(cur, t0);
+        p.linearRampToValueAtTime(0, t0 + fade);
+        if (v.src && v.src.stop) {
+          try { v.src.stop(t0 + fade + 0.02); } catch (e2) {}
+        }
+      } catch (e) {}
+      v.live = false;
+      v.choked = true;
+    }
+
+    function chokeOthers(padId, group, time) {
+      if (!group) return;
+      for (var i = 0; i < voices.length; i++) {
+        var v = voices[i];
+        if (v.live && v.padId !== padId && v.choke === group) fadeStop(v, time, CHOKE_FADE);
+      }
+    }
+
+    function playPad(pad, vel, time) {
+      var t = time != null ? time : (ctx ? ctx.currentTime + 0.004 : 0);
+      var v = clamp(vel == null ? 0.9 : vel, 0, 1);
+      var g = v * (pad.vol == null ? 1 : pad.vol);
+      pad.lastVel = v;
+      pad.choked = false;
+      chokeOthers(pad.id, pad.choke, t);
+
+      var src = pad.src || { type: 'empty' };
+      if (src.type === 'planet' && src.planetId) {
+        try { playPlanetSound(src.planetId, t, g, pad.pitch || 0); } catch (e) {}
+        pad.lastRate = Math.pow(2, (pad.pitch || 0) / 12);
+      } else if (src.type === 'sample' && src.buffer && ctx) {
+        try {
+          var bs = ctx.createBufferSource();
+          var gn = ctx.createGain();
+          var rate = Math.pow(2, (pad.pitch || 0) / 12);
+          bs.buffer = src.buffer;
+          bs.playbackRate.setValueAtTime(rate, t);
+          gn.gain.setValueAtTime(Math.max(0, g), t);
+          bs.connect(gn);
+          gn.connect(dest || ctx.destination);
+          bs.start(t);
+          pad.lastRate = rate;
+          pad.lastGain = gn;
+          var voice = { padId: pad.id, src: bs, gain: gn, choke: pad.choke || 0, live: true, choked: false, rate: rate };
+          voices.push(voice);
+          bs.onended = function () { voice.live = false; };
+          if (voices.length > 64) voices = voices.filter(function (x) { return x.live; });
+        } catch (e) {}
+      }
+      return t;
+    }
+
+    function recordHit(pad, vel, time) {
+      if (!armed) return null;
+      var b = beatAt(time);
+      var q = quantize(b, SNAP);
+      var o = wrapBeats(q - origin, lapBeats);
+      var pat = patterns[pad.id];
+      var near = null;
+      var tol = Math.min(SNAP / 2, 1 / 64);
+      for (var i = 0; i < pat.length; i++) {
+        var d = Math.abs(pat[i].o - o);
+        d = Math.min(d, Math.abs(d - lapBeats));
+        if (d < tol) { near = pat[i]; break; }
+      }
+      undoStack.push({ kind: 'hit', padId: pad.id, prev: copyPat(pat) });
+      if (undoStack.length > 64) undoStack.shift();
+      if (near) near.v = Math.max(near.v, +vel.toFixed(3));
+      else {
+        pat.push({ o: o, v: +vel.toFixed(3) });
+        pat.sort(function (a, b) { return a.o - b.o; });
+      }
+      return { o: o, v: vel, beat: b, q: q };
+    }
+
+    function flash(padId, x, y) {
+      if (!rootEl) return;
+      var cell = rootEl.querySelector('.p9-cell[data-pad="' + padId + '"]');
+      if (!cell) return;
+      var rip = cell.querySelector('.p9-ripple');
+      if (rip && x != null && y != null) {
+        var r = cell.getBoundingClientRect();
+        rip.style.left = (x - r.left) + 'px';
+        rip.style.top = (y - r.top) + 'px';
+      }
+      cell.classList.remove('hit');
+      void cell.offsetWidth;
+      cell.classList.add('hit');
+      clearTimeout(cell._t);
+      cell._t = setTimeout(function () { cell.classList.remove('hit'); }, 120);
+    }
+
+    function hit(padId, vel, time) {
+      var i = padIndex(padId);
+      var pad = pads[i];
+      var v = clamp(vel == null ? 0.9 : vel, 0, 1);
+      if (ctx && ctx.state === 'suspended' && ctx.resume) { try { ctx.resume(); } catch (e) {} }
+      var t = playPad(pad, v, time);
+      var rec = recordHit(pad, v, t);
+      lastHit = { padId: i, time: t, vel: v, rec: rec };
+      syncState();
+      flash(i);
+      try { onHit(i, t, v); } catch (e) {}
+      renderCells();
+      return lastHit;
+    }
+
+    function persistSample(pad) {
+      if (!pad.src || pad.src.type !== 'sample' || !pad.src.buffer) return Promise.resolve();
+      if (!pad.src.id) pad.src.id = 'p9-' + nowMs().toString(36) + '-' + pad.id;
+      return idbPut(bufferToRec(pad.src.id, pad.src.name, pad.src.buffer));
+    }
+
+    function saveStore() {
+      if (!storageKey) return;
+      try { localStorage.setItem(storageKey, JSON.stringify(toJSON())); } catch (e) {}
+    }
+
+    function assign(padId, src) {
+      var i = padIndex(padId);
+      var pad = pads[i];
+      var p = Promise.resolve(pad);
+      if (src == null || src === '' || (src.type === 'empty')) {
+        pad.src = { type: 'empty' };
+        pad.name = '';
+      } else if (typeof AudioBuffer !== 'undefined' && src instanceof AudioBuffer) {
+        pad.src = { type: 'sample', buffer: src, name: 'sample', id: 'p9-' + nowMs().toString(36) + '-' + i };
+        pad.name = 'sample';
+        p = persistSample(pad);
+      } else if (typeof File !== 'undefined' && src instanceof File) {
+        p = decodeFile(src).then(function (buf) {
+          pad.src = { type: 'sample', buffer: buf, name: src.name || 'file', id: 'p9-' + nowMs().toString(36) + '-' + i };
+          pad.name = pad.src.name;
+          return persistSample(pad).then(function () { return pad; });
+        });
+      } else if (typeof src === 'string') {
+        pad.src = { type: 'planet', planetId: src };
+        pad.name = src;
+      } else if (src.type === 'planet' || src.planetId || src.id && !src.buffer && src.type !== 'sample') {
+        var pid = src.planetId || src.id;
+        pad.src = { type: 'planet', planetId: pid };
+        pad.name = src.label || pid;
+      } else if (src.type === 'sample' || src.buffer) {
+        pad.src = {
+          type: 'sample',
+          buffer: src.buffer || null,
+          name: src.name || 'sample',
+          id: src.id || ('p9-' + nowMs().toString(36) + '-' + i)
+        };
+        pad.name = pad.src.name;
+        if (pad.src.buffer) p = persistSample(pad);
+        else if (pad.src.id) {
+          p = loadSample(pad.src.id, pad.src.name).then(function (buf) {
+            if (buf) pad.src.buffer = buf;
+            return pad;
+          });
+        }
+      } else {
+        pad.src = { type: 'empty' };
+        pad.name = '';
+      }
+      selected = i;
+      syncState();
+      render();
+      saveStore();
+      return p.then(function () { return pad; });
+    }
+
+    function setPad(padId, spec) {
+      var i = padIndex(padId);
+      var pad = pads[i];
+      spec = spec || {};
+      if (spec.vol != null) pad.vol = clamp(+spec.vol, 0, 1);
+      if (spec.pitch != null) pad.pitch = clamp(+spec.pitch, -24, 24);
+      if (spec.choke != null) {
+        var c = +spec.choke;
+        pad.choke = (!c || c < 1) ? 0 : clamp(c | 0, 1, 4);
+      }
+      selected = i;
+      syncState();
+      render();
+      saveStore();
+      return pad;
+    }
+
+    function decodeFile(file) {
+      return file.arrayBuffer().then(function (ab) { return decodeArrayBuffer(ab); });
+    }
+
+    function decodeArrayBuffer(ab) {
+      if (!ctx) return Promise.reject(new Error('no audio context'));
+      return ctx.decodeAudioData(ab.slice ? ab.slice(0) : ab);
+    }
+
+    function loadSample(id, name) {
+      return idbGet(id).then(function (rec) {
+        if (!rec && name) return idbByName(name);
+        return rec;
+      }).then(function (rec) {
+        return rec ? recToBuffer(rec, ctx) : null;
+      });
+    }
+
+    /* ----- record ----- */
+    function recStart(n) {
+      var allowed = { 1: 1, 2: 2, 4: 4, 8: 8 };
+      bars = allowed[n] ? n : (allowed[bars] ? bars : 1);
+      lapBeats = bars * 4;
+      var b = beatAt(ctx ? ctx.currentTime : 0);
+      origin = Math.floor(b / 4) * 4;
+      armed = true;
+      syncState();
+      renderRec();
+      setStatus('recording · ' + bars + (bars === 1 ? ' bar' : ' bars') + ' · snap 1/16');
+      return api;
+    }
+
+    function recStop() {
+      armed = false;
+      syncState();
+      renderRec();
+      setStatus('stopped');
+      return api;
+    }
+
+    function recUndo() {
+      var u = undoStack.pop();
+      if (!u) return api;
+      if (u.kind === 'clear') {
+        for (var i = 0; i < 9; i++) patterns[i] = copyPat(u.prev[i]);
+      } else if (u.kind === 'hit') {
+        patterns[u.padId] = copyPat(u.prev);
+      }
+      syncState();
+      render();
+      return api;
+    }
+
+    function recClear() {
+      undoStack.push({ kind: 'clear', prev: patterns.map(copyPat) });
+      if (undoStack.length > 64) undoStack.shift();
+      for (var i = 0; i < 9; i++) patterns[i] = [];
+      syncState();
+      render();
+      setStatus('cleared');
+      return api;
+    }
+
+    function recCommit(mode, target) {
+      if (armed) recStop();
+      mode = mode === 'add' ? 'add' : 'new';
+      var out = [];
+      for (var i = 0; i < 9; i++) {
+        var pat = patterns[i];
+        if (!pat || !pat.length) continue;
+        var payload = {
+          mode: mode,
+          padId: i,
+          source: srcJSON(pads[i].src),
+          pattern: copyPat(pat),
+          lapBeats: lapBeats
+        };
+        if (target != null && target !== '') payload.target = target;
+        out.push(payload);
+        try { onCommit(payload); } catch (e) {}
+      }
+      setStatus(out.length ? ('committed ' + out.length + (out.length === 1 ? ' pad' : ' pads')) : 'nothing to commit');
+      return out;
+    }
+
+    function recPattern(padId) {
+      return copyPat(patterns[padIndex(padId)]);
+    }
+
+    /* ----- mic ----- */
+    function stopMic() {
+      if (!micCtl) return Promise.resolve(null);
+      var c = micCtl;
+      micCtl = null;
+      c.stop();
+      return c.done;
+    }
+
+    function recordMic(padId, extra) {
+      var i = padIndex(padId == null ? selected : padId);
+      selected = i;
+      if (micCtl) stopMic();
+      extra = extra || {};
+      var maxSec = extra.maxSec || 4;
+
+      function finishWith(buffer) {
+        if (!buffer) return pads[i];
+        var trimmed = trimSilence(buffer, ctx, extra.trim || {});
+        return assign(i, { type: 'sample', buffer: trimmed, name: extra.name || 'mic' }).then(function () {
+          setStatus('mic · ' + (pads[i].name || 'mic'));
+          return pads[i];
+        });
+      }
+
+      if (extra.buffer) {
+        return Promise.resolve(finishWith(extra.buffer));
+      }
+
+      var getUM = opts.getUserMedia
+        || (typeof navigator !== 'undefined' && navigator.mediaDevices && navigator.mediaDevices.getUserMedia
+          ? function (c) { return navigator.mediaDevices.getUserMedia(c); }
+          : null);
+      if (!getUM || !ctx) return Promise.reject(new Error('mic unavailable'));
+
+      var stopped = false;
+      var resolveDone, rejectDone;
+      var done = new Promise(function (res, rej) { resolveDone = res; rejectDone = rej; });
+
+      var ctl = {
+        stop: function () { stopped = true; },
+        done: done
+      };
+      micCtl = ctl;
+      setStatus('mic · recording…');
+      renderRec();
+
+      return getUM({ audio: true, video: false }).then(function (stream) {
+        var recFn = opts.recordStream || recordStreamDefault;
+        var recPromise = recFn(ctx, stream, {
+          maxSec: maxSec,
+          isStopped: function () { return stopped; }
+        });
+        ctl.stop = function () {
+          stopped = true;
+          try { stream.getTracks().forEach(function (t) { t.stop(); }); } catch (e) {}
+        };
+        return recPromise.then(function (buffer) {
+          ctl.stop();
+          if (micCtl === ctl) micCtl = null;
+          renderRec();
+          return finishWith(buffer);
+        });
+      }).then(function (pad) {
+        resolveDone(pad);
+        return pad;
+      }).catch(function (err) {
+        if (micCtl === ctl) micCtl = null;
+        renderRec();
+        setStatus('mic failed');
+        rejectDone(err);
+        throw err;
+      });
+    }
+
+    function recordStreamDefault(ac, stream, cfg) {
+      return new Promise(function (resolve, reject) {
+        var src, mute, rec, acc = [], started = ac.currentTime;
+        try {
+          src = ac.createMediaStreamSource(stream);
+          rec = ac.createScriptProcessor(2048, 1, 1);
+          mute = ac.createGain();
+          mute.gain.value = 0;
+          rec.onaudioprocess = function (ev) {
+            acc.push(new Float32Array(ev.inputBuffer.getChannelData(0)));
+            if (cfg.isStopped() || ac.currentTime - started >= (cfg.maxSec || 4)) finish();
+          };
+          src.connect(rec);
+          rec.connect(mute);
+          mute.connect(ac.destination);
+        } catch (e) {
+          return reject(e);
+        }
+        var done = false;
+        function finish() {
+          if (done) return;
+          done = true;
+          try { rec.onaudioprocess = null; rec.disconnect(); src.disconnect(); mute.disconnect(); } catch (e2) {}
+          var n = 0;
+          for (var i = 0; i < acc.length; i++) n += acc[i].length;
+          if (!n) {
+            var empty = ac.createBuffer(1, ac.sampleRate * 0.05, ac.sampleRate);
+            return resolve(empty);
+          }
+          var data = new Float32Array(n);
+          var o = 0;
+          for (var j = 0; j < acc.length; j++) { data.set(acc[j], o); o += acc[j].length; }
+          var buf = ac.createBuffer(1, n, ac.sampleRate);
+          buf.getChannelData(0).set(data);
+          resolve(buf);
+        }
+        var poll = setInterval(function () {
+          if (cfg.isStopped() || ac.currentTime - started >= (cfg.maxSec || 4)) {
+            clearInterval(poll);
+            finish();
+          }
+        }, 40);
+      });
+    }
+
+    /* ----- JSON ----- */
+    function toJSON() {
+      return {
+        v: 1,
+        pos: { left: left, top: top },
+        bars: bars,
+        pads: pads.map(function (p) {
+          return {
+            id: p.id,
+            vol: p.vol,
+            pitch: p.pitch,
+            choke: p.choke,
+            src: srcJSON(p.src)
+          };
+        })
+      };
+    }
+
+    function fromJSON(obj) {
+      if (!obj) return Promise.resolve(state);
+      if (obj.pos) {
+        if (obj.pos.left != null) left = obj.pos.left;
+        if (obj.pos.top != null) top = obj.pos.top;
+      }
+      if (obj.bars) {
+        bars = obj.bars;
+        lapBeats = bars * 4;
+      }
+      var list = obj.pads || [];
+      var jobs = list.map(function (spec) {
+        var i = padIndex(spec.id);
+        var pad = pads[i];
+        if (spec.vol != null) pad.vol = clamp(+spec.vol, 0, 1);
+        if (spec.pitch != null) pad.pitch = clamp(+spec.pitch, -24, 24);
+        if (spec.choke != null) pad.choke = +spec.choke || 0;
+        var s = spec.src || { type: 'empty' };
+        if (s.type === 'planet') {
+          pad.src = { type: 'planet', planetId: s.planetId || s.id };
+          pad.name = pad.src.planetId;
+          return Promise.resolve();
+        }
+        if (s.type === 'sample') {
+          pad.src = { type: 'sample', id: s.id, name: s.name || 'sample', buffer: null };
+          pad.name = pad.src.name;
+          return loadSample(s.id, s.name).then(function (buf) {
+            if (buf) pad.src.buffer = buf;
+          });
+        }
+        pad.src = { type: 'empty' };
+        pad.name = '';
+        return Promise.resolve();
+      });
+      return Promise.all(jobs).then(function () {
+        syncState();
+        place();
+        render();
+        return state;
+      });
+    }
+
+    /* ----- UI ----- */
+    var rootEl = null, statusEl = null, menuEl = null;
+
+    function setStatus(t) {
+      if (statusEl) statusEl.textContent = t || '';
+    }
+
+    function place() {
+      if (!rootEl) return;
+      rootEl.style.left = left + 'px';
+      rootEl.style.top = top + 'px';
+    }
+
+    function renderCells() {
+      if (!rootEl) return;
+      var cells = rootEl.querySelectorAll('.p9-cell');
+      for (var i = 0; i < cells.length; i++) {
+        var pad = pads[i];
+        cells[i].classList.toggle('on', selected === i);
+        var name = cells[i].querySelector('.p9-name');
+        if (name) name.textContent = pad.name || srcLabel(pad.src) || '';
+      }
+    }
+
+    function renderSliders() {
+      if (!rootEl) return;
+      var pad = pads[selected];
+      var volU = rootEl.querySelector('.p9-kn[data-k="vol"] u');
+      var pitU = rootEl.querySelector('.p9-kn[data-k="pitch"] u');
+      var volV = rootEl.querySelector('[data-val="vol"]');
+      var pitV = rootEl.querySelector('[data-val="pitch"]');
+      if (volU) volU.style.left = (pad.vol * 100) + '%';
+      if (pitU) pitU.style.left = ((pad.pitch + 24) / 48 * 100) + '%';
+      if (volV) volV.textContent = Math.round(pad.vol * 100);
+      if (pitV) pitV.textContent = (pad.pitch > 0 ? '+' : '') + Math.round(pad.pitch);
+      var chips = rootEl.querySelectorAll('[data-choke]');
+      for (var i = 0; i < chips.length; i++) {
+        chips[i].classList.toggle('on', (+chips[i].getAttribute('data-choke') || 0) === (pad.choke || 0));
+      }
+    }
+
+    function renderRec() {
+      if (!rootEl) return;
+      var arm = rootEl.querySelector('[data-act="rec"]');
+      if (arm) arm.classList.toggle('live', !!armed);
+      if (arm) arm.textContent = armed ? 'rec' : 'rec';
+      var barChips = rootEl.querySelectorAll('[data-bars]');
+      for (var i = 0; i < barChips.length; i++) {
+        barChips[i].classList.toggle('on', +barChips[i].getAttribute('data-bars') === bars);
+      }
+      var micBtn = rootEl.querySelector('[data-act="mic"]');
+      if (micBtn) micBtn.classList.toggle('live', !!micCtl);
+    }
+
+    function render() {
+      renderCells();
+      renderSliders();
+      renderRec();
+      place();
+    }
+
+    function closeMenu() {
+      if (menuEl && menuEl.parentNode) menuEl.parentNode.removeChild(menuEl);
+      menuEl = null;
+    }
+
+    function openPlanetMenu(anchor) {
+      closeMenu();
+      var list = [];
+      try { list = getPlanets() || []; } catch (e) { list = []; }
+      menuEl = el('div', 'p9-menu');
+      if (!list.length) {
+        var empty = el('div', '', 'no planets');
+        menuEl.appendChild(empty);
+      }
+      list.forEach(function (p) {
+        var id = typeof p === 'string' ? p : (p.id || p.label);
+        var label = typeof p === 'string' ? p : (p.label || p.id);
+        var row = el('div', '', label);
+        row.setAttribute('data-planet', id);
+        row.addEventListener('click', function (ev) {
+          ev.stopPropagation();
+          assign(selected, { type: 'planet', planetId: id, label: label });
+          closeMenu();
+        });
+        menuEl.appendChild(row);
+      });
+      var r = (anchor || rootEl).getBoundingClientRect();
+      menuEl.style.left = r.left + 'px';
+      menuEl.style.top = (r.bottom + 2) + 'px';
+      document.body.appendChild(menuEl);
+    }
+
+    function build() {
+      if (typeof document === 'undefined') return;
+      ensureCSS();
+      rootEl = el('div', 'orbs-pad9');
+      rootEl.setAttribute('data-orbs-pad9', '1');
+      rootEl.style.display = 'none';
+
+      var head = el('div', 'p9-head');
+      head.appendChild(el('span', 'p9-ttl', 'pad'));
+      head.appendChild(el('span', 'p9-hint', 'q w e · a s d · z x c'));
+      var xbtn = el('button', 'p9-x', '×');
+      xbtn.setAttribute('aria-label', 'close');
+      xbtn.setAttribute('title', 'close (esc)');
+      xbtn.type = 'button';
+      xbtn.addEventListener('click', function (ev) { ev.preventDefault(); ev.stopPropagation(); close(); });
+      xbtn.addEventListener('pointerup', function () { try { xbtn.blur(); } catch (e) {} });
+      head.appendChild(xbtn);
+      rootEl.appendChild(head);
+
+      var grid = el('div', 'p9-grid');
+      for (var i = 0; i < 9; i++) {
+        (function (i) {
+          var cell = el('div', 'p9-cell');
+          cell.setAttribute('data-pad', String(i));
+          cell.setAttribute('tabindex', '-1');
+          var rip = el('span', 'p9-ripple');
+          cell.appendChild(rip);
+          cell.appendChild(el('span', 'p9-key', KEYS[i]));
+          cell.appendChild(el('span', 'p9-name', ''));
+          cell.addEventListener('pointerdown', function (ev) {
+            if (ev.button != null && ev.button !== 0) return;
+            ev.preventDefault();
+            selected = i;
+            var r = cell.getBoundingClientRect();
+            var vel = velFromY(ev.clientY - r.top, r.height);
+            if (ctx && ctx.state === 'suspended' && ctx.resume) { try { ctx.resume(); } catch (e) {} }
+            var t = playPad(pads[i], vel, null);
+            var rec = recordHit(pads[i], vel, t);
+            lastHit = { padId: i, time: t, vel: vel, rec: rec };
+            syncState();
+            flash(i, ev.clientX, ev.clientY);
+            try { onHit(i, t, vel); } catch (e2) {}
+            render();
+          });
+          cell.addEventListener('dragover', function (ev) {
+            ev.preventDefault();
+            ev.dataTransfer.dropEffect = 'copy';
+            cell.classList.add('drop');
+          });
+          cell.addEventListener('dragleave', function () { cell.classList.remove('drop'); });
+          cell.addEventListener('drop', function (ev) {
+            ev.preventDefault();
+            cell.classList.remove('drop');
+            var files = ev.dataTransfer && ev.dataTransfer.files;
+            if (files && files[0]) assign(i, files[0]);
+          });
+          grid.appendChild(cell);
+        })(i);
+      }
+      rootEl.appendChild(grid);
+
+      var sl = el('div', 'p9-sec');
+      function sliderRow(key, label) {
+        var row = el('div', 'p9-row');
+        row.appendChild(el('b', '', label));
+        var kn = el('div', 'p9-kn');
+        kn.setAttribute('data-k', key);
+        kn.appendChild(el('i', ''));
+        kn.appendChild(el('u', ''));
+        row.appendChild(kn);
+        var val = el('span', 'p9-val', '');
+        val.setAttribute('data-val', key);
+        row.appendChild(val);
+        sl.appendChild(row);
+        kn.addEventListener('pointerdown', function (ev) {
+          ev.preventDefault();
+          kn.setPointerCapture(ev.pointerId);
+          function move(e) {
+            var r = kn.getBoundingClientRect();
+            var u = clamp((e.clientX - r.left) / r.width, 0, 1);
+            if (key === 'vol') setPad(selected, { vol: u });
+            else setPad(selected, { pitch: Math.round(u * 48 - 24) });
+          }
+          function up(e) {
+            kn.releasePointerCapture(e.pointerId);
+            kn.removeEventListener('pointermove', move);
+            kn.removeEventListener('pointerup', up);
+          }
+          kn.addEventListener('pointermove', move);
+          kn.addEventListener('pointerup', up);
+          move(ev);
+        });
+      }
+      sliderRow('vol', 'vol');
+      sliderRow('pitch', 'pitch');
+
+      var choke = el('div', 'p9-chips');
+      choke.appendChild(el('b', '', 'choke'));
+      [0, 1, 2, 3, 4].forEach(function (n) {
+        var s = el('span', '', n ? String(n) : 'off');
+        s.setAttribute('data-choke', String(n));
+        s.addEventListener('click', function () { setPad(selected, { choke: n }); });
+        choke.appendChild(s);
+      });
+      sl.appendChild(choke);
+      rootEl.appendChild(sl);
+
+      var asg = el('div', 'p9-sec p9-acts');
+      var planetBtn = el('span', '', 'planet');
+      planetBtn.setAttribute('data-act', 'planet');
+      planetBtn.addEventListener('click', function (ev) {
+        ev.stopPropagation();
+        if (menuEl) closeMenu();
+        else openPlanetMenu(planetBtn);
+      });
+      var sampleBtn = el('span', '', 'sample');
+      sampleBtn.setAttribute('data-act', 'sample');
+      sampleBtn.addEventListener('click', function () {
+        if (typeof pickSample === 'function') {
+          try {
+            var ret = pickSample(selected);
+            if (ret && typeof ret.then === 'function') {
+              ret.then(function (src) { if (src) assign(selected, src); });
+            }
+          } catch (e) {}
+        } else {
+          var inp = el('input');
+          inp.type = 'file';
+          inp.accept = 'audio/*';
+          inp.style.display = 'none';
+          document.body.appendChild(inp);
+          inp.addEventListener('change', function () {
+            if (inp.files && inp.files[0]) assign(selected, inp.files[0]);
+            if (inp.parentNode) inp.parentNode.removeChild(inp);
+          });
+          inp.click();
+        }
+      });
+      var micBtn = el('span', '', 'mic');
+      micBtn.setAttribute('data-act', 'mic');
+      micBtn.addEventListener('click', function () {
+        if (micCtl) stopMic();
+        else recordMic(selected).catch(function () {});
+      });
+      asg.appendChild(planetBtn);
+      asg.appendChild(sampleBtn);
+      asg.appendChild(micBtn);
+      rootEl.appendChild(asg);
+
+      var rec = el('div', 'p9-sec');
+      var recRow = el('div', 'p9-acts');
+      var recBtn = el('span', '', 'rec');
+      recBtn.setAttribute('data-act', 'rec');
+      recBtn.addEventListener('click', function () { armed ? recStop() : recStart(bars); });
+      recRow.appendChild(recBtn);
+      [1, 2, 4, 8].forEach(function (n) {
+        var s = el('span', '', String(n));
+        s.setAttribute('data-bars', String(n));
+        s.addEventListener('click', function () {
+          bars = n;
+          lapBeats = bars * 4;
+          if (armed) recStart(n);
+          else { syncState(); renderRec(); }
+        });
+        recRow.appendChild(s);
+      });
+      rec.appendChild(recRow);
+      var editRow = el('div', 'p9-acts');
+      var undoBtn = el('span', '', 'undo');
+      undoBtn.setAttribute('data-act', 'undo');
+      undoBtn.addEventListener('click', recUndo);
+      var clearBtn = el('span', '', 'clear');
+      clearBtn.setAttribute('data-act', 'clear');
+      clearBtn.addEventListener('click', recClear);
+      var commitBtn = el('span', '', 'commit');
+      commitBtn.setAttribute('data-act', 'commit');
+      commitBtn.addEventListener('click', function () { recCommit('new'); });
+      editRow.appendChild(undoBtn);
+      editRow.appendChild(clearBtn);
+      editRow.appendChild(commitBtn);
+      rec.appendChild(editRow);
+      rootEl.appendChild(rec);
+
+      statusEl = el('div', 'p9-status', '');
+      rootEl.appendChild(statusEl);
+
+      (opts.mount || document.body).appendChild(rootEl);
+
+      // drag by header (not the close button)
+      var drag = null;
+      head.addEventListener('pointerdown', function (ev) {
+        if (ev.target.closest && ev.target.closest('.p9-x')) return;
+        if (ev.button != null && ev.button !== 0) return;
+        ev.preventDefault();
+        drag = { dx: ev.clientX - left, dy: ev.clientY - top };
+        head.classList.add('grabbing');
+        try { head.setPointerCapture(ev.pointerId); } catch (e) {}
+      });
+      head.addEventListener('pointermove', function (ev) {
+        if (!drag) return;
+        left = ev.clientX - drag.dx;
+        top = ev.clientY - drag.dy;
+        var vw = window.innerWidth || 1280, vh = window.innerHeight || 800;
+        var rw = rootEl.offsetWidth || 280, rh = rootEl.offsetHeight || 200;
+        left = clamp(left, 0, Math.max(0, vw - 48));
+        top = clamp(top, 0, Math.max(0, vh - 36));
+        if (left + rw > vw) left = Math.max(0, vw - rw);
+        if (top + rh > vh) top = Math.max(0, vh - rh);
+        syncState();
+        place();
+      });
+      function endDrag(ev) {
+        if (!drag) return;
+        drag = null;
+        head.classList.remove('grabbing');
+        try { head.releasePointerCapture(ev.pointerId); } catch (e) {}
+        saveStore();
+      }
+      head.addEventListener('pointerup', endDrag);
+      head.addEventListener('pointercancel', endDrag);
+
+      place();
+      render();
+    }
+
+    function onKey(ev) {
+      if (!open_ || disposed) return;
+      if (ev.key === 'Escape') {
+        ev.preventDefault();
+        if (menuEl) { closeMenu(); return; }
+        close();
+        return;
+      }
+      if (ev.repeat) return;
+      if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
+      if (typingIn(ev.target) || typingIn(document.activeElement)) return;
+      var idx = -1;
+      if (ev.code && Object.prototype.hasOwnProperty.call(CODE_MAP, ev.code)) idx = CODE_MAP[ev.code];
+      else {
+        var k = (ev.key || '').toLowerCase();
+        if (Object.prototype.hasOwnProperty.call(KEY_MAP, k)) idx = KEY_MAP[k];
+      }
+      if (idx < 0) return;
+      ev.preventDefault();
+      selected = idx;
+      hit(idx, 0.9);
+    }
+
+    function onDocClick(ev) {
+      if (menuEl && !menuEl.contains(ev.target) && rootEl && !rootEl.contains(ev.target)) closeMenu();
+    }
+
+    function open() {
+      if (disposed) return api;
+      if (!rootEl) build();
+      open_ = true;
+      if (rootEl) rootEl.style.display = 'block';
+      syncState();
+      render();
+      return api;
+    }
+
+    function close() {
+      open_ = false;
+      closeMenu();
+      if (rootEl) rootEl.style.display = 'none';
+      syncState();
+      return api;
+    }
+
+    function toggle() { return open_ ? close() : open(); }
+    function isOpen() { return !!open_; }
+
+    function dispose() {
+      disposed = true;
+      armed = false;
+      stopMic();
+      close();
+      for (var i = 0; i < voices.length; i++) {
+        try { if (voices[i].src) voices[i].src.stop(); } catch (e) {}
+        voices[i].live = false;
+      }
+      voices = [];
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('keydown', onKey, true);
+        document.removeEventListener('click', onDocClick, true);
+      }
+      if (rootEl && rootEl.parentNode) rootEl.parentNode.removeChild(rootEl);
+      rootEl = null;
+      INSTANCES = Math.max(0, INSTANCES - 1);
+      if (!INSTANCES && typeof document !== 'undefined') {
+        var css = document.getElementById(CSS_ID);
+        if (css && css.parentNode) css.parentNode.removeChild(css);
+      }
+    }
+
+    if (typeof document !== 'undefined') {
+      document.addEventListener('keydown', onKey, true);
+      document.addEventListener('click', onDocClick, true);
+      INSTANCES++;
+      build();
+    }
+
+    if (storageKey) {
+      try {
+        var raw = localStorage.getItem(storageKey);
+        if (raw) fromJSON(JSON.parse(raw));
+      } catch (e) {}
+    }
+
+    var recApi = {
+      start: recStart,
+      stop: recStop,
+      undo: recUndo,
+      clear: recClear,
+      commit: recCommit,
+      pattern: recPattern
+    };
+    Object.defineProperty(recApi, 'armed', { get: function () { return armed; } });
+
+    var api = {
+      open: open,
+      close: close,
+      toggle: toggle,
+      isOpen: isOpen,
+      assign: assign,
+      hit: hit,
+      setPad: setPad,
+      record: recApi,
+      state: state,
+      toJSON: toJSON,
+      fromJSON: fromJSON,
+      dispose: dispose,
+      recordMic: recordMic,
+      stopMic: stopMic,
+      // test hooks
+      _voices: function () { return voices; },
+      _patterns: function () { return patterns; },
+      _origin: function () { return origin; }
+    };
+    syncState();
+    return api;
+  }
+
+  return {
+    create: create,
+    KEYS: KEYS,
+    SNAP: SNAP,
+    quantize: quantize,
+    velFromY: velFromY,
+    trimSilence: trimSilence,
+    typingIn: typingIn,
+    encodeWav: encodeWav,
+    padIndex: padIndex
+  };
+});
+
+</script>
+<script>
 /* ===== orbs extras space (inlined from fx/extras-space.js, by vmorphs) ===== */
 /* orbs extras — space: binaural, eclipses, gravity, size-as-pitch, mood light, trail
    plain umd / cjs, no deps.
@@ -4642,7 +5966,7 @@
       stereo.connect(outputNode);
       inputNode.connect(hrtfGain);
       hrtfGain.connect(panner);
-      panner.connect(outputNode);
+      const mk = ctx.createGain(); mk.gain.value = Math.pow(10, 3.4 / 20); panner.connect(mk); mk.connect(outputNode); /* binaural level match +3.4 dB (qa cd) */
       nodes[id] = { inputNode, outputNode, stereoGain, hrtfGain, stereo, panner, a: 0, r: 0 };
       return nodes[id];
     }
@@ -5476,7 +6800,7 @@ function playStep(n, t) {
   }
   if (COMET.on) cometStep(n, t, sd);
 }
-const dT = (e, t, k, j) => (e.drift ? Math.max(ac.currentTime + 0.002, t + driftOff(e, k, j) * 60 / bpm) : t); // drift: a seeded wander per lap
+const dT = (e, t, k, j) => { if (!e.drift) return t; const lim = 0.09 * 60 / bpm; return clamp(Math.max(ac.currentTime + 0.002, t + driftOff(e, k, j) * 60 / bpm), t - lim, t + lim); }; // clamped at scheduling too (qa cd) // drift: a seeded wander per lap
 const MOON_OFF = [-0.25, 0.5, 0.25], MOON_V = [0.34, 0.3, 0.26];
 function hitAtP(e, p) { const L = lapOf(e), a0 = aEff(e); return hitsOf(e).some(h => { const f = frac(p / L + a0 - h.o + 1e-9); return f < 2e-9 || f > 1 - 2e-9; }); }
 // chance (like live's note chance): planet chance × hit chance, seeded per lap so a replay from the start sounds the same
@@ -5616,13 +6940,14 @@ const typingIn = t => t && (/^(INPUT|SELECT|TEXTAREA|BUTTON)$/.test(t.tagName) |
 addEventListener('keydown', e => {
   if (typingIn(e.target)) return;
   if (e.metaKey || e.ctrlKey || e.altKey) return;
-  if (winId && padKey(e)) return;
+  if (pad9Open()) { if (/^Key[QWEASDZXC]$/.test(e.code)) return; } else if (winId && padKey(e)) return;
   if (!winId && jamKey(e)) return; // jam keys and zoom stay off behind the planet window (qa)
   if (e.code === 'Space') { e.preventDefault(); if (!e.repeat) { spaceDown = true; spacePanned = false; } } // space: play / stop on release, or hold + drag to pan
   else if (winId && /^[-+=_]$/.test(e.key)) {}
   else if (e.key === '+' || e.key === '=') { e.preventDefault(); zoomKey(1.25); } else if (e.key === '-' || e.key === '_') { e.preventDefault(); zoomKey(0.8); }
   else if (e.code === 'KeyT') { e.preventDefault(); tapTempo(); }
   else if (e.code === 'Escape' && winId) closeWin();
+  else if (winId && (e.code === 'ArrowUp' || e.code === 'ArrowDown')) {} // not behind the planet window (qa cd)
   else if (e.code === 'ArrowUp') setBpm(bpm + 1); else if (e.code === 'ArrowDown') setBpm(bpm - 1);
 });
 addEventListener('keyup', e => { if (e.code !== 'Space' || !spaceDown) return; spaceDown = false; if (typingIn(e.target)) return; if (!spacePanned) toggle(); spacePanned = false; cv.style.cursor = 'default'; });
@@ -5683,6 +7008,7 @@ function resize() {
   const sr = sheet.getBoundingClientRect(), tb = topEl.getBoundingClientRect().bottom; { const pk = document.getElementById('picker'); if (pk) pk.style.top = Math.round(tb) + 'px'; } // the picker opens below the top bar, so fit · 1:1 · more stay visible (qa)
   SIDE = sr.left > 40;
   SA = SIDE ? { x: 0, y: tb, w: sr.left, h: H - tb } : { x: 0, y: tb, w: W, h: Math.max(160, sr.top - tb) };
+  if (document.body.classList.contains('clean')) { SIDE = W > H; SA = { x: 0, y: 0, w: W, h: H }; } // clean view: the system gets the whole screen
   CX0 = SA.x + SA.w / 2; CY0 = SA.y + SA.h / 2;
   const hw = SA.w / 2 - (SIDE ? 50 : 20), hh = SA.h / 2 - 22;
   K = clamp(hh / hw, 0.55, SIDE ? 0.8 : 0.72);
@@ -5849,7 +7175,7 @@ cv.addEventListener('pointerdown', ev => {
     if (lk) { if (dbl) { unlink(lk[0], lk[1]); lastTap.t = 0; } return; } // a line: double-click / double-tap cuts it
     const lb = hitLabel(x, y); if (lb) { openPicker(baseOf(lb.id)); select(lb.id); return; }
     if (pickId) { closePicker(); return; }
-    if (Math.hypot(x - CX, y - CY) < SUNR + (touchMode ? 20 : 12)) { initAudio(); sunTap(); return; } // on the sun the sun wins: quick taps step chords, a line through it is cut off the sun (qa #5) // chord sun: tap steps the chords (play / stop: ▷ or space)
+    if (Math.hypot(x - CX, y - CY) < SUNR + (touchMode ? 20 : 12)) { const sl = linkAt(x, y, true); if (sl && dbl && linked(sl[0], sl[1])) { unlink(sl[0], sl[1]); CHORD.held = sunPrev; clearTimeout(sunHoldT); lastTap.t = 0; return; } sunPrev = CHORD.held; initAudio(); sunTap(); return; } // a line over the sun: double-click cuts it (qa cd), single taps step chords // on the sun the sun wins: quick taps step chords, a line through it is cut off the sun (qa #5) // chord sun: tap steps the chords (play / stop: ▷ or space)
     return;
   }
   cv.setPointerCapture(ev.pointerId);
@@ -5952,7 +7278,7 @@ function smoky(A, B, bright, T, seed) { // connection: a thin smoky white line (
 }
 const hash = s => { let h = 7; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) % 9973; return h; };
 function frame(now) {
-  const dt = Math.min(0.05, (now - last) / 1000); last = now; const T = now / 1000;
+  const f0 = performance.now(), dt = Math.min(0.05, (now - last) / 1000); last = now; const T = now / 1000;
   layout(); morphTick(); extrasTick(dt); updateMix();
   if (drag && drag.moved) drag.tgt = dragTarget(drag);
   if (ac && playing) while (visQ.length && visQ[0].t <= ac.currentTime) {
@@ -5967,9 +7293,14 @@ function frame(now) {
 
   g.setTransform(DPR, 0, 0, DPR, 0, 0);
   g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1; g.setLineDash([]); g.shadowBlur = 0;
-  g.fillStyle = MOODCSS; g.fillRect(0, 0, W, H);
-  g.fillStyle = g.strokeStyle = '#fff'; g.lineCap = 'round';
   const hair = Math.max(0.5, 1 / DPR) * 0.9, sel = E[selId], dragging = drag && drag.moved && !drag.tether ? drag : null;
+  const sr = SUNR * (1 + 0.18 * kickPulse);
+  const linksA = [];
+  for (const k of links) { const [a, b] = k.split('|'), A = E[a], B = E[b]; if (!A || !B || A.inHole || B.inHole) continue; const opp = Math.abs(frac(A.ang - B.ang) - 0.5) < 0.04; linksA.push({ A, B, bright: opp, seed: hash(k) }); }
+  const planetsA = IDS.map(id => { const e = E[id], r = e.r * (1 + 0.35 * e.pulse), dragging = drag && drag.e === e && drag.moved, mutedLook = e.muted || (ORB[e.orbit] && (ORB[e.orbit].st.muted || (anySolo() && !ORB[e.orbit].solo)) && !dragging) || (dragging && drag.tgt && drag.tgt.mute) || e._ghost; return { e, r, muted: !!mutedLook }; });
+  // batch E: the skin draws background, orbits, trigger, links, sun, planets and moons; the app keeps everything that means something (rings, labels, ripples, hole, comets…)
+  drawScene(g, SKIN, { T, hair, sr, kick: kickPulse, skip: dragging && dragging.e, links: linksA, planets: planetsA,
+    under: S => {
   // --- no permanent rings: just a faint ghost ring for the selected planet and the one being dragged ---
   if (sel && !(dragging && dragging.e === sel)) ghostRing(sel.rad, grpOf(sel), 0.07, T, hair);
   if (dragging && dragging.tgt && !dragging.tgt.mute && !dragging.tgt.hole) {
@@ -5978,7 +7309,7 @@ function frame(now) {
   }
   // --- trigger line (moving) / hands (still) ---
   const yTop = CY - 1.04 * RMAX * K;
-  if (!still) { g.globalAlpha = 0.14 + 0.1 * trigFlash; g.lineWidth = hair; g.beginPath(); g.moveTo(CX, CY - SUNR - 7); g.lineTo(CX, yTop); g.stroke(); g.globalAlpha = 0.2 + 0.15 * trigFlash; g.beginPath(); g.moveTo(CX - 3, yTop); g.lineTo(CX + 3, yTop); g.stroke(); }
+  if (!still) S.trigger(yTop, hair, trigFlash);
   else { // a hairline hand from the sun per group, sweeping at that group's lap; each planet keeps a tiny tick where its hand is
     g.lineWidth = hair;
     for (const o of ORB) { const mem = membersOf(o).filter(e => !(dragging && dragging.e === e)); if (!mem.length) continue;
@@ -5990,8 +7321,8 @@ function frame(now) {
   }
   // mute zone while dragging
   if (dragging) { const Ro = 1.12 * RMAX; g.globalAlpha = dragging.tgt && dragging.tgt.mute ? 0.35 : 0.08; g.lineWidth = hair; g.setLineDash([1, 6]); g.beginPath(); g.ellipse(CX, CY, Ro, Ro * K, 0, 0, TAU); g.stroke(); g.setLineDash([]); }
-  // --- connections: smoky lines; opposite partners glow brighter ---
-  for (const k of links) { const [a, b] = k.split('|'), A = E[a], B = E[b]; if (!A || !B || A.inHole || B.inHole) continue; const opp = Math.abs(frac(A.ang - B.ang) - 0.5) < 0.04; smoky(A, B, opp, T, hash(k)); }
+    },
+    mid: S => {
   if (dragging && dragging.tgt && dragging.tgt.connect) { g.setLineDash([1, 4]); g.globalAlpha = 0.45; g.lineWidth = 0.7; g.beginPath(); g.moveTo(dragging.px, dragging.py); g.lineTo(dragging.tgt.connect.x, dragging.tgt.connect.y); g.stroke(); g.setLineDash([]); }
   if (dragging && dragging.tgt && dragging.tgt.breaks) for (const p of dragging.tgt.breaks) { const P = E[p]; g.setLineDash([1, 7]); g.globalAlpha = 0.3; g.lineWidth = 0.7; g.beginPath(); g.moveTo(dragging.px, dragging.py); g.lineTo(P.x, P.y); g.stroke(); g.setLineDash([]); }
   // --- sidechain tethers: faint dashed, flash on each duck ---
@@ -6001,13 +7332,8 @@ function frame(now) {
     g.globalAlpha *= 0.9; g.beginPath(); g.moveTo(x1, y1); g.lineTo(x1 - ux * 4 + uy * 2.2, y1 - uy * 4 - ux * 2.2); g.moveTo(x1, y1); g.lineTo(x1 - ux * 4 - uy * 2.2, y1 - uy * 4 + ux * 2.2); g.stroke(); }
   if (drag && drag.moved && drag.tether) { const A = drag.e, T2 = drag.tgt && drag.tgt.tether; g.setLineDash([2, 5]); g.lineWidth = 0.8; g.globalAlpha = T2 ? 0.6 : 0.3; g.beginPath(); g.moveTo(A.x, A.y); g.lineTo(T2 ? T2.x : drag.px, T2 ? T2.y : drag.py); g.stroke(); g.setLineDash([]); g.font = LABEL_FONT; g.textAlign = 'center'; g.globalAlpha = 0.5; g.fillText(T2 ? 'duck ' + (T2.label || T2.id) : 'duck…', drag.px, drag.py - 14); }
   drawHole(T, !!(dragging && (dragging.tgt && dragging.tgt.hole || inHoleZone(dragging.px, dragging.py) || dragging.e.inHole)) || IDS.some(id => E[id].inHole && E[id].pulse > 0.05));
-  // --- sun ---
-  const sr = SUNR * (1 + 0.18 * kickPulse);
-  const grd = g.createRadialGradient(CX, CY, 0, CX, CY, sr * 4.5); grd.addColorStop(0, 'rgba(255,255,255,0.22)'); grd.addColorStop(1, 'rgba(255,255,255,0)');
-  g.globalAlpha = 0.6 + 0.4 * kickPulse; g.fillStyle = grd; g.beginPath(); g.arc(CX, CY, sr * 4.5, 0, TAU); g.fill(); g.fillStyle = '#fff';
-  g.globalAlpha = 0.95; g.beginPath(); g.arc(CX, CY, sr, 0, TAU); g.fill();
-  g.lineWidth = 0.7; g.globalAlpha = 0.4; g.beginPath(); g.arc(CX, CY, sr + 4.5, 0, TAU); g.stroke();
-  g.globalAlpha = 0.16; g.beginPath(); g.arc(CX, CY, sr + 9, 0, TAU); g.stroke();
+    },
+    over: S => { g.fillStyle = g.strokeStyle = '#fff';
   sunFlash *= Math.exp(-dt * 5); drawSunChord();
   if (!playing) { g.globalAlpha = 0.5; g.beginPath(); g.moveTo(CX - 1.6, CY - 2.4); g.lineTo(CX + 2.6, CY); g.lineTo(CX - 1.6, CY + 2.4); g.closePath(); g.fillStyle = '#000'; g.fill(); g.fillStyle = '#fff'; }
   // --- echo: hollow ghost dots trailing on the planet's ring · recorded pattern: tiny ticks ---
@@ -6028,8 +7354,7 @@ function frame(now) {
   const tn = ac ? ac.currentTime : 0;
   for (const id of IDS) { const e = E[id]; if (!e.moons || e.muted || (dragging && dragging.e === e)) continue; const n = e.moons, iv = lapOf(e) / hitsOf(e).length;
     for (let m = 0; m < n; m++) { const rr = e.r + 5 + 3.2 * m, an = (curPos / iv + m / n) * TAU * (m & 1 ? -1 : 1), fl = e.mflash && e.mflash[m] != null ? Math.max(0, 1 - Math.abs(tn - e.mflash[m]) * 6) * (tn >= e.mflash[m] ? 1 : 0) : 0;
-      g.globalAlpha = 0.05; g.lineWidth = hair; g.beginPath(); g.arc(e.x, e.y, rr, 0, TAU); g.stroke();
-      g.globalAlpha = 0.55 + 0.45 * fl; g.beginPath(); g.arc(e.x + rr * Math.sin(an), e.y - rr * Math.cos(an), 1.15 + 0.9 * fl, 0, TAU); g.fill(); } }
+      S.moon(e, rr, e.x + rr * Math.sin(an), e.y - rr * Math.cos(an), fl, hair); } }
   drawComets(now);
   // --- ripples ---
   for (let i = ripples.length - 1; i >= 0; i--) {
@@ -6045,21 +7370,22 @@ function frame(now) {
     g.fillText(tg.connect ? '→ ' + (tg.connect.label || tg.connect.id) + ' · ' + lapTxt(tg.lap) : lapTxt(tg.lap) + (tg.breaks && tg.breaks.length ? ' · disconnect' : ''), dragging.px, dragging.py + dragging.e.r + 14); }
   // --- planets ---
   drawTrails(); drawEclipses(); g.globalAlpha = 1;
-  g.font = LABEL_FONT; g.textBaseline = 'middle';
+    },
+    after: S => { g.font = LABEL_FONT; g.textBaseline = 'middle';
   for (const id of IDS) {
     const e = E[id], r = e.r * (1 + 0.35 * e.pulse), dragging = drag && drag.e === e && drag.moved, mutedLook = e.muted || (ORB[e.orbit] && (ORB[e.orbit].st.muted || (anySolo() && !ORB[e.orbit].solo)) && !dragging) || (dragging && drag.tgt && drag.tgt.mute) || e._ghost;
-    if (mutedLook) { g.globalAlpha = 0.4; g.lineWidth = 0.9; g.beginPath(); g.arc(e.x, e.y, r, 0, TAU); g.stroke(); }
-    else { g.globalAlpha = 0.95; g.beginPath(); g.arc(e.x, e.y, r, 0, TAU); g.fill(); }
     if (!mutedLook && e.verb > 0.2) { g.globalAlpha = 0.12 + 0.18 * e.verb; g.lineWidth = 0.6; g.setLineDash([0.5, 3]); g.beginPath(); g.arc(e.x, e.y, r + 3 + 6 * e.verb, 0, TAU); g.stroke(); g.setLineDash([]); }
     if (e.side === 'rec') { g.globalAlpha = 0.35; g.lineWidth = 0.7; g.beginPath(); g.arc(e.x, e.y, r + 3.5, 0, TAU); g.stroke(); }
     if (id === selId) { g.globalAlpha = 0.65; g.lineWidth = 0.8; g.beginPath(); g.arc(e.x, e.y, r + 7, 0, TAU); g.stroke(); }
     if (baseOf(id) === pickId || id === barId || id === winId) { g.save(); g.translate(e.x, e.y); g.rotate(T * 0.5); g.globalAlpha = 0.6; g.lineWidth = 0.8; g.setLineDash([2, 5]); g.beginPath(); g.arc(0, 0, r + 12, 0, TAU); g.stroke(); g.setLineDash([]); g.restore(); }
-    if (JAM && jamIds().includes(id)) { g.font = LABEL_FONT; g.textAlign = 'center'; g.globalAlpha = 0.38; g.fillText(String(jamIds().indexOf(id) + 1), e.x, e.y - r - 9); }
-    const b = e.lb; if (b && e.lbA > 0.02 && !e.inHole) { g.textAlign = b.al; g.globalAlpha = (mutedLook ? 0.3 : (id === selId ? 0.95 : 0.62)) * e.lbA; g.fillText(b.txt, b.tx, b.ty + 0.5); }
+    if (JAM && !CLEAN && jamIds().includes(id)) { g.font = LABEL_FONT; g.textAlign = 'center'; g.globalAlpha = 0.38; g.fillText(String(jamIds().indexOf(id) + 1), e.x, e.y - r - 9); }
+    const b = e.lb; if (b && e.lbA > 0.02 && !e.inHole && (!CLEAN || CLEAN_LABELS)) { g.textAlign = b.al; g.globalAlpha = (mutedLook ? 0.3 : (id === selId ? 0.95 : 0.62)) * e.lbA; g.fillText(b.txt, b.tx, b.ty + 0.5); }
   }
   if (drag && drag.moved && drag.tgt && drag.tgt.mute) { g.textAlign = 'center'; g.globalAlpha = 0.5; g.fillText('mute', drag.px, drag.py - drag.e.r - 14); }
   g.globalAlpha = 1;
-  drawRecIndicator(); drawBar(); if (winId) drawWinRing();
+    } });
+  drawRecIndicator(); drawBar(); if (winId) drawWinRing(); drawXfade(now); if (PAD9) pad9Tick();
+  SKSTAT.push(performance.now() - f0); if (SKSTAT.length > 240) SKSTAT.shift();
   requestAnimationFrame(frame);
 }
 /* ---------------- info sheet ---------------- */
@@ -6071,8 +7397,8 @@ const ICON = {
 };
 /* ---- overlays v2: collapsible sections (state kept per id) ---- */
 let SECS = {}; try { SECS = JSON.parse(localStorage.getItem('orbs-solar-secs') || '{}') || {}; } catch (x) {}
-let UI_ALL = false; // tests: every section open and every window tab shown (the old one-long-list layout)
-const secOpen = (id, def) => UI_ALL || (SECS[id] == null ? !!def : !!SECS[id]);
+let UI_ALL = false, SEC_ALL = false; // SEC_ALL: old qa scripts — every sheet section open, window tabs as usual // tests: every section open and every window tab shown (the old one-long-list layout)
+const secOpen = (id, def) => UI_ALL || SEC_ALL || (SECS[id] == null ? !!def : !!SECS[id]);
 function setSec(id, on) { SECS[id] = !!on; try { localStorage.setItem('orbs-solar-secs', JSON.stringify(SECS)); } catch (x) {} }
 const secHTML = (id, title, sum, inner, def) => '<div class="sec' + (secOpen(id, def) ? '' : ' col') + '" data-sec="' + id + '"><div class="sec-h"><b>' + title + '</b><span class="sum">' + (sum || '') + '</span><span class="chev">▾</span></div><div class="sec-b">' + inner + '</div></div>';
 const hint = s => '<div class="hint">' + s + '</div>';
@@ -6233,7 +7559,7 @@ document.getElementById('wTabs').addEventListener('click', ev => { const b = ev.
 const PAD = { len: 'lap', q: 0.25, overdub: false, vel: 'pos' }; // record length · quantize (beats, 0 = off) · overdub · velocity from click position or fixed
 function openWin(id) {
   if (!E[id]) return; initAudio(); winId = id; select(id); if (pickId) closePicker();
-  winEl.classList.add('open'); document.body.classList.add('win-open'); renderWin(); sizeRing();
+  if (typeof pad9Open === 'function' && pad9Open()) pad9Toggle(false); winEl.classList.add('open'); document.body.classList.add('win-open'); renderWin(); sizeRing();
 }
 function closeWin() { if (!winId) return; if (prec) endPadRec(true); winId = null; winEl.classList.remove('open'); document.body.classList.remove('win-open'); sheetDirty = true; }
 document.getElementById('wClose').addEventListener('click', closeWin);
@@ -6247,7 +7573,7 @@ function renderWin() {
   T.sound += ['vol', 'pn'].map(k => sliderHTML(e, slOf(k))).join('');
   const vars = (VAR_NAMES[base] || []).slice(); if (E[base].buf && !vars.includes('file')) vars.push('file');
   if (vars.length) T.sound += '<div class="grp"><b>sound</b><span class="gv"><span data-act="pick" data-id="' + e.id + '">all samples ›</span></span></div><div class="laps vars">' + vars.map(v => '<span data-act="var" data-id="' + e.id + '" data-v="' + v + '" class="' + (E[base].variant === v ? 'on' : '') + '">' + esc(v === 'file' ? (E[base].fileName || 'file') : v) + '</span>').join('') + '</div>';
-  T.sound += sliderHTML(e, slOf('size')) + hint('bigger is lower · or shift + wheel over the planet');
+  T.sound += sliderHTML(e, slOf('size')) + hint('bigger is lower · or shift + wheel over the planet') + hint('click a tick on the ring to set that hit’s chance');
   T.fx += ['echo', 'verb', 'cut'].map(k => sliderHTML(e, slOf(k))).join('') + orbFxHTML(i, e.id, 'w') + roomHTML('wroom');
   T.pattern += '<div class="grp"><b>lap</b><span class="gv">' + (membersOf(o).length > 1 ? 'whole group' : 'distance from the sun') + '</span></div>' + lapChips(i) + hint('3, 5 or 7 beat laps drift against the bar and line up again later');
   T.pattern += X2.trail + X2.build + X2.export + X2.chop;
@@ -6611,7 +7937,7 @@ async function loadShared() { // opening a share link: write the state, drop the
   const m = location.hash.match(/^#s=([zj])([A-Za-z0-9_-]+)$/); if (!m) return false;
   try { const u = ub64(m[2]), js = m[1] === 'z' ? new TextDecoder().decode(await zipStr(u, true)) : new TextDecoder().decode(u); const s = JSON.parse(js); if (!s || !s.els) throw 0;
     const mine = localStorage.getItem(LS), mineSc = localStorage.getItem('orbs-solar-scenes'); let backed = false; // the receiver's own system is backed up, not lost
-    if (mine && mine !== JSON.stringify(s)) { localStorage.setItem(LS + '-backup', mine); if (mineSc) localStorage.setItem('orbs-solar-scenes-backup', mineSc); else localStorage.removeItem('orbs-solar-scenes-backup'); backed = true; }
+    if (mine && mine !== JSON.stringify(s) && !localStorage.getItem(LS + '-backup')) { /* keep the first backup (the user's own system) until it is restored (qa cd #3) */ localStorage.setItem(LS + '-backup', mine); if (mineSc) localStorage.setItem('orbs-solar-scenes-backup', mineSc); else localStorage.removeItem('orbs-solar-scenes-backup'); backed = true; }
     const sc = s.scenes; delete s.scenes; if (sc && sc.slots && typeof sc.slots === 'object') localStorage.setItem('orbs-solar-scenes', JSON.stringify({ slots: sc.slots, bars: [0, 1, 2, 4, 8].includes(sc.bars) ? sc.bars : 4 })); else localStorage.removeItem('orbs-solar-scenes');
     localStorage.setItem(LS, JSON.stringify(s)); sessionStorage.setItem('orbs-shared', backed ? '2' : '1'); location.replace(location.href.split('#')[0]); return true;
   } catch (x) { recMsg('that share link could not be read'); history.replaceState(null, '', location.href.split('#')[0]); return false; }
@@ -6647,7 +7973,8 @@ function renderMore() { // overlays v2: a grouped list (play · scenes · share 
     + '<div class="mi" style="cursor:default"><b>length</b>' + gr + [4, 8, 16].map(b => ch('xbars', b, XS.xbars === b, b + '')).join('') + lb('bars') + '</div>'
     + '<div class="mi" style="cursor:default"><b>export</b>' + gr + ch('xmid', 1, false, 'midi') + ch('xwav', 'mix', false, 'wav mix') + ch('xwav', 'stems', false, 'wav stems') + '</div>'
     + '<div class="mn">share copies a link with the system and its scenes (recordings stay here) · midi is one track per planet · stems = one wav per planet + the mix</div>';
-  h += '<div class="lab">view</div>' + [['binaural', 'binaural', '3d sound on headphones'], ['eclipse', 'eclipses', 'a planet behind another dips and darkens'], ['gravity', 'gravity', 'slow drag toward the sun while playing = a build'], ['mood', 'mood light', 'the dark tints with genre and energy']]
+  h += '<div class="lab">view</div>' + '<div class="mi" style="cursor:default"><b>skin</b>' + gr + SKIN_IDS.map(k => ch('skin', k, SKIN === k, k)).join('') + '</div>'
+    + '<div class="mi" data-m="clean"><b>clean view</b>' + gr + lb('h') + tog(CLEAN) + '</div>' + '<div class="mi" data-m="full"><b>full screen</b>' + gr + lb('f') + tog(!!document.fullscreenElement) + '</div>' + [['binaural', 'binaural', '3d sound on headphones'], ['eclipse', 'eclipses', 'a planet behind another dips and darkens'], ['gravity', 'gravity', 'slow drag toward the sun while playing = a build'], ['mood', 'mood light', 'the dark tints with genre and energy']]
     .map(([k, l, n]) => '<div class="mi' + (XS[k] ? ' on' : '') + '" data-m="xs" data-k="' + k + '" title="' + n + '"><b>' + l + '</b>' + gr + tog(XS[k]) + '</div>').join('')
     + '<div class="mn">binaural: 3d sound on headphones · eclipses: a planet passing behind another dips · gravity: slow drag inward while playing = a build · mood light: the dark tints with the genre and energy</div>';
   mmenu.innerHTML = h;
@@ -6665,6 +7992,7 @@ mmenu.addEventListener('click', ev => { ev.stopPropagation(); const k = ev.targe
     else if (k.dataset.mk === 'sstore') storeScene(v);
     else if (k.dataset.mk === 'mundo') undoMutate();
     else if (k.dataset.mk === 'xbars') setXS('xbars', +v);
+    else if (k.dataset.mk === 'skin') setSkin(v);
     else if (k.dataset.mk === 'xmid') exportMidi();
     else if (k.dataset.mk === 'xwav') exportWav(v);
     return; }
@@ -6675,8 +8003,10 @@ mmenu.addEventListener('click', ev => { ev.stopPropagation(); const k = ev.targe
   else if (m.dataset.m === 'jam') setJam(!JAM);
   else if (m.dataset.m === 'xs') setXS(m.dataset.k, !XS[m.dataset.k]);
   else if (m.dataset.m === 'restore') restoreBackup();
+  else if (m.dataset.m === 'clean') setClean(true);
+  else if (m.dataset.m === 'full') { toggleFull(); setTimeout(renderMore, 300); }
   else if (m.dataset.m === 'share') { moreOpen(false); shareLink(); } });
-addEventListener('pointerdown', ev => { if (!ev.target.closest('#mmenu,#more') && mmenu.classList.contains('open')) moreOpen(false); });
+addEventListener('pointerdown', ev => { if (!ev.target.closest('#mmenu,#more') && mmenu.classList.contains('open')) { moreOpen(false); if (ev.target === cv) { ev.stopPropagation(); ev.preventDefault(); } } }, true); // the first click outside only closes (qa cd)
 
 /* ---------------- snapshots: shared by scenes and mutate ---------------- */
 const SNAP_KEYS = ['rad', 'a', 'vol', 'pn', 'cut', 'verb', 'echo', 'muted', 'inHole', 'moons', 'prob', 'drift'];
@@ -6823,7 +8153,7 @@ const exportable = e => e && !e.muted && !e.inHole;
 
 /* ---- export: .mid (all planets or one) ---- */
 function midiFor(ids, beats) {
-  const planets = ids.map(id => { const e = E[id]; return { id, name: e.label || id, channel: e.ch, hits: hitsIn(e, 0, beats).map(h => ({ beat: h.p, vel: clamp(h.ev.v * e.vol, 0.01, 1), note: h.ev.n, dur: Math.max(0.05, h.ev.dur * bpm / 60) })) }; });
+  const planets = ids.map(id => { const e = E[id]; return { id, name: e.label || id, channel: e.ch, cycle: beats, lap: beats, hits: hitsIn(e, 0, beats).map(h => ({ beat: h.p, vel: clamp(h.ev.v * e.vol, 0.01, 1), note: h.ev.n, dur: Math.max(0.05, h.ev.dur * bpm / 60) })) }; });
   return X.toMidi(planets, { bpm, loopBeats: beats, names: { conductor: 'orbs ' + bpm + ' bpm' } });
 }
 function exportMidi(id) {
@@ -6887,18 +8217,20 @@ function drawEclipses() {
 }
 
 /* ---- gravity: drag a planet slowly toward the sun (while playing) and its group's lap speeds up gradually, like a build ---- */
-const GRAV = {};
+const GRAV = {}, GRAV_DONE = {}; // GRAV_DONE: finished builds that can still be released back out
 function gravGesture(d, t, i) { // slow (> 1.2 s) drag inward, while playing, gravity on, same group: ease the lap in over 2 bars per band
-  const o = ORB[i]; if (!XS.gravity || !playing || !o || o.poly || POLY.includes(t.lap) || (t.breaks && t.breaks.length) || !d.t0 || performance.now() - d.t0 < 1200 || !(t.lap < o.lap)) return false;
+  const o = ORB[i]; if (!XS.gravity || !playing || !o || o.poly || POLY.includes(t.lap) || (t.breaks && t.breaks.length) || !d.t0 || performance.now() - d.t0 < 1200 || t.lap === o.lap) return false;
+  if (t.lap > o.lap) { if (GRAV[o.id] || GRAV_DONE[o.id]) return !!releaseGravity(o.id); const bands = Math.max(1, Math.round(Math.log2(t.lap / o.lap))); return !!startGravity(i, OrbsFX.snapLap(t.lap / 4) * 4, Math.min(16, 2 * bands)); } // slow drag outward: the release
   const bands = Math.max(1, Math.round(Math.log2(o.lap / t.lap))); return !!startGravity(i, OrbsFX.snapLap(t.lap / 4) * 4, Math.min(16, 2 * bands));
 }
 function startGravity(i, toLap, bars) {
   const o = ORB[i]; if (!o || !X.gravity || toLap === o.lap) return null; const gr = X.gravity({ id: o.id }, { fromLap: o.lap, toLap, bars, laps: BANDS });
   gr.start(posNow() / 4); GRAV[o.id] = gr; recMsg('build: ' + lapTxt(o.lap) + ' → ' + lapTxt(toLap) + ' over ' + bars + ' bars'); sheetDirty = true; return gr;
 }
+function releaseGravity(gid) { const gr = GRAV[gid] || GRAV_DONE[gid]; if (!gr) return null; gr._rev = true; gr.reverse(posNow() / 4); GRAV[gid] = gr; delete GRAV_DONE[gid]; recMsg('release: back to ' + lapTxt(gr.fromLap)); sheetDirty = true; return gr; }
 function gravTick() {
-  for (const gid in GRAV) { const gr = GRAV[gid], i = orbIdx(gid); if (i < 0) { delete GRAV[gid]; continue; } if (!playing) { setGroupLap(i, gr.toLap); delete GRAV[gid]; continue; }
-    const L = gr.lapAt(posNow() / 4); if (L !== ORB[i].lap) setGroupLap(i, L); if (!gr.running) delete GRAV[gid]; }
+  for (const gid in GRAV) { const gr = GRAV[gid], i = orbIdx(gid); if (i < 0) { delete GRAV[gid]; continue; } if (!playing) { setGroupLap(i, gr._rev ? gr.fromLap : gr.toLap); if (!gr._rev) GRAV_DONE[gid] = gr; delete GRAV[gid]; continue; }
+    const L = gr.lapAt(posNow() / 4); if (L !== ORB[i].lap) setGroupLap(i, L); if (!gr.running) { if (!gr._rev) GRAV_DONE[gid] = gr; delete GRAV[gid]; sheetDirty = true; } }
 }
 
 /* ---- size as pitch: shift + wheel over a planet; bigger = lower ---- */
@@ -6998,9 +8330,10 @@ function pracTick() {
 function endPractice(abort) {
   const r = prac; prac = null; if (!r) return null; const e = E[r.id]; if (e) e._ghost = false; if (abort) { if (winId) renderWin(); return null; }
   const sc = X.score(r.targets, r.taps, { bpm, startTime: r.t0, toleranceMs: 70 }); r.result = sc; lastPractice = Object.assign({ id: r.id, targets: r.targets, taps: r.taps.map(t => (t - r.t0) * bpm / 60) }, sc);
-  const off = isFinite(sc.meanOffsetMs) ? ' · ' + (Math.abs(sc.meanOffsetMs) < 4 ? 'on time' : Math.round(Math.abs(sc.meanOffsetMs)) + ' ms ' + (sc.meanOffsetMs > 0 ? 'late' : 'early')) : '';
-  const hitN = Array.isArray(sc.hits) ? sc.hits.length : sc.hits;
-  if (winId === r.id) wNote.textContent = 'score ' + Math.round(sc.score) + ' · ' + hitN + ' / ' + r.targets.length + ' hits' + off + (sc.extras ? ' · ' + sc.extras + ' extra' : '');
+  const off = isFinite(sc.meanOffsetMs) && (Array.isArray(sc.hits) ? sc.hits.some(h => h.hit) : sc.hits > 0) ? ' · ' + (Math.abs(sc.meanOffsetMs) < 4 ? 'on time' : Math.round(Math.abs(sc.meanOffsetMs)) + ' ms ' + (sc.meanOffsetMs > 0 ? 'late' : 'early')) : '';
+  const hitN = Array.isArray(sc.hits) ? sc.hits.filter(h => h.hit).length : sc.hits;
+  const txt = 'score ' + Math.round(sc.score) + ' · ' + hitN + ' / ' + r.targets.length + ' hits' + off + (sc.extras ? ' · ' + sc.extras + ' extra' : ''); lastPractice.text = txt;
+  if (winId === r.id) wNote.textContent = txt;
   if (winId) renderWin(); return sc;
 }
 let lastPractice = null;
@@ -7011,7 +8344,7 @@ function winExtrasHTML(e) { // window parts for the pattern tab (overlays v2)
   out.trail = '<div class="grp"><b>trail</b><span class="gv">a curve over its lap</span></div><div class="laps">' + ['off', 'cut', 'vol'].map(v => '<span data-act="trail" data-id="' + e.id + '" data-v="' + v + '" class="' + (k === v ? 'on' : '') + '">' + (v === 'cut' ? 'filter' : v === 'vol' ? 'volume' : 'off') + '</span>').join('') + '</div>'
     + (e.trail ? '<canvas id="wTrail" style="width:100%;height:58px;display:block;margin:4px 0 4px;cursor:crosshair;touch-action:none"></canvas>' + hint('click adds a point · drag moves · double-click removes · shift-drag bends') : '');
   const gr = o && GRAV[o.id], tl = o ? BANDS.filter(L => L < o.lap) : [];
-  out.build = '<div class="grp"><b>build</b><span class="gv">' + (gr ? 'pulling in · ' + lapTxt(Math.round(gr.lap)) : 'gravity: the lap speeds up over bars') + '</span></div><div class="laps">' + (gr ? '<span data-act="gstop" data-i="' + i + '">stop</span>' : tl.length ? [4, 8].map(b => '<span data-act="build" data-i="' + i + '" data-b="' + b + '">to ' + lapTxt(tl[0]) + ' · ' + b + ' bars</span>').join('') : '<span class="off">already fastest</span>') + '</div>';
+  out.build = '<div class="grp"><b>build</b><span class="gv">' + (gr ? (gr._rev ? 'releasing · ' : 'pulling in · ') + lapTxt(Math.round(gr.lap)) : 'gravity: the lap speeds up over bars') + '</span></div><div class="laps">' + (gr ? '<span data-act="grev" data-i="' + i + '">release</span><span data-act="gstop" data-i="' + i + '">stop</span>' : o && GRAV_DONE[o.id] && GRAV_DONE[o.id].toLap === o.lap ? '<span data-act="grev" data-i="' + i + '">release → ' + lapTxt(GRAV_DONE[o.id].fromLap) + '</span>' : tl.length ? [4, 8].map(b => '<span data-act="build" data-i="' + i + '" data-b="' + b + '">to ' + lapTxt(tl[0]) + ' · ' + b + ' bars</span>').join('') : '<span class="off">already fastest</span>') + '</div>';
   out.export = '<div class="grp"><b>export</b><span class="gv">its pattern</span></div><div class="laps"><span data-act="xmid" data-id="' + e.id + '">midi clip</span><span data-act="xstem" data-id="' + e.id + '">stem wav</span><span data-act="bar" data-id="' + e.id + '">wave ›</span></div>';
   out.chop = '<div class="grp"><b>chop</b><span class="gv">' + (e.side === 'rec' || e.variant === 'file' ? (e.chops ? e.chops.length + ' slices' : 'cut the recording at its transients') : 'recordings only') + '</span></div><div class="laps"><span data-act="chop" data-id="' + e.id + '" class="' + (e.buf && (e.side === 'rec' || e.variant === 'file') ? '' : 'off') + '">chop into hits</span></div>';
   return out;
@@ -7020,6 +8353,7 @@ function extrasAct(act, t, id) {
   const e = E[id];
   if (act === 'trail') { setTrailKind(e, t.dataset.v); return true; }
   if (act === 'build') { const o = ORB[+t.dataset.i], tl = BANDS.filter(L => L < o.lap); if (!playing) play(); startGravity(+t.dataset.i, tl[0], +t.dataset.b); return true; }
+  if (act === 'grev') { const o = ORB[+t.dataset.i]; if (o) releaseGravity(o.id); return true; }
   if (act === 'gstop') { const o = ORB[+t.dataset.i]; if (o) delete GRAV[o.id]; sheetDirty = true; return true; }
   if (act === 'xmid') { exportMidi(id); return true; }
   if (act === 'xstem') { exportWav('stem', id); return true; }
@@ -7040,19 +8374,205 @@ function applySheet(noResize) {
 }
 function sheetCollapse(v) { v = !!v; if (SHEET.col === v) return; SHEET.col = v; applySheet(); }
 sCol.addEventListener('click', ev => { ev.stopPropagation(); sheetCollapse(!SHEET.col); });
-document.getElementById('sHead').addEventListener('click', ev => { if (SHEET.col && !ev.target.closest('#sCol')) sheetCollapse(false); });
+sheet.addEventListener('click', ev => { if (SHEET.col && !ev.target.closest('#sCol') && !ev.target.closest('#sResize')) sheetCollapse(false); }); // the whole collapsed strip reopens (qa cd #4)
 let sDrag = null;
 sResize.addEventListener('pointerdown', ev => { ev.preventDefault(); ev.stopPropagation(); if (SHEET.col) return; sDrag = { x: ev.clientX, w: SHEET.w }; sResize.setPointerCapture(ev.pointerId); });
 sResize.addEventListener('pointermove', ev => { if (!sDrag) return; SHEET.w = sDrag.w + (sDrag.x - ev.clientX); applySheet(); });
 const sDragEnd = () => { sDrag = null; }; sResize.addEventListener('pointerup', sDragEnd); sResize.addEventListener('pointercancel', sDragEnd);
 addEventListener('keydown', ev => { // esc: closes the more panel, else (nothing else open) collapses / opens the sheet
-  if (ev.key !== 'Escape' || typingIn(ev.target)) return;
+  if (ev.key !== 'Escape' || typingIn(ev.target) || document.body.classList.contains('clean')) return;
+  if (pad9Open()) { setTimeout(pad9Tick, 0); return; }
   if (mmenu.classList.contains('open')) { moreOpen(false); ev.stopImmediatePropagation(); return; }
   if (winId || pickId || barId || gmenu.classList.contains('open')) return;
   sheetCollapse(!SHEET.col);
 }, true);
 addEventListener('resize', () => applySheet(true));
 applySheet(true);
+
+/* ================= batch E: skins (simple / solar / galaxy, after vmorphs' mockups/skins.html) + clean view ================= */
+const SKIN_IDS = ['simple', 'solar', 'galaxy'];
+let SKIN = 'solar'; try { const v = localStorage.getItem('orbs-solar-skin'); if (SKIN_IDS.includes(v)) SKIN = v; } catch (x) {}
+const SKC = { spheres: new Map(), glows: new Map(), field: null, dpr: 0,
+  check() { if (this.dpr !== DPR) { this.spheres.clear(); this.glows.clear(); this.field = null; this.dpr = DPR; } if (this.spheres.size > 160) this.spheres.clear(); if (this.glows.size > 160) this.glows.clear(); },
+  invalidate() { this.spheres.clear(); this.glows.clear(); this.field = null; },
+  sphere(rCss) { const r = Math.max(2, Math.ceil(rCss * DPR)), k = r; let s = this.spheres.get(k); if (s) return s;
+    const S = r + Math.ceil(2 * DPR), c = document.createElement('canvas'); c.width = c.height = S * 2; const x = c.getContext('2d');
+    const grd = x.createRadialGradient(S - r * 0.38, S - r * 0.42, r * 0.08, S + r * 0.1, S + r * 0.12, r);
+    grd.addColorStop(0, 'rgba(255,255,255,1)'); grd.addColorStop(0.22, 'rgba(235,235,235,1)'); grd.addColorStop(0.62, 'rgba(110,110,110,1)'); grd.addColorStop(1, 'rgba(28,28,28,1)');
+    x.fillStyle = grd; x.beginPath(); x.arc(S, S, r, 0, TAU); x.fill(); x.strokeStyle = 'rgba(0,0,0,0.35)'; x.lineWidth = Math.max(0.6, DPR * 0.4); x.beginPath(); x.arc(S, S, r - 0.3, 0, TAU); x.stroke();
+    s = { c, css: c.width / DPR }; this.spheres.set(k, s); return s; },
+  glow(rCss, a, col) { const r = Math.max(2, Math.ceil(Math.pow(1.06, Math.ceil(Math.log(Math.max(1, rCss * DPR)) / Math.log(1.06))))), k = r + ':' + a + ':' + (col || 'w'); let s = this.glows.get(k); if (s) return s;
+    const c = document.createElement('canvas'); c.width = c.height = r * 2; const x = c.getContext('2d'), cl = col || [255, 255, 255], rgba = v => 'rgba(' + cl[0] + ',' + cl[1] + ',' + cl[2] + ',' + v + ')';
+    const grd = x.createRadialGradient(r, r, 0, r, r, r); grd.addColorStop(0, rgba(a)); grd.addColorStop(0.35, rgba(a * 0.28)); grd.addColorStop(1, rgba(0));
+    x.fillStyle = grd; x.beginPath(); x.arc(r, r, r, 0, TAU); x.fill(); s = { c, css: c.width / DPR }; this.glows.set(k, s); return s; } };
+const blit = (s, x, y) => g.drawImage(s.c, x - s.css / 2, y - s.css / 2, s.css, s.css);
+const srng = seed => { let s = seed | 0; return () => { s = (s * 1664525 + 1013904223) | 0; return (s >>> 0) / 4294967296; }; };
+const TWINKLE_MAX = 120;
+// galaxy starfield: built once in world space (the unzoomed layout: CX0, CY0, RMAX0, K) and drawn under the zoom / pan transform
+function buildField() { const t0 = performance.now();
+  const R = RMAX0, E = Math.ceil(R * 2.3), q = VIEW.z > 1.4 ? 2 : 1, sc = Math.min(DPR * q, 2600 / (2 * E)); // soft dust: capped at 2600 px square (~27 MB) so dpr 2 stays light
+  const c = document.createElement('canvas'); c.width = c.height = Math.ceil(2 * E * sc); const x = c.getContext('2d'); x.setTransform(sc, 0, 0, sc, 0, 0);
+  const cx = E, cy = E, Kg = K, rand = srng(0x5a11);
+  const haze = x.createRadialGradient(cx, cy, 0, cx, cy, R * 2.2); haze.addColorStop(0, 'rgba(170,190,220,0.07)'); haze.addColorStop(0.35, 'rgba(140,160,200,0.03)'); haze.addColorStop(1, 'rgba(0,0,0,0)');
+  x.fillStyle = haze; x.beginPath(); x.arc(cx, cy, R * 2.2, 0, TAU); x.fill();
+  const arm = (u, a, sp) => { const th = a * Math.PI + u * 1.15 * TAU, rad = 6 + Math.pow(u, 0.82) * R * 1.38, spr = sp * (5 + u * 42), c1 = Math.cos(th), s1 = Math.sin(th); return { x: cx + s1 * rad + c1 * spr, y: cy - c1 * rad * Kg + s1 * spr * Kg }; };
+  const puff = (px, py, s, a) => { const gr = x.createRadialGradient(px, py, 0, px, py, s); gr.addColorStop(0, 'rgba(172,192,228,' + a + ')'); gr.addColorStop(1, 'rgba(172,192,228,0)'); x.fillStyle = gr; x.beginPath(); x.arc(px, py, s, 0, TAU); x.fill(); };
+  for (let i = 0; i < 90; i++) { const th = rand() * TAU, rad = Math.pow(rand(), 0.65) * R * 0.38; puff(cx + Math.sin(th) * rad, cy - Math.cos(th) * rad * Kg, 6 + rand() * 16, 0.02 + rand() * 0.03); }
+  for (let i = 0; i < 340; i++) { const u = Math.pow(rand(), 0.7), p = arm(u, i % 2, rand() - 0.5); puff(p.x, p.y, (4 + rand() * 16) * (0.6 + u * 0.8), 0.016 + rand() * 0.032); }
+  const tw = [];
+  for (let i = 0; i < 780; i++) { const u = Math.pow(rand(), 0.6), p = arm(u, i % 2, (rand() - 0.5) * (0.35 + u * 0.4)), field = rand() < 0.12;
+    const px = field ? cx + (rand() - 0.5) * R * 2.2 : p.x, py = field ? cy + (rand() - 0.5) * R * 1.8 : p.y, br = field ? rand() * 0.35 : Math.pow(rand(), 2.15), rr = 0.28 + br * 1.2;
+    const layer = !field && rand() < 0.32, ph = rand() * TAU, spd = 0.6 + rand() * 1.8;
+    if (layer && br >= 0.2 && tw.length < TWINKLE_MAX) tw.push({ dx: px - cx, dy: py - cy, r: rr, br, ph, spd });
+    else { x.globalAlpha = 0.16 + br * 0.7; x.fillStyle = br > 0.75 ? '#fff' : 'rgb(210,220,235)'; x.beginPath(); x.arc(px, py, rr, 0, TAU); x.fill(); } }
+  SKC.field = { c, E, key: fieldKey(), tw, ms: +(performance.now() - t0).toFixed(1) };
+}
+const fieldKey = () => [W, H, DPR, Math.round(CX0), Math.round(CY0), Math.round(RMAX0), K.toFixed(3), VIEW.z > 1.4 ? 2 : 1].join(',');
+let fieldBuilds = 0;
+const SKINS = {
+  simple: { orbitA: 0.085, orbitC: '#fff',
+    trigger(yTop, hair, fl) { g.lineWidth = hair; g.globalAlpha = 0.16 + 0.1 * fl; g.beginPath(); g.moveTo(CX, CY - SUNR - 3); g.lineTo(CX, yTop); g.stroke(); g.globalAlpha = 0.22 + 0.15 * fl; g.beginPath(); g.moveTo(CX - 3.5, yTop); g.lineTo(CX + 3.5, yTop); g.stroke(); },
+    link(A, B, br) { g.globalAlpha = 0.28 * (br ? 1.8 : 1); g.lineWidth = 0.7; g.beginPath(); g.moveTo(A.x, A.y); g.lineTo(B.x, B.y); g.stroke(); },
+    sun(sr, kp) { g.globalAlpha = 0.95; g.beginPath(); g.arc(CX, CY, sr * 0.55, 0, TAU); g.fill(); g.globalAlpha = 0.18 + 0.3 * kp; g.lineWidth = 0.7; g.beginPath(); g.arc(CX, CY, sr + 2, 0, TAU); g.stroke(); },
+    planet(e, r) { g.globalAlpha = 0.9; g.lineWidth = 1; g.beginPath(); g.arc(e.x, e.y, r, 0, TAU); g.stroke(); g.globalAlpha = 0.8; g.beginPath(); g.arc(e.x, e.y, r * 0.42, 0, TAU); g.fill(); },
+    moon(e, rr, x, y, fl, hair) { g.globalAlpha = 0.1; g.lineWidth = hair; g.beginPath(); g.arc(e.x, e.y, rr, 0, TAU); g.stroke(); g.globalAlpha = 0.7 + 0.3 * fl; g.beginPath(); g.arc(x, y, 1.6 + 0.9 * fl, 0, TAU); g.fill(); } },
+  solar: { orbitA: 0.075, orbitC: '#fff',
+    trigger(yTop, hair, fl) { g.lineWidth = hair; g.globalAlpha = 0.15 + 0.1 * fl; g.beginPath(); g.moveTo(CX, CY - SUNR - 7); g.lineTo(CX, yTop); g.stroke(); g.globalAlpha = 0.22 + 0.15 * fl; g.beginPath(); g.moveTo(CX - 3.5, yTop); g.lineTo(CX + 3.5, yTop); g.stroke(); },
+    link(A, B, br, T, seed) { const dx = B.x - A.x, dy = B.y - A.y, len = Math.hypot(dx, dy) || 1, nx = -dy / len, ny = dx / len;
+      for (let j = 0; j < 3; j++) { const w = Math.sin(T * (0.55 + j * 0.23) + seed * 1.7 + j * 2.1) * (1.6 + j * 1.4), w2 = Math.sin(T * (0.4 + j * 0.29) + seed + j) * (1.2 + j);
+        g.globalAlpha = (j ? 0.05 : 0.22) * (br ? 1.9 : 1); g.lineWidth = j ? 1.2 + j * 0.5 : 0.7; g.beginPath(); g.moveTo(A.x, A.y); g.bezierCurveTo(A.x + dx * 0.33 + nx * w, A.y + dy * 0.33 + ny * w, A.x + dx * 0.66 + nx * w2, A.y + dy * 0.66 + ny * w2, B.x, B.y); g.stroke(); } },
+    sun(sr, kp) { g.globalAlpha = 0.75 + 0.25 * kp; blit(SKC.glow(sr * 7.5, 0.34), CX, CY); g.globalAlpha = 1; g.beginPath(); g.arc(CX, CY, sr, 0, TAU); g.fill();
+      g.lineWidth = 0.7; g.globalAlpha = 0.38; g.beginPath(); g.arc(CX, CY, sr + 4.5, 0, TAU); g.stroke(); g.globalAlpha = 0.14; g.beginPath(); g.arc(CX, CY, sr + 9, 0, TAU); g.stroke(); },
+    planet(e, r) { g.globalAlpha = 1; blit(SKC.sphere(r), e.x, e.y); },
+    moon(e, rr, x, y, fl, hair) { g.globalAlpha = 0.08; g.lineWidth = hair; g.beginPath(); g.arc(e.x, e.y, rr, 0, TAU); g.stroke(); g.globalAlpha = 1; blit(SKC.sphere(1.85 * (1 + 0.6 * fl)), x, y); } },
+  galaxy: { orbitA: 0.035, orbitC: 'rgb(200,214,235)',
+    trigger(yTop, hair, fl) { const gr = g.createLinearGradient(CX, CY, CX, yTop); gr.addColorStop(0, 'rgba(210,225,255,0.05)'); gr.addColorStop(1, 'rgba(210,225,255,' + (0.22 + 0.2 * fl) + ')');
+      g.strokeStyle = gr; g.lineWidth = 1; g.globalAlpha = 1; g.beginPath(); g.moveTo(CX, CY - SUNR - 9); g.lineTo(CX, yTop); g.stroke(); g.strokeStyle = '#fff'; g.globalAlpha = 0.28 + 0.15 * fl; g.lineWidth = hair; g.beginPath(); g.moveTo(CX - 3.5, yTop); g.lineTo(CX + 3.5, yTop); g.stroke(); },
+    link(A, B, br, T, seed) { const dx = B.x - A.x, dy = B.y - A.y, w = Math.sin(T * 0.5 + seed) * 6, n = Math.hypot(dx, dy) || 1, nx = -dy / n, ny = dx / n;
+      const c1x = A.x + dx * 0.33 + nx * w, c1y = A.y + dy * 0.33 + ny * w, c2x = A.x + dx * 0.66 - nx * w * 0.6, c2y = A.y + dy * 0.66 - ny * w * 0.6;
+      g.globalCompositeOperation = 'lighter'; g.globalAlpha = 0.07 * (br ? 1.6 : 1); g.strokeStyle = 'rgb(170,200,240)'; g.lineWidth = 6; g.beginPath(); g.moveTo(A.x, A.y); g.bezierCurveTo(c1x, c1y, c2x, c2y, B.x, B.y); g.stroke();
+      g.globalAlpha = 0.34 * (br ? 1.6 : 1); g.strokeStyle = 'rgb(230,238,255)'; g.lineWidth = 0.8; g.beginPath(); g.moveTo(A.x, A.y); g.bezierCurveTo(c1x, c1y, c2x, c2y, B.x, B.y); g.stroke();
+      g.globalCompositeOperation = 'source-over'; g.strokeStyle = '#fff'; },
+    sun(sr, kp) { g.globalCompositeOperation = 'lighter'; g.globalAlpha = 0.7 + 0.3 * kp; blit(SKC.glow(RMAX * 0.42, 0.55, [210, 225, 255]), CX, CY); g.globalAlpha = 1; blit(SKC.glow(18 * DS, 1), CX, CY);
+      g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1; g.beginPath(); g.arc(CX, CY, sr * 0.75, 0, TAU); g.fill(); },
+    planet(e, r) { g.globalCompositeOperation = 'lighter'; g.globalAlpha = 0.85; blit(SKC.glow(3.4 * r, 0.9, [220, 230, 255]), e.x, e.y); g.globalAlpha = 1; g.beginPath(); g.arc(e.x, e.y, Math.max(1.15, r * 0.32), 0, TAU); g.fill(); g.globalCompositeOperation = 'source-over'; },
+    moon(e, rr, x, y, fl, hair) { g.globalAlpha = 0.07; g.lineWidth = hair; g.strokeStyle = 'rgba(200,214,235,0.9)'; g.beginPath(); g.arc(e.x, e.y, rr, 0, TAU); g.stroke(); g.strokeStyle = '#fff';
+      g.globalCompositeOperation = 'lighter'; g.globalAlpha = 0.8; blit(SKC.glow(6.5 * (1 + 0.5 * fl), 0.85, [220, 230, 255]), x, y); g.globalAlpha = 1; g.beginPath(); g.arc(x, y, 1.05 + 0.6 * fl, 0, TAU); g.fill(); g.globalCompositeOperation = 'source-over'; } } };
+function skinBackground(skin, T) {
+  g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1;
+  if (skin !== 'galaxy') { g.fillStyle = MOODCSS; g.fillRect(0, 0, W, H); g.fillStyle = '#fff'; return; } // mood light tints the clear
+  g.fillStyle = '#000'; g.fillRect(0, 0, W, H);
+  if (!SKC.field || SKC.field.key !== fieldKey()) { buildField(); fieldBuilds++; }
+  const f = SKC.field, z = VIEW.z, s = 2 * f.E * z; g.drawImage(f.c, CX - f.E * z, CY - f.E * z, s, s); // world space: moves and scales with zoom / pan
+  const px = Math.sin(T * 0.05) * 1.6, py = Math.cos(T * 0.04) * 1.2; g.globalCompositeOperation = 'lighter';
+  for (const st of f.tw) { const tw = 0.55 + 0.45 * Math.sin(T * st.spd + st.ph); g.globalAlpha = (0.22 + st.br * 0.7) * tw; g.fillStyle = st.br > 0.7 ? '#fff' : 'rgb(200,214,235)'; g.beginPath(); g.arc(CX + (st.dx + px) * z, CY + (st.dy + py) * z, st.r * (0.85 + 0.25 * tw) * Math.sqrt(z), 0, TAU); g.fill(); }
+  if (XS.mood && MOODCSS !== '#000') { g.globalCompositeOperation = 'screen'; g.globalAlpha = 0.9; g.fillStyle = MOODCSS; g.fillRect(0, 0, W, H); } // mood light: a light grade over the field
+  g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1; g.fillStyle = '#fff';
+}
+function skinOrbits(skin, hair, skip) { // a faint ring for every distance a planet sits at
+  const S = SKINS[skin], seen = new Set(); g.lineWidth = hair; g.strokeStyle = S.orbitC; g.globalAlpha = S.orbitA;
+  for (const id of IDS) { const e = E[id]; if (e.inHole || e === skip) continue; const k = Math.round(e.rad * RMAX); if (seen.has(k)) continue; seen.add(k); g.beginPath(); g.ellipse(CX, CY, e.rad * RMAX, e.rad * RMAX * K, 0, 0, TAU); g.stroke(); }
+  g.strokeStyle = '#fff';
+}
+// drawScene(g, skin, st): background · orbits · [st.under: ghost rings, trigger / hands, tethers, black hole] · links · sun · [st.over: echoes, comets, ripples, trails, eclipses] · planets · [st.after: selection rings, labels]
+function drawScene(gx, skin, st) {
+  const S = SKINS[skin] || SKINS.solar; SKC.check();
+  skinBackground(skin, st.T); g.fillStyle = g.strokeStyle = '#fff'; g.lineCap = 'round';
+  skinOrbits(skin, st.hair, st.skip);
+  if (st.under) st.under(S);
+  for (const L of st.links) S.link(L.A, L.B, L.bright, st.T, L.seed);
+  if (st.mid) st.mid(S);
+  S.sun(st.sr, st.kick); g.globalAlpha = 1; g.globalCompositeOperation = 'source-over'; g.fillStyle = '#fff';
+  if (st.over) st.over(S);
+  for (const p of st.planets) { if (p.muted) { g.globalAlpha = 0.4; g.lineWidth = 0.9; g.strokeStyle = skin === 'galaxy' ? 'rgb(200,214,235)' : '#fff'; g.beginPath(); g.arc(p.e.x, p.e.y, p.r, 0, TAU); g.stroke(); g.strokeStyle = '#fff'; } else S.planet(p.e, p.r); }
+  g.globalAlpha = 1; g.globalCompositeOperation = 'source-over'; g.fillStyle = g.strokeStyle = '#fff';
+  if (st.after) st.after(S);
+}
+/* crossfade + skin name */
+let XFADE = null; const skinNameEl = document.getElementById('skinName');
+function setSkin(s, fade) {
+  if (!SKIN_IDS.includes(s)) s = 'solar'; if (s === SKIN && !fade) return;
+  if (fade !== false) { const c = document.createElement('canvas'); c.width = cv.width; c.height = cv.height; c.getContext('2d').drawImage(cv, 0, 0); XFADE = { c, t0: performance.now() }; }
+  SKIN = s; try { localStorage.setItem('orbs-solar-skin', s); } catch (x) {}
+  if (fade !== false) { skinNameEl.textContent = s; skinNameEl.classList.remove('show'); void skinNameEl.offsetWidth; skinNameEl.classList.add('show'); }
+  if (mmenu.classList.contains('open')) renderMore();
+}
+function drawXfade(now) { if (!XFADE) return; const a = 1 - (now - XFADE.t0) / 450; if (a <= 0) { XFADE = null; return; }
+  g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = 'source-over'; g.globalAlpha = a; g.drawImage(XFADE.c, 0, 0); g.globalAlpha = 1; g.setTransform(DPR, 0, 0, DPR, 0, 0); }
+const SKSTAT = []; // frame cost (ms) of the last 240 frames
+/* clean view: hide the whole interface; H / esc bring it back · F browser full screen · [ ] skins · L labels */
+let CLEAN = false, CLEAN_LABELS = true; const cleanHint = document.getElementById('cleanHint');
+function setClean(on) {
+  on = !!on; if (on === CLEAN) return; CLEAN = on;
+  if (on) { if (winId) closeWin(); if (pad9Open()) pad9Toggle(false); if (pickId) closePicker(); if (barId) closeBar(); moreOpen(false); gmenu.classList.remove('open'); }
+  document.body.classList.toggle('clean', on); resize(); sheetDirty = true;
+  if (on) { cleanHint.classList.add('show'); clearTimeout(setClean.t); setClean.t = setTimeout(() => cleanHint.classList.remove('show'), 1800); } else cleanHint.classList.remove('show');
+  if (mmenu.classList.contains('open')) renderMore();
+}
+function toggleFull() { try { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen().catch(() => {}); } catch (x) {} }
+document.getElementById('hideUi').addEventListener('click', ev => { ev.stopPropagation(); setClean(true); });
+cleanHint.addEventListener('click', ev => { ev.stopPropagation(); setClean(false); });
+addEventListener('keydown', ev => {
+  if (typingIn(ev.target) || ev.metaKey || ev.ctrlKey || ev.altKey) return;
+  if (ev.code === 'KeyH' && !winId) { ev.preventDefault(); setClean(!CLEAN); return; }
+  if (ev.code === 'KeyF' && !winId) { ev.preventDefault(); toggleFull(); return; }
+  if (!CLEAN) return;
+  if (ev.code === 'Escape') { ev.preventDefault(); ev.stopImmediatePropagation(); setClean(false); return; }
+  if (ev.key === '[' || ev.key === ']') { ev.preventDefault(); const i = SKIN_IDS.indexOf(SKIN); setSkin(SKIN_IDS[(i + (ev.key === ']' ? 1 : SKIN_IDS.length - 1)) % SKIN_IDS.length]); return; }
+  if (ev.code === 'KeyL') { ev.preventDefault(); CLEAN_LABELS = !CLEAN_LABELS; }
+}, true);
+addEventListener('pointermove', ev => { if (!CLEAN) return; if (ev.clientY < 28) { cleanHint.classList.add('show'); clearTimeout(setClean.t); setClean.t = setTimeout(() => cleanHint.classList.remove('show'), 1500); } }, { passive: true });
+addEventListener('resize', () => { SKC.field = null; });
+
+/* ================= batch E: 3x3 sample pad (vmorphs' fx/pad9.js) ================= */
+let PAD9 = null; const pad9Btn = document.getElementById('pad9Btn'), P9V = []; // P9V: planet voices started from pads (per-hit gain, so choke works)
+const pad9Open = () => !!(PAD9 && PAD9.isOpen());
+function pad9PadFor(id, g) { const ps = PAD9.state.pads.filter(p => p.src && p.src.type === 'planet' && p.src.planetId === id); if (ps.length < 2) return ps[0]; return ps.find(p => Math.abs(p.lastVel * (p.vol == null ? 1 : p.vol) - g) < 1e-6) || ps[0]; }
+function playPlanetSound(id, t, g, pitch) { // thin wrapper on playPlanet / midiNote: velocity + pitch (like pitchEv), into a per-hit gain
+  const e = E[id]; if (!e || !ac) return; ensureNodes(e); t = Math.max(t, ac.currentTime);
+  const ev = decorate(e, hitEvent(e, posAt(t), 0), 0); ev.v = clamp((ev.v || 1) * g, 0, 1.2); ev.roll = null;
+  if (pitch) { ev.n = Array.isArray(ev.n) ? ev.n.map(n => n + pitch) : ev.n + pitch; ev.tune = (ev.tune || 1) * Math.pow(2, pitch / 12); if (e.variant === 'file' || e.chops) ev.rate = ev.tune; }
+  const pad = pad9PadFor(id, g), ch = pad ? pad.choke | 0 : 0;
+  if (ch) for (const v of P9V) if (v.live && v.choke === ch && v.pad !== pad.id) { const p = v.gain.gain; p.cancelScheduledValues(t); p.setValueAtTime(p.value, t); p.linearRampToValueAtTime(0, t + 0.012); v.live = false; } // choke group: the other pads fade out
+  const vg = ac.createGain(); vg.gain.value = 1; vg.connect(e.in);
+  const dur = ev.dur || 0.3;
+  if (e.chops && ev.slice != null) playSlice(e, t, ev, vg); else { const fn = voiceFn(e, ev); if (fn) fn(t, ev, vg, dur); else playVoice(e.id, t, ev, vg, dur); }
+  const om = ORB[e.orbit] && ORB[e.orbit].st.muted; if (!om) midiNote(e, ev, t, dur);
+  P9V.push({ pad: pad ? pad.id : -1, choke: ch, gain: vg, live: true, t1: t + Math.max(dur, 0.5) + 2 });
+  const now = ac.currentTime; for (let i = P9V.length - 1; i >= 0; i--) if (P9V[i].t1 < now) { try { P9V[i].gain.disconnect(); } catch (x) {} P9V.splice(i, 1); }
+  e.pulse = Math.max(e.pulse, ev.v); ripples.push({ x: e.x, y: e.y, t0: performance.now(), r0: e.r, v: ev.v });
+}
+function pad9Commit(pl) { // {mode new|add, padId, source, pattern [{o (beats), v}], lapBeats, target}
+  if (!pl || !pl.pattern || !pl.pattern.length) return; const org = PAD9 ? PAD9._origin() : 0, src = pl.source || {};
+  let e = null, add = pl.mode === 'add';
+  if (add) { e = E[pl.target] || (src.type === 'planet' && E[src.planetId]) || null; if (!e) add = false; }
+  if (!add) {
+    if (src.type === 'planet' && E[src.planetId]) { e = copyPlanet(src.planetId); if (!e) return; links.delete(lkey(src.planetId, e.id)); }
+    else if (src.type === 'sample') { const pad = PAD9.state.pads[pl.padId], buf = pad && pad.src && pad.src.buffer; if (!buf) return;
+      do { recCount++; } while (E['rec' + recCount]); e = makeRec('rec' + recCount, (src.name || 'pad ' + (pl.padId + 1)).toLowerCase().slice(0, 14));
+      Object.assign(e, { buf, fileData: encodeWav(buf), fileName: e.label, variant: 'file', loop: false, bars: 1, recBpm: bpm, phase: 0, trimS: 0, trimE: 1, rev: false, recorded: true, _pbSrc: null });
+      idbPut({ id: e.id, name: e.fileName, data: e.fileData }); }
+    else return;
+    regroup(); const L = OrbsFX.snapLap(pl.lapBeats / 4) * 4; let i = e.orbit;
+    if (membersOf(ORB[i]).length > 1) { for (const p of partnersOf(e.id)) links.delete(lkey(e.id, p)); regroup(); i = e.orbit; }
+    setGroupLap(i, L, e); e.rad = clampRadLap(bandMid(bandOfLap(L)) + 0.02, L); e.a = 0; e.muted = false;
+  } else pushPat(e);
+  const L = lapOf(e), a = aEff(e), hits = pl.pattern.map(h => ({ o: +frac((org + h.o) / L + a).toFixed(6), v: +(+h.v).toFixed(3) }));
+  const pat = add ? (e.pat && e.pat.length ? e.pat.map(h => Object.assign({}, h)) : [{ o: 0, v: 1 }]) : [];
+  for (const h of hits) { const n = pat.find(x => Math.min(Math.abs(x.o - h.o), 1 - Math.abs(x.o - h.o)) < 1 / 256); if (n) n.v = Math.max(n.v, h.v); else pat.push(h); }
+  e.pat = pat.sort((x, y) => x.o - y.o); layout(); ripples.push({ x: e.x, y: e.y, t0: performance.now(), r0: 6, big: true });
+  select(e.id); sheetDirty = true; save(); recMsg((add ? 'added to ' : 'new planet ') + (e.label || e.id) + ' · ' + hits.length + (hits.length === 1 ? ' hit' : ' hits'));
+}
+function pad9Init() {
+  if (PAD9 || !window.OrbsPad9) return PAD9; initAudio();
+  PAD9 = OrbsPad9.create({ ctx: ac, dest: master, storageKey: 'orbs-solar-pad9', getBeat: t => posAt(t == null ? ac.currentTime : t), getBpm: () => bpm,
+    getPlanets: () => IDS.filter(id => !E[id].inHole).map(id => ({ id, label: E[id].label || id })), playPlanetSound, onCommit: pad9Commit,
+    onHit: () => {}, left: 24, top: Math.round(topEl.getBoundingClientRect().bottom) + 12 });
+  return PAD9;
+}
+function pad9Toggle(on) { const p = pad9Init(); if (!p) return; if (on == null) on = !p.isOpen(); if (on) { if (winId) closeWin(); p.open(); } else p.close(); pad9Tick(); }
+function pad9Tick() { pad9Btn.classList.toggle('on', pad9Open()); }
+pad9Btn.addEventListener('click', ev => { ev.stopPropagation(); pad9Toggle(); });
 
 
 /* ---------------- sample picker ---------------- */
@@ -7404,7 +8924,7 @@ window.SS = { E, get ORB() { return ORB; }, IDS, links, get TETH() { return TETH
   geom: () => ({ CX, CY, K, RMAX, SA }),
   get VIEW() { return VIEW; }, zoomAt, setView, zoomFit, zoom11, get COMET() { return COMET; }, setComet, comets, shareLink, shareState, chanceOk, MOON_OFF, POLY, renderMore, get spaceDown() { return spaceDown; },
   sysSnap, applyDiscrete, storeScene, gotoScene, get SCENES() { return SCENES; }, get MORPH() { return MORPH; }, set SCENE_BARS(v) { SCENE_BARS = v; }, mutate, undoMutate, MUT_UNDO, setJam, get JAM() { return JAM; }, jamHit, jamNudge, driftOff, swallow, get HOLE() { return HOLE; }, sunTap, get CHORD() { return CHORD; }, chordIdx, chordName, hitEvent,
-  get XS() { return XS; }, setXS, hitsIn, midiFor, exportMidi, exportWav, renderInto, get bin() { return bin; }, binauralOn, get ECL() { return ECL; }, GRAV, startGravity, sizeSemis, sizeWheel, get MOODCSS() { return MOODCSS; }, setTrailKind, trailOf, trailMix, chopPlanet, playSlice, startPractice, endPractice, pracTap, get prac() { return prac; }, get lastPractice() { return lastPractice; }, gravGesture, X, save, setWinTab, get WTAB() { return WTAB; }, setSec, secOpen, set UI_ALL(v) { UI_ALL = !!v; sheetDirty = true; if (winId) renderWin(); }, get SHEET() { return SHEET; }, sheetCollapse, applySheet, moreOpen, get SECS() { return SECS; } };
+  get XS() { return XS; }, setXS, hitsIn, midiFor, exportMidi, exportWav, renderInto, get bin() { return bin; }, binauralOn, get ECL() { return ECL; }, GRAV, startGravity, sizeSemis, sizeWheel, get MOODCSS() { return MOODCSS; }, setTrailKind, trailOf, trailMix, chopPlanet, playSlice, startPractice, endPractice, pracTap, get prac() { return prac; }, get lastPractice() { return lastPractice; }, gravGesture, X, save, setWinTab, get WTAB() { return WTAB; }, setSec, secOpen, set SEC_ALL(v) { SEC_ALL = !!v; sheetDirty = true; }, set UI_ALL(v) { UI_ALL = !!v; sheetDirty = true; if (winId) renderWin(); }, get SHEET() { return SHEET; }, sheetCollapse, applySheet, moreOpen, get SECS() { return SECS; }, get SKIN() { return SKIN; }, setSkin, SKIN_IDS, SKINS, drawScene, SKC, SKSTAT, get fieldBuilds() { return fieldBuilds; }, get CLEAN() { return CLEAN; }, setClean, get CLEAN_LABELS() { return CLEAN_LABELS; }, get XFADE() { return XFADE; }, get GRAV_DONE() { return GRAV_DONE; }, releaseGravity, linked, get lastShare() { return lastShare; }, get PAD9() { return PAD9; }, pad9Init, pad9Toggle, pad9Open, pad9Commit, playPlanetSound, P9V, posAt, timeAtPos, get recCount() { return recCount; } };
 })();
 </script>
 </body>
