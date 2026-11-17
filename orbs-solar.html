@@ -7360,7 +7360,7 @@ function frame(now) {
   // --- ripples ---
   for (let i = ripples.length - 1; i >= 0; i--) {
     const rp = ripples[i], life = rp.big ? 1400 : 1000, a = (now - rp.t0) / life;
-    if (a > 1) { ripples.splice(i, 1); continue; }
+    if (a > 1) { ripples.splice(i, 1); continue; } if (a < 0) continue; // scheduled ahead (lookahead): not yet
     const reach = rp.big ? 60 : 16 + 22 * (rp.v || 0.5), ease = 1 - Math.pow(1 - a, 2.2);
     g.lineWidth = 0.7;
     for (let j = 0; j < (rp.big ? 1 : 2); j++) { g.globalAlpha = (rp.big ? 0.4 : 0.5 * (rp.v || 0.5)) * (1 - a) * (1 - j * 0.4); g.beginPath(); g.arc(rp.x, rp.y, rp.r0 + 2 + reach * ease * (1 - j * 0.45), 0, TAU); g.stroke(); }

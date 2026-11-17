@@ -432,6 +432,24 @@ body.lvPhone #mmenu.lmenu{left:0!important;right:0!important;width:auto!importan
 body.lvPhone #mmenu.lmenu .mi{min-height:40px} body.lvPhone #mmenu.lmenu .ch{min-height:40px;min-width:40px;display:inline-flex;align-items:center;justify-content:center}
 body.lvPhone #gmenu{left:0!important;right:0!important;width:auto!important}
 body.lvPhone #gmenu [data-g]{min-height:40px;display:flex;align-items:center}
+/* ===== batch I (qa F) ===== */
+#lv .it.grp{padding:0 8px!important;min-height:0;font-size:inherit!important;align-items:center!important}
+#lv .cats{padding:4px 0 5px}
+#sysHd{height:24px}
+/* docked pad: everything incl. rec / undo / clear / commit fits the default detail height */
+#padc .orbs-pad9>.p9-sec:not(.p9-acts):not(:has(.p9-acts)){display:grid;grid-template-columns:1fr 1fr;gap:0 8px;padding:2px 8px 0}
+#padc .orbs-pad9>.p9-sec:not(.p9-acts):not(:has(.p9-acts)) .p9-row{grid-template-columns:auto 1fr 22px;gap:4px;min-height:18px}
+#padc .orbs-pad9>.p9-sec:not(.p9-acts):not(:has(.p9-acts)) .p9-chips{grid-column:1/-1;min-height:20px}
+#padc .orbs-pad9>.p9-sec.p9-acts{display:none}
+#padc .orbs-pad9>.p9-sec:has(.p9-acts){display:flex;flex-wrap:wrap;align-items:center;gap:0 10px;padding:2px 8px}
+#padc .orbs-pad9>.p9-sec:has(.p9-acts) .p9-acts{padding:0}
+#padc .orbs-pad9 .p9-status{padding:0 8px 2px;min-height:0;line-height:1.2}
+body.lvPhone #padc .orbs-pad9 .p9-head{min-height:28px}
+body.lvPhone #padc .orbs-pad9>.p9-sec:not(.p9-acts):not(:has(.p9-acts)) .p9-row{min-height:40px}
+body.lvPhone #padc .orbs-pad9>.p9-sec:not(.p9-acts):not(:has(.p9-acts)) .p9-chips{min-height:40px}
+@media (max-height:500px){body.lvPhone #padc .orbs-pad9 .p9-grid{grid-template-rows:repeat(3,40px)!important} body.lvPhone #padc .orbs-pad9 .p9-cell{height:40px!important}}
+#lv .dev[data-dev="duck"] .dc{gap:4px} #lv .dev[data-dev="duck"] select{max-width:42px;flex-shrink:1;min-width:0}
+#lv .chain{gap:2px;padding:6px 6px}
 
 </style>
 </head>
@@ -7626,7 +7644,7 @@ function frame(now) {
   // --- ripples ---
   for (let i = ripples.length - 1; i >= 0; i--) {
     const rp = ripples[i], life = rp.big ? 1400 : 1000, a = (now - rp.t0) / life;
-    if (a > 1) { ripples.splice(i, 1); continue; }
+    if (a > 1) { ripples.splice(i, 1); continue; } if (a < 0) continue; // scheduled ahead (lookahead): not yet
     const reach = rp.big ? 60 : 16 + 22 * (rp.v || 0.5), ease = 1 - Math.pow(1 - a, 2.2);
     g.lineWidth = 0.7;
     for (let j = 0; j < (rp.big ? 1 : 2); j++) { g.globalAlpha = (rp.big ? 0.4 : 0.5 * (rp.v || 0.5)) * (1 - a) * (1 - j * 0.4); g.beginPath(); g.arc(rp.x, rp.y, rp.r0 + 2 + reach * ease * (1 - j * 0.45), 0, TAU); g.stroke(); }
@@ -8889,7 +8907,7 @@ document.querySelectorAll('#lv>.lbx').forEach(b => {
   b.addEventListener('pointerenter', () => lvHint(b.title.split(' (')[0], 1800));
 });
 cv.addEventListener('pointerdown', ev => { // a click on empty system closes the open panels
-  if (ev.button !== 0 || spaceDown || !lvAnyOpen() || CLEAN) return; const x = ev.clientX, y = ev.clientY;
+  if (ev.button !== 0 || spaceDown || !lvAnyOpen() || CLEAN || lvMenuWas) return; /* a click that closes a menu only closes the menu */ const x = ev.clientX, y = ev.clientY;
   if (hitDot(x, y, 4) || hitLabel(x, y) || linkAt(x, y) || Math.hypot(x - CX, y - CY) < SUNR + 12) return;
   setTimeout(lvCloseAll, 0);
 });
@@ -8909,7 +8927,17 @@ function lvGet(d) { // {t, txt} of a control without changing it
 }
 function lvSet(d, u) {
   if (d.master) { LVMASTER = u; if (master) master.gain.setTargetAtTime(LVMASTER < 0.02 ? 0 : 0.8 * Math.pow(10, (-48 + 54 * u) / 20), ac.currentTime, 0.02); try { localStorage.setItem('orbs-live-master', String(u)); } catch (x) {} return lvGet(d); }
-  return slApply(d, u);
+  lvWakeD(d); return slApply(d, u);
+}
+function lvWakeD(d) { // a value change on a switched-off device switches it on (its stash comes back first, so nothing is lost), like live
+  let dev = null, e = null, o = null;
+  if (d.sl) { e = E[d.id]; o = e && ORB[e.orbit]; dev = ['echo', 'verb', 'cut'].includes(d.sl) ? 'sends' : null; }
+  else if (d.osl || d.o2sl || d.rsend != null) { const i = +d.i; o = ORB[i]; if (!o) return; e = E[selId] && E[selId].orbit === i ? E[selId] : membersOf(o)[0];
+    dev = d.osl ? { amount: 'filter', q: 'filter' }[d.osl] : d.o2sl ? { lo: 'eq', mid: 'eq', hi: 'eq', drive: 'sat', time: 'delay', fb: 'delay', send: 'delay' }[d.o2sl] : 'reverb'; }
+  else if (d.tsl) { const T0 = TETH[+d.t]; e = T0 && E[T0.tgt]; o = e && ORB[e.orbit]; dev = 'duck'; }
+  if (!dev || !e || !o || !LVOFF[lvOffKey(dev, e, o)]) return;
+  lvDevToggle(dev, e.id); LVD = true;
+  const dot = document.querySelector('#lChain [data-ldev="' + dev + ':' + e.id + '"]'); if (dot) { dot.classList.add('on'); const dv = dot.closest('.dev'); if (dv) dv.classList.remove('off'); }
 }
 const lvAttrs = d => Object.keys(d).map(k => 'data-' + k + '="' + lvEsc(d[k]) + '"').join(' ');
 function lvKnobSvg(t, bip) {
@@ -8925,7 +8953,7 @@ const LV_DEF = { vol: null, pn: 0.5, size: 0.5, pan: 0.5, gain: 48 / 54, lo: 0.5
 document.addEventListener('pointerdown', ev => { // knob: vertical drag · fader: absolute position
   const k = ev.target.closest('#lv .k[data-sl],#lv .k[data-osl],#lv .k[data-o2sl],#lv .k[data-rsl],#lv .k[data-rsend],#lv .k[data-tsl],#lv .k[data-gsl],#lv .k[data-master]'), f = !k && ev.target.closest('#lv .fd');
   if (!k && !f) return; ev.preventDefault(); initAudio(); if (ac.state !== 'running') ac.resume();
-  const el = k || f, v0 = lvGet(el.dataset); if (!v0) return; lvDrag = { el, fader: !!f, y0: ev.clientY, t0: v0.t }; try { el.setPointerCapture(ev.pointerId); } catch (x) {}
+  const el = k || f; lvWake(el); const v0 = lvGet(el.dataset); if (!v0) return; lvDrag = { el, fader: !!f, y0: ev.clientY, t0: v0.t }; try { el.setPointerCapture(ev.pointerId); } catch (x) {}
   if (f) lvDragMove(ev);
 }, true);
 function lvDragMove(ev) {
@@ -8937,10 +8965,18 @@ function lvDragMove(ev) {
 document.addEventListener('pointermove', ev => { if (lvDrag) lvDragMove(ev); });
 const lvDragEnd = () => { if (!lvDrag) return; if (lvDrag.el.dataset.rsl === 'size') commitRoom(); lvDrag = null; save(); sheetDirty = true; };
 document.addEventListener('pointerup', lvDragEnd); document.addEventListener('pointercancel', lvDragEnd);
-document.addEventListener('dblclick', ev => { const k = ev.target.closest('#lv .k'); if (!k) return; const key = k.dataset.sl || k.dataset.osl || k.dataset.o2sl, u = key in LV_DEF ? LV_DEF[key] : null; if (u == null) return; lvSet(k.dataset, u); lvKnobPaint(k); save(); sheetDirty = true; });
-document.addEventListener('wheel', ev => { const k = ev.target.closest('#lv .k'); if (!k) return; ev.preventDefault(); const v = lvGet(k.dataset); if (!v) return; lvSet(k.dataset, clamp(v.t + (ev.deltaY < 0 ? 0.02 : -0.02), 0, 1)); lvKnobPaint(k); save(); sheetDirty = true; }, { passive: false });
+document.addEventListener('dblclick', ev => { const k = ev.target.closest('#lv .k'); if (!k) return; lvWake(k); const key = k.dataset.sl || k.dataset.osl || k.dataset.o2sl, u = key in LV_DEF ? LV_DEF[key] : null; if (u == null) return; lvSet(k.dataset, u); lvKnobPaint(k); save(); sheetDirty = true; });
+document.addEventListener('wheel', ev => { const k = ev.target.closest('#lv .k'); if (!k) return; ev.preventDefault(); lvWake(k); const v = lvGet(k.dataset); if (!v) return; lvSet(k.dataset, clamp(v.t + (ev.deltaY < 0 ? 0.02 : -0.02), 0, 1)); lvKnobPaint(k); save(); sheetDirty = true; }, { passive: false });
+function lvWake(el) { // a knob on a switched-off device: switch the device on first (like live), its stashed values come back, then the edit applies
+  const dv = el.closest && el.closest('#lChain .dev[data-dev]'); if (!dv || !dv.classList.contains('off')) return; const tog = dv.querySelector('[data-ldev]'); if (!tog) return;
+  const [dev, id] = tog.dataset.ldev.split(':'), e = E[id], o = e && ORB[e.orbit]; if (!o) return;
+  if (dev === 'sound') { if (e.muted) { e.muted = false; save(); } }
+  else if (dev === 'utility') { if (o.st.muted) orbSet(e.orbit, 'mute', false); }
+  else if (LVOFF[lvOffKey(dev, e, o)]) lvDevToggle(dev, id);
+  dv.classList.remove('off'); tog.classList.add('on'); LVD = true;
+}
 /* ---- top bar ---- */
-const lvCh = (label, on, attrs) => '<span class="ch' + (on ? ' on' : '') + '" ' + (attrs || '') + '>' + label + '</span>';
+const lvCh = (label, on, attrs, cls) => '<span class="ch' + (on ? ' on' : '') + (cls ? ' ' + cls : '') + '" ' + (attrs || '') + '>' + label + '</span>';
 const lvTg = (on, attrs) => '<span class="tg' + (on ? ' on' : '') + '" ' + (attrs || '') + '><i></i></span>';
 function lvBoxDrag(el, get, set, step) { // drag up / down or scroll a value box
   el.addEventListener('wheel', ev => { ev.preventDefault(); set(get() + (ev.deltaY < 0 ? step : -step)); lvLive(); }, { passive: false });
@@ -9009,12 +9045,12 @@ function lvOpenMenu(k) {
   if (k === 'genre') { moreOpen(false); if (lvGWas) { lvGWas = false; gmenu.classList.remove('open'); return; } renderGenre(); const b = document.querySelector('#ltop [data-menu="genre"]'), r = b.getBoundingClientRect(); gmenu.style.left = Math.max(4, Math.min(innerWidth - 180, r.left - 12)) + 'px'; gmenu.style.top = '35px'; gmenu.classList.add('open'); return; }
   gmenu.classList.remove('open');
   if (lvMenu === k) { moreOpen(false); return; }
-  if (k === lvMenu0 && performance.now() - lvMenuT < 400) { lvMenu0 = null; return; } // its own button: the pointerdown outside already closed it
+  if (k === lvMenu0 && lvBtnWas) { lvMenu0 = null; lvBtnWas = false; return; } lvMenu0 = null; // its own button: the pointerdown outside already closed it
   lvMenu = k; moreOpen(true);
 }
-let lvMenu0 = null, lvGWas = false;
+let lvMenu0 = null, lvGWas = false, lvBtnWas = false;
 document.querySelectorAll('#ltop [data-menu]').forEach(b => {
-  b.addEventListener('pointerdown', () => { lvGWas = b.dataset.menu === 'genre' && gmenu.classList.contains('open'); });
+  b.addEventListener('pointerdown', () => { lvGWas = b.dataset.menu === 'genre' && gmenu.classList.contains('open'); lvBtnWas = lvMenu0 === b.dataset.menu && lvMenuWas && performance.now() - lvMenuT < 60; /* open on the last frame = this press closed it */ });
   b.addEventListener('click', ev => { ev.stopPropagation(); lvOpenMenu(b.dataset.menu); });
 });
 mmenu.addEventListener('click', ev => {
@@ -9085,7 +9121,7 @@ LV('lItems').addEventListener('click', ev => {
   else if (a === 'mutate') mutate();
   else if (a === 'jam') setJam(!JAM);
   else if (a === 'slot' && PAD9) PAD9.setPad(+v, {});
-  else if (a === 'psrc' && PAD9) { if (v === 'planet') { if (E[selId]) { PAD9.assign(PAD9.state.selected, { type: 'planet', planetId: selId }); lvTemp.delete(PAD9.state.selected); } else recMsg('select a planet first'); } else { const b = document.querySelector('#padc .orbs-pad9 [data-act="' + v + '"]'); if (b) b.click(); } }
+  else if (a === 'psrc' && PAD9) { if (v === 'planet') { if (E[selId]) { PAD9.assign(PAD9.state.selected, { type: 'planet', planetId: selId }); lvTemp.delete(PAD9.state.selected); lvTempSave(); } else recMsg('select a planet first'); } else { const b = document.querySelector('#padc .orbs-pad9 [data-act="' + v + '"]'); if (b) b.click(); } }
   LVD = true; lvLive();
 });
 /* drag a sound from the browser onto an orbit (new planet there), onto the detail view (new planet), or onto a pad slot */
@@ -9111,7 +9147,7 @@ function lvAddPlanet(b, v, p) { // a copy of the sound in its own group, placed 
 }
 function lvDrop(d, x, y) {
   const tg = lvDropTarget(x, y);
-  if (tg.slot != null && PAD9) { if (d.v && E[d.b]) { E[d.b].variant = d.v; save(); } PAD9.assign(tg.slot, { type: 'planet', planetId: d.b }); lvTemp.delete(tg.slot); recMsg('pad ' + 'qweasdzxc'[tg.slot] + ' = ' + d.b); }
+  if (tg.slot != null && PAD9) { if (d.v && E[d.b]) { E[d.b].variant = d.v; save(); } PAD9.assign(tg.slot, { type: 'planet', planetId: d.b }); lvTemp.delete(tg.slot); lvTempSave(); recMsg('pad ' + 'qweasdzxc'[tg.slot] + ' = ' + d.b); }
   else if (tg.sys) lvAddPlanet(d.b, d.v, tg.p);
   else if (tg.det) lvAddPlanet(d.b, d.v, null);
   LVD = true;
@@ -9184,19 +9220,19 @@ function lvDetail() {
   ch.innerHTML = lvDev('sound', 104, on('sound'), 'sound:' + id, sel, [lvKnob('vol', { sl: 'vol', id }), lvKnob('pan', { sl: 'pn', id }, true), lvKnob('size', { sl: 'size', id }, true)], e.side === 'rec' ? 'rec' : 'planet')
     + lvDev('sends', 94, on('sends'), 'sends:' + id, '<span class="dim">planet fx</span>', [lvKnob('echo', { sl: 'echo', id }), lvKnob('verb', { sl: 'verb', id }), lvKnob('tone', { sl: 'cut', id })])
     + '<span class="arrow"></span><div class="rack" title="group fx · ' + lvEsc(groupName(o)) + '">'
-    + lvDev('utility', 84, on('utility'), 'utility:' + id, tg('mute', 'm', s.muted) + lvCh('s', o.solo, 'data-act="solo" data-i="' + i + '"') + tg('phase', 'ø', s.phase === 180) + tg('mono', 'mono', s.mono), [lvKnob('gain', { osl: 'gain', i }), lvKnob('pan', { osl: 'pan', i }, true)])
+    + lvDev('utility', 92, on('utility'), 'utility:' + id, tg('mute', 'm', s.muted) + lvCh('s', o.solo, 'data-act="solo" data-i="' + i + '"') + tg('phase', 'ø', s.phase === 180) + tg('mono', 'mono', s.mono), [lvKnob('gain', { osl: 'gain', i }), lvKnob('pan', { osl: 'pan', i }, true)])
     + lvDev('filter', 74, on('filter'), 'filter:' + id, lvCh('lp', ft === 'lowpass', 'data-lflt="lp" data-i="' + i + '"') + lvCh('hp', ft === 'highpass', 'data-lflt="hp" data-i="' + i + '"'), [lvKnob('freq', { osl: 'amount', i }, true), lvKnob('res', { osl: 'q', i })])
-    + lvDev('eq', 96, on('eq'), 'eq:' + id, lvEqSvg(t2), [lvKnob('low', { o2sl: 'lo', i }, true), lvKnob('mid', { o2sl: 'mid', i }, true), lvKnob('high', { o2sl: 'hi', i }, true)])
-    + lvDev('saturator', 78, on('sat'), 'sat:' + id, lvCh('soft', t2.curve === 'soft', 'data-act="scurve" data-c="soft" data-i="' + i + '"') + lvCh('hard', t2.curve === 'hard', 'data-act="scurve" data-c="hard" data-i="' + i + '"'), [lvKnob('drive', { o2sl: 'drive', i })])
-    + lvDev('delay', 94, on('delay'), 'delay:' + id, '<span class="dim">synced</span>', [lvKnob('time', { o2sl: 'time', i }), lvKnob('fb', { o2sl: 'fb', i }), lvKnob('send', { o2sl: 'send', i })])
-    + lvDev('reverb', 60, on('reverb'), 'reverb:' + id, '<span class="dim">room</span>', [lvKnob('send', { rsend: 1, i })])
-    + lvDev('duck', dj >= 0 ? 96 : 92, on('duck'), 'duck:' + id, (dj >= 0 ? '<span class="dim">' + lvEsc(E[TETH[dj].src].label || TETH[dj].src) + ' →</span>' + lvCh('×', false, 'data-act="tdel" data-t="' + dj + '" title="remove this duck"') : '') + (cands.length ? '<select data-lduck="' + id + '"><option value="">' + (dj >= 0 ? '+' : 'add ▾') + '</option>' + cands.map(x => '<option value="' + x + '">' + lvEsc(E[x].label || x) + '</option>').join('') + '</select>' : ''), dj >= 0 ? [lvKnob('depth', { tsl: 'depth', t: dj }), lvKnob('rel', { tsl: 'rel', t: dj })] : ['<div class="k" style="cursor:default"><span class="kl" style="height:auto;margin-top:6px">shift-drag</span><span class="kl">a planet in</span></div>'])
+    + lvDev('eq', 90, on('eq'), 'eq:' + id, lvEqSvg(t2), [lvKnob('low', { o2sl: 'lo', i }, true), lvKnob('mid', { o2sl: 'mid', i }, true), lvKnob('high', { o2sl: 'hi', i }, true)])
+    + lvDev('saturator', 80, on('sat'), 'sat:' + id, lvCh('soft', t2.curve === 'soft', 'data-act="scurve" data-c="soft" data-i="' + i + '"') + lvCh('hard', t2.curve === 'hard', 'data-act="scurve" data-c="hard" data-i="' + i + '"'), [lvKnob('drive', { o2sl: 'drive', i })])
+    + lvDev('delay', 90, on('delay'), 'delay:' + id, '<span class="dim">synced</span>', [lvKnob('time', { o2sl: 'time', i }), lvKnob('fb', { o2sl: 'fb', i }), lvKnob('send', { o2sl: 'send', i })])
+    + lvDev('reverb', 56, on('reverb'), 'reverb:' + id, '<span class="dim">room</span>', [lvKnob('send', { rsend: 1, i })])
+    + lvDev('duck', dj >= 0 ? 112 : 104, on('duck'), 'duck:' + id, (dj >= 0 ? '<span class="dim">' + lvEsc(E[TETH[dj].src].label || TETH[dj].src) + ' →</span>' + lvCh('×', false, 'data-act="tdel" data-t="' + dj + '" title="remove this duck"') : '') + (cands.length ? '<select data-lduck="' + id + '"><option value="">' + (dj >= 0 ? '+' : 'add ▾') + '</option>' + cands.map(x => '<option value="' + x + '">' + lvEsc(E[x].label || x) + '</option>').join('') + '</select>' : ''), dj >= 0 ? [lvKnob('depth', { tsl: 'depth', t: dj }), lvKnob('rel', { tsl: 'rel', t: dj })] : ['<div class="k" style="cursor:default"><span class="kl" style="height:auto;margin-top:6px">shift-drag</span><span class="kl">a planet in</span></div>'])
     + '</div>';
   const gr = o && GRAV[o.id], tl = o ? BANDS.filter(L => L < o.lap) : [], q = s.quantize, tk = e.trail ? e.trail.kind : 'off';
-  const build = gr ? lvCh('release', false, 'data-act="grev" data-i="' + i + '"') + lvCh('stop', false, 'data-act="gstop" data-i="' + i + '"') : GRAV_DONE[o.id] && GRAV_DONE[o.id].toLap === o.lap ? lvCh('release', false, 'data-act="grev" data-i="' + i + '" title="back to ' + lapTxt(GRAV_DONE[o.id].fromLap) + '"') : tl.length ? lvCh('build', false, 'data-act="build" data-i="' + i + '" data-b="4" title="gravity: the lap speeds up to ' + lapTxt(tl[0]) + ' over 4 bars"') : lvCh('build', false, 'class="off"');
+  const build = gr ? lvCh('release', false, 'data-act="grev" data-i="' + i + '"') + lvCh('stop', false, 'data-act="gstop" data-i="' + i + '"') : GRAV_DONE[o.id] && GRAV_DONE[o.id].toLap === o.lap ? lvCh('release', false, 'data-act="grev" data-i="' + i + '" title="back to ' + lapTxt(GRAV_DONE[o.id].fromLap) + '"') : tl.length ? lvCh('build', false, 'data-act="build" data-i="' + i + '" data-b="4" title="gravity: the lap speeds up to ' + lapTxt(tl[0]) + ' over 4 bars"') : lvCh('build', false, 'title="already the shortest lap"', 'off');
   cl.innerHTML = '<div class="crow"><span class="lb">clip</span><span class="dim">lap</span>' + LAPS.map(L => lvCh(lapTxt(L).replace(' bars', '').replace(' bar', ''), L === o.lap, 'data-act="lap" data-i="' + i + '" data-l="' + L + '"')).join('') + '<span class="dim">bars</span><span class="gsep"></span><span class="dim">poly</span>' + POLY.map(L => lvCh(L + '', L === o.lap, 'data-act="lap" data-i="' + i + '" data-l="' + L + '"')).join('') + '<span class="dim">beats</span><span class="gsep"></span><span class="dim">offset</span><span>' + whereTxt(e) + '</span><span class="gsep"></span><span class="dim">snap</span>' + lvCh('off', !q, 'data-lq="0" data-i="' + i + '"') + lvCh('1/16', !!q, 'data-lq="1" data-i="' + i + '"') + '</div>'
     + '<div class="grid"><span class="lb">hits' + (e.trail ? '<br>trail' : '') + '</span><canvas id="lGrid" title="click a hit to set its chance (100 → 75 → 50 → 25)"></canvas></div>'
-    + '<div class="crow"><span class="lb">&nbsp;</span><span class="dim">moons</span>' + [0, 1, 2, 3].map(n => lvCh(n + '', (e.moons | 0) === n, 'data-act="moons" data-id="' + id + '" data-n="' + n + '"')).join('') + '<span class="gsep"></span><span class="dim">chance</span><span data-lnum="prob">' + Math.round((e.prob == null ? 1 : e.prob) * 100) + '</span><span class="dim">drift</span><span data-lnum="drift">' + (e.drift ? Math.round(e.drift * 100) : 'off') + '</span><span class="gsep"></span><span class="dim">trail</span>' + ['off', 'cut', 'vol'].map(v => lvCh(v === 'cut' ? 'filter' : v, tk === v, 'data-act="trail" data-id="' + id + '" data-v="' + v + '"')).join('') + '<span class="gsep"></span>' + build + lvCh('drag', !!XS.gravity, 'data-lgrav="1" title="gravity gesture: a slow drag toward the sun while playing builds"') + lvCh('chop', false, 'data-act="chop" data-id="' + id + '"' + (e.buf && (e.side === 'rec' || e.variant === 'file') ? '' : ' class="off"')) + lvCh(prac && prac.id === id ? 'stop' : 'practice', !!(prac && prac.id === id), 'data-lact="practice"') + (lastPractice && lastPractice.id === id ? '<span class="dim">' + Math.round(lastPractice.score) + '</span>' : '') + '<span class="gsep"></span><span class="dim">clip →</span>' + lvCh('midi', false, 'data-act="xmid" data-id="' + id + '"') + lvCh('stem', false, 'data-act="xstem" data-id="' + id + '"') + lvCh('wave ›', false, 'data-act="bar" data-id="' + id + '"') + '</div>';
+    + '<div class="crow"><span class="lb">&nbsp;</span><span class="dim">moons</span>' + [0, 1, 2, 3].map(n => lvCh(n + '', (e.moons | 0) === n, 'data-act="moons" data-id="' + id + '" data-n="' + n + '"')).join('') + '<span class="gsep"></span><span class="dim">chance</span><span data-lnum="prob">' + Math.round((e.prob == null ? 1 : e.prob) * 100) + '</span><span class="dim">drift</span><span data-lnum="drift">' + (e.drift ? Math.round(e.drift * 100) : 'off') + '</span><span class="gsep"></span><span class="dim">trail</span>' + ['off', 'cut', 'vol'].map(v => lvCh(v === 'cut' ? 'filter' : v, tk === v, 'data-act="trail" data-id="' + id + '" data-v="' + v + '"')).join('') + '<span class="gsep"></span>' + build + lvCh('drag', !!XS.gravity, 'data-lgrav="1" title="gravity gesture: a slow drag toward the sun while playing builds"') + lvCh('chop', false, 'data-act="chop" data-id="' + id + '"', e.buf && (e.side === 'rec' || e.variant === 'file') ? '' : 'off') + lvCh(prac && prac.id === id ? 'stop' : 'practice', !!(prac && prac.id === id), 'data-lact="practice"') + (lastPractice && lastPractice.id === id ? '<span class="dim">' + Math.round(lastPractice.score) + '</span>' : '') + '<span class="gsep"></span><span class="dim">→</span>' + lvCh('midi', false, 'data-act="xmid" data-id="' + id + '"') + lvCh('stem', false, 'data-act="xstem" data-id="' + id + '"') + lvCh('wave ›', false, 'data-act="bar" data-id="' + id + '"') + '</div>';
   lvGridDraw();
 }
 function lvGridDraw() {
@@ -9240,15 +9276,22 @@ const lvCloseWin = closeWin; closeWin = function () { lvEditorOn = false; lvClos
 pad9Toggle = function (on) { const p = pad9Init(); if (!p) return; if (on === false && CLEAN) p.close(); else if (!p.isOpen()) p.open(); pad9Tick(); };
 const lvPadInit0 = pad9Init;
 pad9Init = function () { if (PAD9) return PAD9; if (!window.OrbsPad9) return null; initAudio();
-  PAD9 = OrbsPad9.create({ ctx: ac, dest: master, storageKey: 'orbs-solar-pad9', getBeat: t => posAt(t == null ? ac.currentTime : t), getBpm: () => bpm, mount: LV('padc'),
+  PAD9 = OrbsPad9.create({ ctx: ac, dest: master, storageKey: 'orbs-live-pad9', getBeat: t => posAt(t == null ? ac.currentTime : t), getBpm: () => bpm, mount: LV('padc'),
     getPlanets: () => IDS.filter(id => !E[id].inHole).map(id => ({ id, label: E[id].label || id })), playPlanetSound, onCommit: pad9Commit, onHit: () => { LVD = true; } });
-  const w = LV('padc').querySelector('.pwait'); if (w) w.remove(); PAD9.open(); lvPadSlot(selId); LVD = true; return PAD9; };
+  const w = LV('padc').querySelector('.pwait'); if (w) w.remove();
+  try { const old = JSON.parse(localStorage.getItem('orbs-live-padtemp') || '[]'); old.forEach(i => { const p = PAD9.state.pads[i]; if (p && p.src && p.src.type === 'planet') PAD9.assign(i, { type: 'empty' }); }); } catch (x) {} // temp slots left by a crash
+  if (PAD9.state.pads.every(p => !p.src || p.src.type === 'empty')) { IDS.filter(id => !E[id].base && E[id].side !== 'rec' && !E[id].inHole).slice(0, 9).forEach((id, i) => PAD9.assign(i, { type: 'planet', planetId: id })); PAD9.setPad(0, {}); } // fresh pad: the system's sounds on q … c
+  PAD9.open(); lvPadSlot(selId); LVD = true; return PAD9; };
+const lvTempSave = () => { try { localStorage.setItem('orbs-live-padtemp', JSON.stringify([...lvTemp])); } catch (x) {} };
+function lvTempClear(keep) { // the one temp slot goes back to empty when the selection moves on
+  if (!PAD9 || lvOd) return; for (const i of [...lvTemp]) { if (i === keep) continue; const p = PAD9.state.pads[i]; if (p && p.src && p.src.type === 'planet') PAD9.assign(i, { type: 'empty' }); lvTemp.delete(i); } lvTempSave(); }
+addEventListener('pagehide', () => { lvTempClear(-1); });
 function lvPadSlot(id) { // pad slot of a planet: its own, else an empty one (temp), else a temp one is reused
   const P = PAD9; if (!P || !E[id]) return -1; const ps = P.state.pads; let i = ps.findIndex(p => p.src && p.src.type === 'planet' && p.src.planetId === id);
-  if (i >= 0) { if (P.state.selected !== i) P.setPad(i, {}); return i; }
-  i = ps.findIndex(p => !p.src || p.src.type === 'empty'); if (i < 0) i = [...lvTemp][0] != null ? [...lvTemp][0] : -1;
+  if (i >= 0) { lvTempClear(i); if (P.state.selected !== i) P.setPad(i, {}); return i; }
+  const t0 = [...lvTemp][0]; i = t0 != null ? t0 : ps.findIndex(p => !p.src || p.src.type === 'empty');
   if (i < 0) { recMsg('pad full · drag ' + (E[id].label || id) + ' onto a slot'); return -1; }
-  P.assign(i, { type: 'planet', planetId: id }); lvTemp.add(i); return i;
+  lvTempClear(i); P.assign(i, { type: 'planet', planetId: id }); lvTemp.add(i); lvTempSave(); return i;
 }
 const lvStartAudio = () => { if (!PAD9) { try { pad9Init(); } catch (x) {} } };
 addEventListener('pointerdown', () => setTimeout(lvStartAudio, 0), true); addEventListener('keydown', () => setTimeout(lvStartAudio, 0), true);
@@ -9271,12 +9314,14 @@ LV('lHandle').addEventListener('pointerdown', ev => { ev.preventDefault(); const
 addEventListener('keydown', ev => {
   if (typingIn(ev.target)) return;
   if (ev.ctrlKey && ev.altKey && !ev.metaKey) { const k = { KeyB: 'B', KeyL: 'D', KeyM: 'M', KeyT: 'T' }[ev.code]; if (k) { ev.preventDefault(); ev.stopImmediatePropagation(); lvCollapse(k); } return; }
+  if (ev.code === 'Escape' && lvSndDrag) { ev.preventDefault(); ev.stopImmediatePropagation(); lvSndDrag = null; lvGhost.style.display = 'none'; LV('lChain').classList.remove('drop'); return; }
   if (ev.code === 'Escape' && !CLEAN) { ev.preventDefault(); ev.stopImmediatePropagation(); // esc: close the top floating thing, else deselect (never closes the docked pad)
     if (mmenu.classList.contains('open')) moreOpen(false); else if (gmenu.classList.contains('open')) gmenu.classList.remove('open'); else if (winId) closeWin(); else if (barId) closeBar(); else if (pickId) closePicker(); else if (lvAnyOpen()) lvCloseAll(); else if (selId) select(null); LVD = true; return; }
   if (ev.code === 'KeyL' && !CLEAN && !winId && !ev.metaKey && !ev.ctrlKey && !ev.altKey) { LABELS_ON = !LABELS_ON; }
 }, true);
 /* ---- per-frame bits (cheap) + panel rendering when something changed ---- */
 drawSunChord = function () { if (CHORD.held == null || CLEAN) return; g.font = LABEL_FONT; g.textAlign = 'center'; g.textBaseline = 'middle'; g.globalAlpha = 0.28 + 0.4 * sunFlash; g.fillText(chordName(PROG[CHORD.held]), CX, CY + SUNR + (LV_PHONE ? 14 : 18)); }; // subtle, only while the chord sun is manual
+const lvRecMsg0 = recMsg; recMsg = function (s) { if (CLEAN) lvRecMsg0(s); else lvHint(String(s), 2400); }; // live: messages show in the hint line by the bottom box, never over a panel
 renderSheet = function () { sheetDirty = false; LVD = true; };
 renderMidi = (f => function () { f(); LV('lMidiDot').classList.toggle('on', !!midiPorts.find(p => p.selected)); LVD = true; })(renderMidi);
 function lvMeterInit() { if (lvAn || !ac || !clipper) return; try { const sp = ac.createChannelSplitter(2), a = ac.createAnalyser(), b = ac.createAnalyser(); a.fftSize = b.fftSize = 512; clipper.connect(sp); sp.connect(a, 0); sp.connect(b, 1); lvAn = { a, b, buf: new Float32Array(512), l: 0, r: 0 }; } catch (x) { lvAn = false; } }
@@ -9291,8 +9336,9 @@ function lvLive() { // values that change every frame
   LV('lGenre').textContent = GENRE || '—'; LV('lSkin').textContent = SKIN;
   LV('sysMeta').textContent = IDS.length + ' planets · ' + ORB.length + ' groups';
 }
+let lvMenuWas = false;
 function lvTick() {
-  lvLive(); lvBoxes();
+  lvLive(); lvBoxes(); lvMenuWas = mmenu.classList.contains('open') || gmenu.classList.contains('open');
   if (lvAn == null || lvAn === null) lvMeterInit();
   const ob = LV('lOut').querySelectorAll('.meter b'); let l = 0, r = 0; if (lvAn && playing) { l = lvRms(lvAn.a); r = lvRms(lvAn.b); } lvLvl.l = Math.max(l, lvLvl.l * 0.86); lvLvl.r = Math.max(r, lvLvl.r * 0.86);
   ob[0].style.width = Math.min(100, lvLvl.l * 100).toFixed(1) + '%'; ob[1].style.width = Math.min(100, lvLvl.r * 100).toFixed(1) + '%';
@@ -9300,7 +9346,7 @@ function lvTick() {
   document.querySelectorAll('#lStrips [data-vu]').forEach(el => { const k = el.dataset.vu; let v = 0;
     if (k === 'L') v = lvLvl.l; else if (k === 'R') v = lvLvl.r; else { const o = ORB[+k]; if (o) { const g = lvLin(o.st.gainDb) * (o.st.muted ? 0 : 1); membersOf(o).forEach(e => { if (!e.muted) v = Math.max(v, e.pulse * e.vol * g); }); } }
     el.style.height = Math.min(100, v * 100).toFixed(1) + '%'; });
-  if (selId !== lvPrevSel) { lvPrevSel = selId; LVD = true; if (selId && PAD9) lvPadSlot(selId); }
+  if (selId !== lvPrevSel) { lvPrevSel = selId; LVD = true; if (selId && PAD9) lvPadSlot(selId); else lvTempClear(-1); }
   if (PAD9 && !CLEAN && !PAD9.isOpen()) PAD9.open();
   if (PAD9 && CLEAN && PAD9.isOpen()) PAD9.close();
   if (LVD && !lvDrag && !(document.activeElement && document.activeElement.closest && document.activeElement.closest('#lv select'))) { LVD = false; lvBrowser(); lvMixer(); lvDetail(); lvStatus(); }
@@ -9665,7 +9711,7 @@ window.SS = { E, get ORB() { return ORB; }, IDS, links, get TETH() { return TETH
   get VIEW() { return VIEW; }, zoomAt, setView, zoomFit, zoom11, get COMET() { return COMET; }, setComet, comets, shareLink, shareState, chanceOk, MOON_OFF, POLY, renderMore, get spaceDown() { return spaceDown; },
   sysSnap, applyDiscrete, storeScene, gotoScene, get SCENES() { return SCENES; }, get MORPH() { return MORPH; }, set SCENE_BARS(v) { SCENE_BARS = v; }, mutate, undoMutate, MUT_UNDO, setJam, get JAM() { return JAM; }, jamHit, jamNudge, driftOff, swallow, get HOLE() { return HOLE; }, sunTap, get CHORD() { return CHORD; }, chordIdx, chordName, hitEvent,
   get XS() { return XS; }, setXS, hitsIn, midiFor, exportMidi, exportWav, renderInto, get bin() { return bin; }, binauralOn, get ECL() { return ECL; }, GRAV, startGravity, sizeSemis, sizeWheel, get MOODCSS() { return MOODCSS; }, setTrailKind, trailOf, trailMix, chopPlanet, playSlice, startPractice, endPractice, pracTap, get prac() { return prac; }, get lastPractice() { return lastPractice; }, gravGesture, X, save, setWinTab, get WTAB() { return WTAB; }, setSec, secOpen, set SEC_ALL(v) { SEC_ALL = !!v; sheetDirty = true; }, set UI_ALL(v) { UI_ALL = !!v; sheetDirty = true; if (winId) renderWin(); }, get SHEET() { return SHEET; }, sheetCollapse, applySheet, moreOpen, get SECS() { return SECS; }, get SKIN() { return SKIN; }, setSkin, SKIN_IDS, SKINS, drawScene, SKC, SKSTAT, get fieldBuilds() { return fieldBuilds; }, get CLEAN() { return CLEAN; }, setClean, get CLEAN_LABELS() { return CLEAN_LABELS; }, get XFADE() { return XFADE; }, get GRAV_DONE() { return GRAV_DONE; }, releaseGravity, linked, get lastShare() { return lastShare; }, get PAD9() { return PAD9; }, pad9Init, pad9Toggle, pad9Open, pad9Commit, playPlanetSound, P9V, posAt, timeAtPos, get recCount() { return recCount; } };
-liveInit(); Object.defineProperties(window.SS, Object.getOwnPropertyDescriptors({ LIVE: true, get LVP() { return LVP; }, lvCollapse, lvAddPlanet, lvDevToggle, lvDevOn: (dev, id) => { const e = E[id]; return !!e && lvDevOn(dev, e, ORB[e.orbit]); }, lvGet, lvSet, get LVOFF() { return LVOFF; }, lvPadSlot, get lvTemp() { return lvTemp; }, lvOverdub, get lvOd() { return lvOd; }, get master() { return master; }, get LVMASTER() { return LVMASTER; }, get LABELS_ON() { return LABELS_ON; }, get lvMenu() { return lvMenu; }, lvOpenMenu, get recBarsN() { return recBarsN; }, hitDotAt: (x, y) => !!(hitDot(x, y, 4) || hitLabel(x, y) || linkAt(x, y) || Math.hypot(x - CX, y - CY) < SUNR + 12), lvBoxes, lvCloseAll }));
+liveInit(); Object.defineProperties(window.SS, Object.getOwnPropertyDescriptors({ LIVE: true, get LVP() { return LVP; }, lvCollapse, lvAddPlanet, lvDevToggle, lvDevOn: (dev, id) => { const e = E[id]; return !!e && lvDevOn(dev, e, ORB[e.orbit]); }, lvGet, lvSet, get LVOFF() { return LVOFF; }, lvPadSlot, get lvTemp() { return lvTemp; }, lvOverdub, get lvOd() { return lvOd; }, get master() { return master; }, get LVMASTER() { return LVMASTER; }, get LABELS_ON() { return LABELS_ON; }, get lvMenu() { return lvMenu; }, lvOpenMenu, get recBarsN() { return recBarsN; }, hitDotAt: (x, y) => !!(hitDot(x, y, 4) || hitLabel(x, y) || linkAt(x, y) || Math.hypot(x - CX, y - CY) < SUNR + 12), lvBoxes, lvCloseAll, recMsg: s => recMsg(s), lvSnd: () => lvSndDrag }));
 })();
 </script>
 </body>
