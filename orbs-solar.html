@@ -3622,7 +3622,7 @@ let still = false, bpm = 108, snapOn = true, recCount = 0, cloneCount = 0, sheet
 const LS = 'orbs-solar-v1';
 let ready = false, pending = [], savedGroups = null, oldOrbs = null;
 const PKEYS = ['rad', 'a', 'vol', 'pn', 'echo', 'verb', 'cut', 'muted', 'seed'];
-const KEEP = ['trimS', 'trimE', 'rev', 'loop', 'bars', 'recBpm', 'phase', 'recorded', 'label', 'side', 'base', 'gid', 'pat', 'voice', 'prob', 'moons'];
+const KEEP = ['trimS', 'trimE', 'rev', 'loop', 'bars', 'recBpm', 'phase', 'recorded', 'label', 'side', 'base', 'gid', 'pat', 'voice', 'prob', 'moons', 'drift', 'inHole'];
 const dbOut = st => Object.assign({}, st, { gainDb: isFinite(st.gainDb) ? st.gainDb : '-inf' });
 function save() { if (!ready || window.__orbsShareLoading) return; try {
   const els = {}; IDS.forEach(id => { const e = E[id], o = els[id] = { v: e.variant }; PKEYS.concat(KEEP).forEach(k => { if (e[k] !== undefined) o[k] = e[k]; }); o.a = +(+e.a).toFixed(5); o.rad = +(+e.rad).toFixed(4); });
@@ -3634,7 +3634,7 @@ function applySaved(e, o) {
   ['trimS', 'trimE', 'rev', 'loop', 'bars', 'recBpm', 'phase', 'recorded'].forEach(k => { if (o[k] !== undefined) e[k] = o[k]; });
   if (typeof o.gid === 'string') e.gid = o.gid;
   if (o.voice && typeof o.voice === 'object') e.voice = o.voice;
-  if (isFinite(o.prob)) e.prob = clamp(+o.prob, 0, 1); if (isFinite(o.moons)) e.moons = clamp(o.moons | 0, 0, 3);
+  if (isFinite(o.prob)) e.prob = clamp(+o.prob, 0, 1); if (isFinite(o.moons)) e.moons = clamp(o.moons | 0, 0, 3); if (isFinite(o.drift)) e.drift = clamp(+o.drift, 0, 1); e.inHole = !!o.inHole && !!o.muted;
   e.pat = Array.isArray(o.pat) ? o.pat.filter(h => h && isFinite(h.o) && isFinite(h.v)).map(h => { const q = { o: frac(+h.o), v: clamp(+h.v, 0, 1) }; if (isFinite(h.c) && +h.c < 1) q.c = clamp(+h.c, 0, 1); return q; }).slice(0, 128) : [];
   if (e.side === 'rec' && o.label) e.label = String(o.label).slice(0, 14);
 }
@@ -3937,21 +3937,22 @@ function playStep(n, t) {
     const L = lapOf(e), a0 = aEff(e), hs = hitsOf(e);
     for (let j = 0; j < hs.length; j++) {
       const h = nextHitA(L, a0 - hs[j].o, pb);
-      if (h.p < pb + 0.25 - 1e-9 && chanceOk(e, hs[j], h.k, j)) fireHit(e, t + (h.p - pb) * 4 * sd + swingAt(h.p, sd), h.p, h.k, hs[j].v, j);
+      if (h.p < pb + 0.25 - 1e-9 && chanceOk(e, hs[j], h.k, j)) fireHit(e, dT(e, t + (h.p - pb) * 4 * sd + swingAt(h.p, sd), h.k, j), h.p, h.k, hs[j].v, j);
     }
     if (e.moons) for (let m = 0; m < e.moons; m++) { const d = MOON_OFF[m]; // moons: ghost notes a 16th before / an 8th after / a 16th after each hit
       for (let j = 0; j < hs.length; j++) { const h = nextHitA(L, a0 - hs[j].o, pb - d), gp = h.p + d;
-        if (gp >= pb - 1e-9 && gp < pb + 0.25 - 1e-9 && !hitAtP(e, gp) && chanceOk(e, hs[j], h.k, 100 + m)) fireHit(e, t + (gp - pb) * 4 * sd + swingAt(gp, sd), gp, h.k, hs[j].v * MOON_V[m], 100 + m); } }
+        if (gp >= pb - 1e-9 && gp < pb + 0.25 - 1e-9 && !hitAtP(e, gp) && chanceOk(e, hs[j], h.k, 100 + m)) fireHit(e, dT(e, t + (gp - pb) * 4 * sd + swingAt(gp, sd), h.k, 100 + m), gp, h.k, hs[j].v * MOON_V[m], 100 + m); } }
   }
   if (COMET.on) cometStep(n, t, sd);
 }
+const dT = (e, t, k, j) => (e.drift ? Math.max(ac.currentTime + 0.002, t + driftOff(e, k, j) * 60 / bpm) : t); // drift: a seeded wander per lap
 const MOON_OFF = [-0.25, 0.5, 0.25], MOON_V = [0.34, 0.3, 0.26];
 function hitAtP(e, p) { const L = lapOf(e), a0 = aEff(e); return hitsOf(e).some(h => { const f = frac(p / L + a0 - h.o + 1e-9); return f < 2e-9 || f > 1 - 2e-9; }); }
 // chance (like live's note chance): planet chance × hit chance, seeded per lap so a replay from the start sounds the same
 function chanceOk(e, h, k, j) { const c = (e.prob == null ? 1 : e.prob) * (h.c == null ? 1 : h.c); if (c >= 0.999) return true; if (c <= 0.001) return false; return rng((e.seed | 0) * 7919 + k * 131 + j * 17 + 3)() < c; }
 const chordNotes = C => C.t.map(x => C.r + x + (x < 5 ? 12 : 0)).sort((a, c) => a - c);
 function hitEvent(e, p, k) {
-  const base = baseOf(e.id), B0 = E[base], bar = Math.floor(p / 4 + 1e-9), C = PROG[((bar % 4) + 4) % 4], L = lapOf(e), bd = 60 / bpm;
+  const base = baseOf(e.id), B0 = E[base], bar = Math.floor(p / 4 + 1e-9), C = PROG[chordIdx(bar)], L = lapOf(e), bd = 60 / bpm;
   let ev;
   switch (base) {
     case 'kick': ev = { n: 36, v: 1, dur: 0.3 }; break;
@@ -4082,6 +4083,7 @@ addEventListener('keydown', e => {
   if (e.target && e.target.tagName === 'INPUT') return;
   if (e.metaKey || e.ctrlKey || e.altKey) return;
   if (winId && padKey(e)) return;
+  if (jamKey(e)) return;
   if (e.code === 'Space') { e.preventDefault(); if (!e.repeat) { spaceDown = true; spacePanned = false; } } // space: play / stop on release, or hold + drag to pan
   else if (e.key === '+' || e.key === '=') { e.preventDefault(); zoomKey(1.25); } else if (e.key === '-' || e.key === '_') { e.preventDefault(); zoomKey(0.8); }
   else if (e.code === 'KeyT') { e.preventDefault(); tapTempo(); }
@@ -4135,7 +4137,7 @@ const snapA = (a, L) => { a = frac(a); if (!snapOn) return a; const n = L * 4; r
 const sheet = document.getElementById('sheet'), topEl = document.getElementById('top');
 let SA = { x: 0, y: 0, w: 0, h: 0 }, K = 0.62, RMAX = 120, SIDE = false, SUNR = 6, DS = 1, ctlZone = { x: 0, y: 60 };
 // zoom: the view only moves the sun (pan) and scales the orbit radius; planets, lines and text keep their pixel size so it stays thin
-let VIEW = { z: 1, px: 0, py: 0 }, CX0 = 0, CY0 = 0, RMAX0 = 120;
+let VIEW = { z: 1, px: 0, py: 0 }, CX0 = 0, CY0 = 0, RMAX0 = 120, HOLE = { x: 0, y: 0, r: 15 }; // HOLE: the black hole drop target (bottom left of the system)
 const ZMIN = 0.35, ZMAX = 6;
 try { const v = JSON.parse(localStorage.getItem('orbs-solar-view') || 'null'); if (v && isFinite(v.z)) VIEW = { z: clamp(+v.z, ZMIN, ZMAX), px: +v.px || 0, py: +v.py || 0 }; } catch (x) {}
 function applyView() { CX = CX0 + VIEW.px; CY = CY0 + VIEW.py; RMAX = RMAX0 * VIEW.z; }
@@ -4151,6 +4153,7 @@ function resize() {
   RMAX0 = Math.max(50, Math.min(hw, hh / K)); applyView();
   DS = clamp(M / 700, 0.9, 1.3); SUNR = 5.5 * DS;
   ctlZone = { x: 0, y: tb + 16 };
+  placeHole();
 }
 resize(); addEventListener('resize', () => { resize(); sheetDirty = true; });
 // a planet's distance from the sun (rad, 0..1 of RMAX) picks its lap band: 1/4, 1/2, 1, 2, 4, 8 bars going out
@@ -4176,6 +4179,7 @@ function layout() {
     if (drag && drag.e === e && drag.moved && !drag.tether) { e.x = drag.px; e.y = drag.py; continue; }
     const p = onRing(e.rad, e.ang); e.x = p.x; e.y = p.y;
   }
+  holeLayout(performance.now() / 1000);
 }
 
 /* ---------------- groups: connected planets share one lap and one fx chain ---------------- */
@@ -4267,7 +4271,7 @@ function layoutLabels() {
   const dots = IDS.map(id => { const e = E[id]; return [e.x - e.r - 2, e.y - e.r - 2, e.x + e.r + 2, e.y + e.r + 2, id]; });
   const order = IDS.slice().sort((a, b) => ((b === selId) - (a === selId)) || ((drag && drag.e.id === b) - (drag && drag.e.id === a)) || (E[b].vol - E[a].vol) || (IDS.indexOf(a) - IDS.indexOf(b)));
   for (const id of order) {
-    const e = E[id], txt = e.label || id; if (e._twTxt !== txt) { e._twTxt = txt; e._twW = g.measureText(txt).width + 4; }
+    const e = E[id], txt = e.label || id; if (e.inHole) { e.lb = null; e.lbA = 0; continue; } if (e._twTxt !== txt) { e._twTxt = txt; e._twW = g.measureText(txt).width + 4; }
     const cands = labelCands(e, e._twW); let best = null, bestOv = 1e9;
     for (const c of cands) {
       const b = c.box; if (b[0] < SA.x + 2 || b[2] > SA.x + SA.w - 2 || b[1] < SA.y - 6 || b[3] > (SIDE ? H : SA.y + SA.h + 30)) continue;
@@ -4308,7 +4312,7 @@ cv.addEventListener('pointerdown', ev => {
     if (lk) { if (dbl) { unlink(lk[0], lk[1]); lastTap.t = 0; } return; } // a line: double-click / double-tap cuts it
     const lb = hitLabel(x, y); if (lb) { openPicker(baseOf(lb.id)); select(lb.id); return; }
     if (pickId) { closePicker(); return; }
-    if (Math.hypot(x - CX, y - CY) < SUNR + (touchMode ? 20 : 12)) { toggle(); ripples.push({ x: CX, y: CY, t0: performance.now(), r0: SUNR, big: true }); return; }
+    if (Math.hypot(x - CX, y - CY) < SUNR + (touchMode ? 20 : 12)) { initAudio(); sunTap(); return; } // chord sun: tap steps the chords (play / stop: ▷ or space)
     return;
   }
   cv.setPointerCapture(ev.pointerId);
@@ -4330,6 +4334,7 @@ function nearPlanet(x, y, not, R) { let T = null, bd = R; for (const id of IDS) 
 function dragTarget(d) { // what happens if released now
   const e = d.e;
   if (d.tether) { const T = nearPlanet(d.px, d.py, e.id, Math.max(linkR(), hitR(e) + 6)); return { tether: T }; }
+  if (inHoleZone(d.px, d.py)) return { hole: true };
   const pp = pointerPolar(d.px, d.py);
   if (pp.mute) return { mute: true };
   const T = nearPlanet(d.px, d.py, e.id, linkR());
@@ -4345,14 +4350,15 @@ function endDrag(ev) {
   layout(); const t = dragTarget(d), e = d.e;
   if (d.tether) { if (t.tether) addTetherP(e.id, t.tether.id); return; }
   const pos = posNow();
-  if (t.mute) { e.muted = true; recMsg((e.label || e.id) + ' muted · drag it back in to play'); }
+  if (t.hole) { swallow(e); }
+  else if (t.mute) { e.inHole = false; e.muted = true; recMsg((e.label || e.id) + ' muted · drag it back in to play'); }
   else if (t.connect) {
-    e.muted = false; const T = t.connect, took = ev && ev.altKey ? 0 : partnersOf(e.id).length; if (ev && ev.altKey) { for (const p of partnersOf(e.id)) links.delete(lkey(e.id, p)); } links.add(lkey(e.id, T.id)); regroup(T.gid); // alt-drop brings the planet alone
+    e.muted = false; e.inHole = false; const T = t.connect, took = ev && ev.altKey ? 0 : partnersOf(e.id).length; if (ev && ev.altKey) { for (const p of partnersOf(e.id)) links.delete(lkey(e.id, p)); } links.add(lkey(e.id, T.id)); regroup(T.gid); // alt-drop brings the planet alone
     const o = grpOf(T); let rad = clampRadLap(t.rad, o.lap); const sp = 0.055; if (Math.abs(rad - T.rad) < sp) rad = clampRadLap(T.rad + (rad >= T.rad ? sp : -sp), o.lap); if (Math.abs(rad - T.rad) < sp * 0.7) rad = clampRadLap(T.rad - (rad >= T.rad ? sp : -sp), o.lap); // sit a little apart so the line shows
     e.rad = rad; e.a = snapA(aFromAngG(o, t.ang, pos), o.lap);
     recMsg((e.label || e.id) + ' connected to ' + (T.label || T.id) + ' · ' + lapTxt(o.lap) + ' lap' + (took ? ' · its partners came too (alt-drop to bring it alone)' : ''));
   } else {
-    e.muted = false;
+    e.muted = false; e.inHole = false;
     if (t.breaks.length) { t.breaks.forEach(p => links.delete(lkey(e.id, p))); regroup(); recMsg((e.label || e.id) + ' disconnected'); }
     const i = e.orbit; setGroupLap(i, t.lap, e); const o = ORB[i];
     e.rad = clampRadLap(t.rad, o.lap); e.a = snapA(aFromAngG(o, t.ang, pos), o.lap);
@@ -4409,7 +4415,7 @@ function smoky(A, B, bright, T, seed) { // connection: a thin smoky white line (
 const hash = s => { let h = 7; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) % 9973; return h; };
 function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000); last = now; const T = now / 1000;
-  layout(); updateMix();
+  layout(); morphTick(); updateMix();
   if (drag && drag.moved) drag.tgt = dragTarget(drag);
   if (ac && playing) while (visQ.length && visQ[0].t <= ac.currentTime) {
     const q = visQ.shift(), e = E[q.id]; if (!e) continue; e.pulse = Math.max(e.pulse, q.v); trigFlash = Math.max(trigFlash, 0.6 + 0.4 * q.v);
@@ -4428,7 +4434,7 @@ function frame(now) {
   const hair = Math.max(0.5, 1 / DPR) * 0.9, sel = E[selId], dragging = drag && drag.moved && !drag.tether ? drag : null;
   // --- no permanent rings: just a faint ghost ring for the selected planet and the one being dragged ---
   if (sel && !(dragging && dragging.e === sel)) ghostRing(sel.rad, grpOf(sel), 0.07, T, hair);
-  if (dragging && dragging.tgt && !dragging.tgt.mute) {
+  if (dragging && dragging.tgt && !dragging.tgt.mute && !dragging.tgt.hole) {
     const tg = dragging.tgt, rr = tg.connect ? clampRadLap(tg.rad, tg.lap) : tg.rad; ghostRing(rr, grpOf(dragging.e), 0.11, T, hair);
     if (snapOn) { const n = tg.lap * 4; g.globalAlpha = 0.22; for (let j = 0; j < n && n <= 64; j++) { const p = onRing(rr, still ? j / n : frac(j / n + curPos / tg.lap)); g.beginPath(); g.arc(p.x, p.y, j % 4 ? 0.6 : 1.1, 0, TAU); g.fill(); } }
   }
@@ -4447,7 +4453,7 @@ function frame(now) {
   // mute zone while dragging
   if (dragging) { const Ro = 1.12 * RMAX; g.globalAlpha = dragging.tgt && dragging.tgt.mute ? 0.35 : 0.08; g.lineWidth = hair; g.setLineDash([1, 6]); g.beginPath(); g.ellipse(CX, CY, Ro, Ro * K, 0, 0, TAU); g.stroke(); g.setLineDash([]); }
   // --- connections: smoky lines; opposite partners glow brighter ---
-  for (const k of links) { const [a, b] = k.split('|'), A = E[a], B = E[b]; if (!A || !B) continue; const opp = Math.abs(frac(A.ang - B.ang) - 0.5) < 0.04; smoky(A, B, opp, T, hash(k)); }
+  for (const k of links) { const [a, b] = k.split('|'), A = E[a], B = E[b]; if (!A || !B || A.inHole || B.inHole) continue; const opp = Math.abs(frac(A.ang - B.ang) - 0.5) < 0.04; smoky(A, B, opp, T, hash(k)); }
   if (dragging && dragging.tgt && dragging.tgt.connect) { g.setLineDash([1, 4]); g.globalAlpha = 0.45; g.lineWidth = 0.7; g.beginPath(); g.moveTo(dragging.px, dragging.py); g.lineTo(dragging.tgt.connect.x, dragging.tgt.connect.y); g.stroke(); g.setLineDash([]); }
   if (dragging && dragging.tgt && dragging.tgt.breaks) for (const p of dragging.tgt.breaks) { const P = E[p]; g.setLineDash([1, 7]); g.globalAlpha = 0.3; g.lineWidth = 0.7; g.beginPath(); g.moveTo(dragging.px, dragging.py); g.lineTo(P.x, P.y); g.stroke(); g.setLineDash([]); }
   // --- sidechain tethers: faint dashed, flash on each duck ---
@@ -4456,6 +4462,7 @@ function frame(now) {
     g.setLineDash([2, 5]); g.lineWidth = 0.7; g.globalAlpha = t.live ? 0.16 + 0.1 * t.depth + 0.45 * fl : 0.06; g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.stroke(); g.setLineDash([]);
     g.globalAlpha *= 0.9; g.beginPath(); g.moveTo(x1, y1); g.lineTo(x1 - ux * 4 + uy * 2.2, y1 - uy * 4 - ux * 2.2); g.moveTo(x1, y1); g.lineTo(x1 - ux * 4 - uy * 2.2, y1 - uy * 4 + ux * 2.2); g.stroke(); }
   if (drag && drag.moved && drag.tether) { const A = drag.e, T2 = drag.tgt && drag.tgt.tether; g.setLineDash([2, 5]); g.lineWidth = 0.8; g.globalAlpha = T2 ? 0.6 : 0.3; g.beginPath(); g.moveTo(A.x, A.y); g.lineTo(T2 ? T2.x : drag.px, T2 ? T2.y : drag.py); g.stroke(); g.setLineDash([]); g.font = LABEL_FONT; g.textAlign = 'center'; g.globalAlpha = 0.5; g.fillText(T2 ? 'duck ' + (T2.label || T2.id) : 'duck…', drag.px, drag.py - 14); }
+  drawHole(T, !!(dragging && (dragging.tgt && dragging.tgt.hole || inHoleZone(dragging.px, dragging.py) || dragging.e.inHole)) || IDS.some(id => E[id].inHole && E[id].pulse > 0.05));
   // --- sun ---
   const sr = SUNR * (1 + 0.18 * kickPulse);
   const grd = g.createRadialGradient(CX, CY, 0, CX, CY, sr * 4.5); grd.addColorStop(0, 'rgba(255,255,255,0.22)'); grd.addColorStop(1, 'rgba(255,255,255,0)');
@@ -4463,6 +4470,7 @@ function frame(now) {
   g.globalAlpha = 0.95; g.beginPath(); g.arc(CX, CY, sr, 0, TAU); g.fill();
   g.lineWidth = 0.7; g.globalAlpha = 0.4; g.beginPath(); g.arc(CX, CY, sr + 4.5, 0, TAU); g.stroke();
   g.globalAlpha = 0.16; g.beginPath(); g.arc(CX, CY, sr + 9, 0, TAU); g.stroke();
+  sunFlash *= Math.exp(-dt * 5); drawSunChord();
   if (!playing) { g.globalAlpha = 0.5; g.beginPath(); g.moveTo(CX - 1.6, CY - 2.4); g.lineTo(CX + 2.6, CY); g.lineTo(CX - 1.6, CY + 2.4); g.closePath(); g.fillStyle = '#000'; g.fill(); g.fillStyle = '#fff'; }
   // --- echo: hollow ghost dots trailing on the planet's ring · recorded pattern: tiny ticks ---
   for (const id of IDS) {
@@ -4495,7 +4503,7 @@ function frame(now) {
   }
   if (ripples.length > 160) ripples.splice(0, ripples.length - 160);
   // --- drag ghost (where it will land) + lap label ---
-  if (dragging && dragging.tgt && !dragging.tgt.mute) { const tg = dragging.tgt; g.font = LABEL_FONT; g.textAlign = 'center'; g.textBaseline = 'middle'; g.globalAlpha = 0.55;
+  if (dragging && dragging.tgt && !dragging.tgt.mute && !dragging.tgt.hole) { const tg = dragging.tgt; g.font = LABEL_FONT; g.textAlign = 'center'; g.textBaseline = 'middle'; g.globalAlpha = 0.55;
     g.fillText(tg.connect ? '→ ' + (tg.connect.label || tg.connect.id) + ' · ' + lapTxt(tg.lap) : lapTxt(tg.lap) + (tg.breaks && tg.breaks.length ? ' · disconnect' : ''), dragging.px, dragging.py + dragging.e.r + 14); }
   // --- planets ---
   g.font = LABEL_FONT; g.textBaseline = 'middle';
@@ -4507,7 +4515,8 @@ function frame(now) {
     if (e.side === 'rec') { g.globalAlpha = 0.35; g.lineWidth = 0.7; g.beginPath(); g.arc(e.x, e.y, r + 3.5, 0, TAU); g.stroke(); }
     if (id === selId) { g.globalAlpha = 0.65; g.lineWidth = 0.8; g.beginPath(); g.arc(e.x, e.y, r + 7, 0, TAU); g.stroke(); }
     if (baseOf(id) === pickId || id === barId || id === winId) { g.save(); g.translate(e.x, e.y); g.rotate(T * 0.5); g.globalAlpha = 0.6; g.lineWidth = 0.8; g.setLineDash([2, 5]); g.beginPath(); g.arc(0, 0, r + 12, 0, TAU); g.stroke(); g.setLineDash([]); g.restore(); }
-    const b = e.lb; if (b && e.lbA > 0.02) { g.textAlign = b.al; g.globalAlpha = (mutedLook ? 0.3 : (id === selId ? 0.95 : 0.62)) * e.lbA; g.fillText(b.txt, b.tx, b.ty + 0.5); }
+    if (JAM && jamIds().includes(id)) { g.font = LABEL_FONT; g.textAlign = 'center'; g.globalAlpha = 0.38; g.fillText(String(jamIds().indexOf(id) + 1), e.x, e.y - r - 9); }
+    const b = e.lb; if (b && e.lbA > 0.02 && !e.inHole) { g.textAlign = b.al; g.globalAlpha = (mutedLook ? 0.3 : (id === selId ? 0.95 : 0.62)) * e.lbA; g.fillText(b.txt, b.tx, b.ty + 0.5); }
   }
   if (drag && drag.moved && drag.tgt && drag.tgt.mute) { g.textAlign = 'center'; g.globalAlpha = 0.5; g.fillText('mute', drag.px, drag.py - drag.e.r - 14); }
   g.globalAlpha = 1;
@@ -4527,6 +4536,7 @@ const SLIDERS = [
   { k: 'echo', name: 'echo', get: e => e.echo, set: (e, t) => e.echo = t, show: e => Math.round(e.echo * 100) },
   { k: 'verb', name: 'reverb', get: e => e.verb, set: (e, t) => e.verb = t, show: e => Math.round(e.verb * 100) },
   { k: 'prob', name: 'chance', get: e => (e.prob == null ? 1 : e.prob), set: (e, t) => e.prob = t > 0.985 ? 1 : Math.round(t * 100) / 100, show: e => Math.round((e.prob == null ? 1 : e.prob) * 100) + '%' },
+  { k: 'drift', name: 'drift', get: e => e.drift || 0, set: (e, t) => e.drift = t < 0.02 ? 0 : Math.round(t * 100) / 100, show: e => e.drift ? Math.round(e.drift * 100) + '' : 'off' },
   { k: 'cut', name: 'filter', get: e => e.cut, set: (e, t) => e.cut = t, show: e => e.cut > 0.985 ? 'open' : fmtHz(cutHz(e.cut)) },
 ];
 const panTxt = p => Math.abs(p) < 0.02 ? 'c' : (p < 0 ? 'l' : 'r') + Math.round(Math.abs(p) * 50);
@@ -4612,7 +4622,7 @@ function renderSheet() {
     h += '<div class="ofx">' + orbFxHTML(i, selId) + '</div>';
     h += '</div></div>';
   });
-  h += '<div class="foot">' + (still ? 'still: planets stay put and a hand sweeps from the sun at each group\'s lap; a planet plays when its hand passes it' : 'moving: each planet plays once per lap, when it crosses the line at 12') + ' · distance from the sun sets the lap · drop a planet on another to connect · drag it away or double-click the line to cut · shift-drag to duck · off the edge mutes · click a planet for its window · hold for its bar · tap the sun or space to play · wheel / pinch zooms, + / − too, space-drag or middle-drag pans, fit · 1:1 up top · in a planet\'s window: moons add ghost notes, chance thins its hits, click a tick on the ring to set that hit\'s chance · poly laps (3 · 5 · 7 beats) drift against the bar · more: comets, share link</div>';
+  h += '<div class="foot">' + (still ? 'still: planets stay put and a hand sweeps from the sun at each group\'s lap; a planet plays when its hand passes it' : 'moving: each planet plays once per lap, when it crosses the line at 12') + ' · distance from the sun sets the lap · drop a planet on another to connect · drag it away or double-click the line to cut · shift-drag to duck · off the edge mutes · click a planet for its window · hold for its bar · ▷ or space plays · tap the sun to step the chords (bass, chords, pad, lead follow), hold it for auto · drop a planet in the black hole (bottom left) to silence it, drag it out again · drift makes its hits wander a little each lap · wheel / pinch zooms, + / − too, space-drag or middle-drag pans, fit · 1:1 up top · in a planet\'s window: moons add ghost notes, chance thins its hits, click a tick on the ring to set that hit\'s chance · poly laps (3 · 5 · 7 beats) drift against the bar · more: comets, scenes (save intro / drop / break, morph over bars), mutate (keeps kick + bass, undoable), jam keys (1–9 play planets, ← → nudge), share link</div>';
   sheet.innerHTML = h;
   if (scrollSel && selId) { scrollSel = false; const el = sheet.querySelector('.pl.sel'); if (el) { const r = el.getBoundingClientRect(), sr = sheet.getBoundingClientRect(); if (r.top < sr.top + 30 || r.bottom > sr.bottom - 120) sheet.scrollTop += r.top - sr.top - 40; } }
 }
@@ -5046,15 +5056,147 @@ function renderMore() {
   const ch = (k, v, on, label) => '<span class="ch' + (on ? ' on' : '') + '" data-mk="' + k + '" data-v="' + v + '">' + label + '</span>';
   mmenu.innerHTML = '<div class="mi' + (COMET.on ? ' on' : '') + '" data-m="comet"><i class="ck"></i><b>comets</b>' + ch('every', 8, COMET.every === 8, '8') + ch('every', 16, COMET.every === 16, '16') + '<span style="opacity:.3">bars</span></div>'
     + '<div class="mn">a riser sweeps in, a crash lands on the downbeat</div><div class="ms"></div>'
+    + '<div class="mi" style="cursor:default;opacity:.8"><b>scenes</b><span style="opacity:.3">morph</span>' + [0, 1, 2, 4, 8].map(b => ch('sbars', b, SCENE_BARS === b, b ? b + '' : 'cut')).join('') + '</div>'
+    + SCENE_SLOTS.map(sl => '<div class="mi' + (sceneOn === sl ? ' on' : '') + '" data-m="scene" data-s="' + sl + '"><i class="ck"' + (SCENES[sl] ? ' style="background:rgba(255,255,255,.55)"' : '') + '></i><b>' + sl + '</b>' + ch('sstore', sl, false, SCENES[sl] ? 'save over' : 'save') + '</div>').join('')
+    + '<div class="mn">click a saved scene to morph to it · morph runs over the chosen bars from the next downbeat</div><div class="ms"></div>'
+    + '<div class="mi" data-m="mutate"><i class="ck" style="border-style:dotted"></i><b>mutate</b>' + (MUT_UNDO.length ? ch('mundo', 1, false, 'undo') : '') + '</div><div class="mn">a variation of the groove · kick and bass stay</div>'
+    + '<div class="mi' + (JAM ? ' on' : '') + '" data-m="jam"><i class="ck"></i><b>jam keys</b></div><div class="mn">1–9 play planets · ← → nudge the selected planet a 16th (none selected: the transport)</div><div class="ms"></div>'
     + '<div class="mi" data-m="share"><i class="ck" style="border-style:dashed"></i><b>share link</b></div><div class="mn">copies a link with the whole system · recordings are not included</div>' + (lastShare ? '<div class="mn"><input readonly value="' + esc(lastShare) + '" style="width:100%;background:#000;color:#fff;border:0;border-bottom:1px solid rgba(255,255,255,.3);font:inherit;font-size:10px;padding:3px 0;opacity:.8"></div>' : '');
 }
 moreEl.addEventListener('click', ev => { ev.stopPropagation(); renderMore(); const r = moreEl.getBoundingClientRect(); mmenu.style.left = Math.max(8, Math.min(innerWidth - 230, r.right - 200)) + 'px'; mmenu.style.top = (r.bottom + 4) + 'px'; mmenu.classList.toggle('open'); gmenu.classList.remove('open'); });
 mmenu.addEventListener('click', ev => { ev.stopPropagation(); const k = ev.target.closest('[data-mk]'), m = ev.target.closest('[data-m]');
-  if (k) { if (k.dataset.mk === 'every') setComet({ every: +k.dataset.v, on: true }); return; }
+  if (k) { const v = k.dataset.v; initAudio();
+    if (k.dataset.mk === 'every') setComet({ every: +v, on: true });
+    else if (k.dataset.mk === 'sbars') { SCENE_BARS = +v; saveScenes(); renderMore(); }
+    else if (k.dataset.mk === 'sstore') storeScene(v);
+    else if (k.dataset.mk === 'mundo') undoMutate();
+    return; }
   if (!m) return; initAudio();
   if (m.dataset.m === 'comet') setComet({ on: !COMET.on });
+  else if (m.dataset.m === 'scene') { const sl = m.dataset.s; if (SCENES[sl]) gotoScene(sl); else storeScene(sl); }
+  else if (m.dataset.m === 'mutate') mutate();
+  else if (m.dataset.m === 'jam') setJam(!JAM);
   else if (m.dataset.m === 'share') { mmenu.classList.remove('open'); shareLink(); } });
 addEventListener('pointerdown', ev => { if (!ev.target.closest('#mmenu,#more')) mmenu.classList.remove('open'); });
+
+/* ---------------- snapshots: shared by scenes and mutate ---------------- */
+const SNAP_KEYS = ['rad', 'a', 'vol', 'pn', 'cut', 'verb', 'echo', 'muted', 'inHole', 'moons', 'prob', 'drift'];
+function sysSnap() {
+  const els = {}; IDS.forEach(id => { const e = E[id], o = {}; SNAP_KEYS.forEach(k => { o[k] = e[k] === undefined ? null : e[k]; }); o.pat = (e.pat || []).map(h => Object.assign({}, h)); o.lap = lapOf(e); els[id] = o; });
+  return { els, links: [...links] };
+}
+function applyDiscrete(s) { // links → groups → laps, then every planet's place, pattern and settings
+  if (!s || !s.els) return; links.clear(); s.links.forEach(k => { const [a, b] = k.split('|'); if (E[a] && E[b]) links.add(k); }); regroup();
+  ORB.forEach((o, i) => { const m = membersOf(o).map(e => s.els[e.id]).find(Boolean); if (m && m.lap && m.lap !== o.lap) setGroupLap(i, m.lap); });
+  for (const id in s.els) { const e = E[id], o = s.els[id]; if (!e) continue; SNAP_KEYS.forEach(k => { if (o[k] === null) delete e[k]; else if (o[k] !== undefined) e[k] = o[k]; }); e.pat = (o.pat || []).map(h => Object.assign({}, h)); }
+  sheetDirty = true; save(); if (winId) renderWin();
+}
+
+/* ---------------- scenes: constellations in slots, morphing over n bars ---------------- */
+const SCENE_SLOTS = ['intro', 'drop', 'break'];
+let SCENES = {}, SCENE_BARS = 4, sceneOn = null, MORPH = null;
+try { const v = JSON.parse(localStorage.getItem('orbs-solar-scenes') || 'null'); if (v && typeof v === 'object') { SCENES = v.slots || {}; if ([0, 1, 2, 4, 8].includes(v.bars)) SCENE_BARS = v.bars; } } catch (x) {}
+const saveScenes = () => { try { localStorage.setItem('orbs-solar-scenes', JSON.stringify({ slots: SCENES, bars: SCENE_BARS })); } catch (x) {} };
+function storeScene(slot) { SCENES[slot] = sysSnap(); sceneOn = slot; saveScenes(); renderMore(); recMsg(slot + ' saved · ' + IDS.filter(id => !E[id].muted).length + ' planets'); }
+function gotoScene(slot, bars) {
+  const to = SCENES[slot]; if (!to) return false; bars = bars == null ? SCENE_BARS : bars; sceneOn = slot; renderMore();
+  if (!playing || bars <= 0) { MORPH = null; applyDiscrete(to); recMsg('→ ' + slot); return true; }
+  const p = posNow(), p0 = Math.ceil(p / 4 - 1e-6) * 4, from = sysSnap();
+  for (const id in to.els) { const e = E[id], t = to.els[id]; if (e && e.muted && !t.muted) { e.muted = false; e.inHole = false; from.els[id].vol = 0; } } // coming in: fade up from silence
+  MORPH = { slot, to, from, p0, p1: p0 + bars * 4 }; recMsg('morphing to ' + slot + ' over ' + bars + (bars > 1 ? ' bars' : ' bar'));
+  return true;
+}
+function morphTick() {
+  if (!MORPH) return; if (!playing) { const m = MORPH; MORPH = null; applyDiscrete(m.to); return; }
+  const u = (posNow() - MORPH.p0) / (MORPH.p1 - MORPH.p0); if (u < 0) return;
+  if (u >= 1) { const m = MORPH; MORPH = null; applyDiscrete(m.to); return; }
+  const k = u * u * (3 - 2 * u);
+  for (const id in MORPH.to.els) { const e = E[id], a = MORPH.from.els[id], b = MORPH.to.els[id]; if (!e || !a) continue;
+    ['pn', 'cut', 'verb', 'echo'].forEach(q => { if (isFinite(a[q]) && isFinite(b[q])) e[q] = a[q] + (b[q] - a[q]) * k; });
+    const vb = b.muted ? 0 : b.vol; if (isFinite(a.vol) && isFinite(vb)) e.vol = a.vol + (vb - a.vol) * k; // leaving: fade out, muted at the end
+    if (bandOf(a.rad) === bandOf(b.rad) && grpOf(e) && bandOfLap(lapOf(e)) === bandOf(b.rad)) e.rad = a.rad + (b.rad - a.rad) * k; }
+}
+
+/* ---------------- mutate: a variation of the groove that keeps kick and bass (undoable) ---------------- */
+const MUT_UNDO = [];
+function mutate(seed) {
+  const r = rng(seed == null ? (Date.now() & 0x7fffffff) : seed); MUT_UNDO.push(sysSnap()); if (MUT_UNDO.length > 20) MUT_UNDO.shift();
+  let n = 0;
+  for (const id of IDS) { const e = E[id], base = baseOf(id); if (base === 'kick' || base === 'bass' || e.side === 'rec' || e.muted) continue; const L = lapOf(e), st = 0.25 / L;
+    if (r() < 0.55) { e.a = frac(e.a + (r() < 0.5 ? -1 : 1) * (1 + (r() * 2 | 0)) * st); if (snapOn) e.a = snapA(e.a, L); n++; }
+    if (r() < 0.35) { const pat = (e.pat && e.pat.length ? e.pat : ONE).map(h => Object.assign({}, h));
+      if (pat.length > 1 && r() < 0.4) pat.splice(1 + (r() * (pat.length - 1) | 0), 1); else { const o = +frac(((r() * L * 4) | 0) / (L * 4)).toFixed(6); if (!pat.some(h => Math.abs(h.o - o) < 1e-6)) pat.push({ o, v: +(0.5 + r() * 0.4).toFixed(2) }); }
+      e.pat = pat.sort((x, y) => x.o - y.o); n++; }
+    if (r() < 0.2) { e.moons = r() * 3 | 0; n++; }
+    if (r() < 0.2) { e.prob = [1, 0.85, 0.7][r() * 3 | 0]; n++; } }
+  sheetDirty = true; save(); if (winId) renderWin(); renderMore(); recMsg('mutated · ' + n + ' changes · kick and bass kept · undo in more');
+  return n;
+}
+function undoMutate() { const s = MUT_UNDO.pop(); if (!s) return false; applyDiscrete(s); renderMore(); recMsg('mutate undone'); return true; }
+
+/* ---------------- jam keys: 1–9 trigger planets, ← / → nudge the selected planet (or the whole transport) ---------------- */
+let JAM = false; try { JAM = localStorage.getItem('orbs-solar-jam') === '1'; } catch (x) {}
+function setJam(v) { JAM = !!v; try { localStorage.setItem('orbs-solar-jam', JAM ? '1' : '0'); } catch (x) {} renderMore(); recMsg(JAM ? 'jam keys on · 1–9 play planets · ← → nudge' : 'jam keys off'); }
+const jamIds = () => IDS.slice(0, 9);
+function jamHit(id, v = 0.9) {
+  const e = E[id]; if (!e) return null; initAudio(); if (ac.state !== 'running') ac.resume();
+  const t = ac.currentTime + 0.004, p = posAt(t), ev = hitEvent(e, p, Math.floor(p * 4) + 911); ev.v *= v;
+  playPlanet(e, t, ev, Math.min(ev.dur, 1.2)); midiNote(e, ev, t, Math.min(ev.dur, 1.2));
+  e.pulse = Math.max(e.pulse, v); ripples.push({ x: e.x, y: e.y, t0: performance.now(), r0: e.r, v }); hitLog.push({ id, t, p, j: 'jam' });
+  return { t, p };
+}
+function jamNudge(dir) {
+  const e = E[selId];
+  if (e) { const L = lapOf(e); e.a = frac(e.a - dir * 0.25 / L); if (snapOn) e.a = snapA(e.a, L); sheetDirty = true; save(); recMsg((e.label || e.id) + ' nudged ' + (dir > 0 ? 'later' : 'earlier') + ' a 16th'); return 'planet'; }
+  if (playing) { nextT += dir * 0.012; recMsg('transport nudged ' + (dir > 0 ? '+' : '−') + '12 ms'); return 'transport'; }
+  return null;
+}
+function jamKey(ev) {
+  if (!JAM) return false;
+  const m = /^Digit([1-9])$/.exec(ev.code); if (m) { if (ev.repeat) return true; const id = jamIds()[+m[1] - 1]; if (id) { ev.preventDefault(); jamHit(id); return true; } return false; }
+  if (ev.code === 'ArrowLeft' || ev.code === 'ArrowRight') { ev.preventDefault(); jamNudge(ev.code === 'ArrowRight' ? 1 : -1); return true; }
+  return false;
+}
+
+/* ---------------- drift: per planet, its hits wander a little each lap (seeded value noise, bounded) ---------------- */
+function driftOff(e, k, j) { // beats; at drift 1 at most ±0.09 beat (about a third of a 16th)
+  if (!e.drift) return 0; const s = (e.seed | 0) * 31 + (j | 0) * 13, x = k / 3, i = Math.floor(x), f = x - i, sm = f * f * (3 - 2 * f);
+  const r = q => rng(s + q * 977)() * 2 - 1; return e.drift * 0.09 * (r(i) + (r(i + 1) - r(i)) * sm);
+}
+
+/* ---------------- black hole: drop a planet in, it falls silent with a reverb tail; drag it back out to play ---------------- */
+
+function placeHole() { HOLE = { x: SA.x + Math.max(44, 40 * DS), y: SA.y + SA.h - Math.max(44, 40 * DS), r: 14 * DS }; }
+const inHoleZone = (x, y) => Math.hypot(x - HOLE.x, y - HOLE.y) < HOLE.r + 16;
+function swallow(e) {
+  e.inHole = true; e.muted = true;
+  if (ac && e.vg) { const t = ac.currentTime, o = grpOf(e), og = o && o.st && !o.st.muted ? OrbsFX.dbToGain(o.st.gainDb) : 1, v0 = Math.pow(e.vol, 1.3) * e.lvl;
+    e._mix.v = 0; e.vg.gain.cancelScheduledValues(t); e.vg.gain.setValueAtTime(v0, t); e.vg.gain.linearRampToValueAtTime(0, t + 0.7); // a last hit falls in: dry fades, the room keeps its tail
+    e.sg.gain.cancelScheduledValues(t); e.sg.gain.setValueAtTime(Math.max(0.9, e.verb) * og, t); e.sg.gain.setTargetAtTime(e.verb * og, t + 1.2, 0.6);
+    const p = posAt(t), ev = hitEvent(e, p, 4242); playPlanet(e, t + 0.01, ev, Math.min(ev.dur, 0.8)); }
+  recMsg((e.label || e.id) + ' fell into the black hole · drag it out to play');
+}
+function holeLayout(T) { const hs = IDS.filter(id => E[id].inHole); hs.forEach((id, k) => { const e = E[id], an = T * 0.35 + k * TAU / hs.length, rr = HOLE.r * 0.62; e.r *= 0.45; if (drag && drag.e === e && drag.moved) return; e.x = HOLE.x + rr * Math.sin(an); e.y = HOLE.y - rr * Math.cos(an); }); }
+function drawHole(T, near) {
+  g.globalAlpha = 1; g.fillStyle = '#000'; g.beginPath(); g.arc(HOLE.x, HOLE.y, HOLE.r, 0, TAU); g.fill(); g.fillStyle = '#fff';
+  g.lineWidth = 0.7; for (let j = 0; j < 3; j++) { const a0 = T * (0.5 + j * 0.27) + j * 2.1, rr = HOLE.r + 2 + j * 2.6; g.globalAlpha = (near ? 0.5 : 0.18) * (1 - j * 0.25); g.beginPath(); g.arc(HOLE.x, HOLE.y, rr, a0, a0 + 2.2 + j * 0.6); g.stroke(); }
+  g.globalAlpha = near ? 0.6 : 0.3; g.beginPath(); g.arc(HOLE.x, HOLE.y, HOLE.r, 0, TAU); g.stroke();
+  if (near) { g.font = LABEL_FONT; g.textAlign = 'center'; g.textBaseline = 'middle'; g.globalAlpha = 0.55; g.fillText('black hole', HOLE.x, HOLE.y - HOLE.r - 14); }
+}
+
+/* ---------------- chord sun: tap the sun to step the chord progression; bass, chords, pad and lead follow · hold it for auto ---------------- */
+let CHORD = { held: null }, sunHoldT = 0;
+const chordIdx = bar => { const n = PROG.length || 1; return CHORD.held != null ? CHORD.held % n : ((bar % n) + n) % n; };
+const NOTE_NM = ['c', 'c#', 'd', 'eb', 'e', 'f', 'f#', 'g', 'ab', 'a', 'bb', 'b'];
+const chordName = C => C ? NOTE_NM[((C.r % 12) + 12) % 12] + (C.t.includes(3) ? 'm' : '') + (C.t.includes(10) || C.t.includes(11) ? '7' : '') : '';
+function sunTap() {
+  const n = PROG.length || 1, cur = chordIdx(Math.floor(posNow() / 4 + 1e-9)); CHORD.held = (cur + 1) % n; sunFlash = 1;
+  ripples.push({ x: CX, y: CY, t0: performance.now(), r0: SUNR, big: true }); recMsg('chord ' + (CHORD.held + 1) + ' / ' + n + ' · ' + chordName(PROG[CHORD.held]) + ' · hold the sun for auto');
+  clearTimeout(sunHoldT); sunHoldT = setTimeout(() => { CHORD.held = null; recMsg('chords back on auto'); }, 650);
+}
+let sunFlash = 0;
+cv.addEventListener('pointerup', () => clearTimeout(sunHoldT)); cv.addEventListener('pointercancel', () => clearTimeout(sunHoldT));
+function drawSunChord() { if (CHORD.held == null) return; g.font = LABEL_FONT; g.textAlign = 'center'; g.textBaseline = 'middle'; g.globalAlpha = 0.5 + 0.4 * sunFlash; g.fillText(chordName(PROG[CHORD.held]), CX, CY + SUNR + 20); }
 
 
 /* ---------------- sample picker ---------------- */
@@ -5404,7 +5546,8 @@ window.SS = { E, get ORB() { return ORB; }, IDS, links, get TETH() { return TETH
   set snap(v) { snapOn = !!v; renderSnap(); }, get snap() { return snapOn; },
   get fx() { return fx; }, get fx2() { return fx2; }, orb2Set, orbSet, setSwing, labelOverlaps, layoutLabels, get swing() { return swing; }, setStill, get still() { return still; }, aEff,
   geom: () => ({ CX, CY, K, RMAX, SA }),
-  get VIEW() { return VIEW; }, zoomAt, setView, zoomFit, zoom11, get COMET() { return COMET; }, setComet, comets, shareLink, shareState, chanceOk, MOON_OFF, POLY, renderMore, get spaceDown() { return spaceDown; } };
+  get VIEW() { return VIEW; }, zoomAt, setView, zoomFit, zoom11, get COMET() { return COMET; }, setComet, comets, shareLink, shareState, chanceOk, MOON_OFF, POLY, renderMore, get spaceDown() { return spaceDown; },
+  sysSnap, applyDiscrete, storeScene, gotoScene, get SCENES() { return SCENES; }, get MORPH() { return MORPH; }, set SCENE_BARS(v) { SCENE_BARS = v; }, mutate, undoMutate, MUT_UNDO, setJam, get JAM() { return JAM; }, jamHit, jamNudge, driftOff, swallow, get HOLE() { return HOLE; }, sunTap, get CHORD() { return CHORD; }, chordIdx, chordName, hitEvent };
 })();
 </script>
 </body>
