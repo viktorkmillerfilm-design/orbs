@@ -174,6 +174,56 @@
     #bar.open{transform:none}
     #barCv{height:120px}
   }
+
+  /* ===== overlays v2 (vmorphs' mockup): 32px rows, sections, tabs, sheet below the top bar, more as a panel ===== */
+  :root{--row:32px}
+  #sheet{display:flex;flex-direction:column;overflow:hidden!important;padding-bottom:0!important}
+  #sBody{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;touch-action:pan-y;overscroll-behavior:contain;padding-bottom:calc(26px + env(safe-area-inset-bottom))}
+  #sHead{display:flex;align-items:center;gap:8px;min-height:var(--row);border-bottom:1px solid rgba(255,255,255,.14);flex-shrink:0;user-select:none}
+  #sHead .ttl{flex:1;opacity:.5} #sMeta{opacity:.35;font-size:10.5px;white-space:nowrap}
+  .grip{width:10px;height:14px;opacity:.35;background:radial-gradient(circle,#fff .8px,transparent 1px) 0 0/5px 5px;flex-shrink:0}
+  .ib{width:32px;height:32px;display:grid;place-items:center;cursor:pointer;opacity:.45;flex-shrink:0} .ib:hover{opacity:1}
+  #sResize{display:none}
+  #sheet.collapsed #sBody{display:none} #sheet.collapsed{top:auto!important;height:auto}
+  .sec{margin:0} .sec-h{display:flex;align-items:center;gap:10px;min-height:var(--row);cursor:pointer;user-select:none}
+  .sec-h b{font-weight:500;opacity:.5;letter-spacing:.03em;white-space:nowrap} .sec-h .sum{flex:1;opacity:.3;font-size:10.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .sec-h .chev{opacity:.3;width:22px;text-align:center;transition:transform .15s} .sec-h:hover b,.sec-h:hover .chev{opacity:.9}
+  .sec.col>.sec-b{display:none} .sec.col>.sec-h .chev{transform:rotate(-90deg)}
+  .sec-b{padding-bottom:6px}
+  .hint{font-size:10px;opacity:.32;padding:2px 0 8px;line-height:1.45}
+  .sl{min-height:var(--row);padding:0!important;box-sizing:border-box} .sl b{width:72px!important;font-weight:400;opacity:.45} .sl em{width:56px!important;opacity:.7;font-variant-numeric:tabular-nums}
+  .sl .tr{height:22px!important} .sl .tr::before,.sl .fi{top:11px!important} .sl .kn{top:5px!important;width:12px!important;height:12px!important;margin-left:-6px!important;background:#000!important;border:1px solid #fff;box-sizing:border-box}
+  .grp{min-height:var(--row);align-items:center!important;padding:0!important;font-size:11px!important} .grp b{width:auto!important;min-width:72px;letter-spacing:.03em!important;opacity:.5!important;font-weight:400}
+  .laps,.acts{min-height:var(--row);align-items:center;padding:0 0 4px!important}
+  .pl{min-height:var(--row);display:flex;align-items:center;box-sizing:border-box}
+  #sheet .orb .row{min-height:36px}
+  #wTabs{display:flex;align-items:center;border-top:1px solid rgba(255,255,255,.12);border-bottom:1px solid rgba(255,255,255,.12);padding:0 10px;min-height:36px;flex-shrink:0;font-size:12px}
+  #wTabs [data-tab]{padding:0 16px;min-height:36px;display:inline-flex;align-items:center;cursor:pointer;opacity:.38;letter-spacing:.04em}
+  #wTabs [data-tab]:hover{opacity:.9} #wTabs [data-tab].on{opacity:1;box-shadow:inset 0 -1px 0 #fff} #wTabs .hint{margin-left:auto;padding:0 8px}
+  #win .wh{padding:6px 8px 6px 22px!important;border-bottom:0!important;align-items:center!important;min-height:40px}
+  #wClose{width:32px;height:32px;display:grid;place-items:center;font-size:16px;cursor:pointer;opacity:.6} #wClose:hover{opacity:1}
+  .tabp{display:none} .tabp.on{display:block} #wFx{padding-top:10px!important}
+  #wFx .prs .pr{min-height:var(--row)}
+  #mmenu .mhead{display:flex;align-items:center;min-height:36px;padding:0 6px 0 16px;border-bottom:1px solid rgba(255,255,255,.14);position:sticky;top:0;background:#000;z-index:1}
+  #mmenu .mhead .ttl{flex:1;opacity:.5} #mmenu .mhead .hint{padding:0 4px}
+  #mmenu .lab{padding:12px 16px 2px;font-size:10px;letter-spacing:.16em;opacity:.34}
+  #mmenu .mi{min-height:32px;padding:0 16px!important;box-sizing:border-box} #mmenu .mi b{font-weight:400!important}
+  #mmenu .tog{width:28px;height:16px;border:1px solid rgba(255,255,255,.45);border-radius:8px;position:relative;flex-shrink:0;opacity:.7;box-sizing:border-box}
+  #mmenu .tog i{position:absolute;top:2px;left:2px;width:10px;height:10px;border-radius:50%;background:#fff;opacity:.35}
+  #mmenu .mi.on .tog,#mmenu .tog.on{opacity:1} #mmenu .mi.on .tog i,#mmenu .tog.on i{left:14px;opacity:1}
+  #wFx .pr{display:flex;flex-wrap:wrap;gap:4px 16px;align-items:center;min-height:var(--row)} #wFx .pr b{font-weight:400;min-width:72px;opacity:.45;font-size:11px}
+  #wFx .pr span{cursor:pointer;opacity:.4;padding:4px 0;border-bottom:1px solid transparent} #wFx .pr span:hover{opacity:.95} #wFx .pr span.on{opacity:.95;border-bottom-color:#fff} #wFx .pr span.off{opacity:.3;pointer-events:none}
+  @media (max-width:819px){#wTabs .hint{display:none}}
+  body.win-open #sheet{visibility:hidden}
+  @media (min-width:820px) and (min-aspect-ratio:1/1){
+    #sheet{top:var(--tb,48px)!important;width:var(--sw,300px)!important;padding:0!important;background:#000;border-left:1px solid rgba(255,255,255,.18)!important}
+    #sHead{padding:0 6px 0 14px} #sBody{padding:8px 16px 24px}
+    #sResize{display:block;position:absolute;left:-5px;top:0;bottom:0;width:10px;cursor:ew-resize;z-index:2}
+    #sheet.collapsed{width:36px!important;bottom:0;height:auto} #sheet.collapsed #sHead{padding:0;justify-content:center;border-bottom:0} #sheet.collapsed .ttl,#sheet.collapsed #sMeta,#sheet.collapsed .grip{display:none}
+    body.more-open #sheet{visibility:hidden}
+    #mmenu.panel{left:auto!important;right:0!important;top:var(--tb,48px)!important;bottom:0;width:var(--sw,300px);max-width:none;max-height:none;border:0;border-left:1px solid rgba(255,255,255,.28);background:#000;padding:0 0 16px}
+    #mmenu.panel .mn{max-width:none}
+  }
 </style>
 </head>
 <body>
@@ -193,13 +243,13 @@
   <span id="zoom" title="zoom: wheel or pinch around the cursor · + / − keys · space-drag or middle-drag to pan"><em data-z="fit">fit</em><em data-z="1">1:1</em></span>
   <span id="more" title="more: comets, scenes, export, binaural, eclipses, gravity, mood light, share link …">more</span>
 </div>
-<div id="sheet" class="ui"></div>
+<div id="sheet" class="ui"><div id="sResize" title="drag to resize"></div><div id="sHead"><i class="grip"></i><span class="ttl">groups</span><span id="sMeta"></span><span id="sCol" class="ib" title="collapse (esc)" aria-label="collapse">–</span></div><div id="sBody"></div></div>
 <div id="gmenu" class="ui"></div>
 <div id="mmenu" class="ui"></div>
 <div id="toast" class="ui"></div>
 <div id="picker" class="ui"><div class="ph"><span>samples</span><span id="pkClose">close</span></div><div id="pkTabs"></div><div id="pkList"></div><label class="pkfile"><i></i><span>load file…</span><input id="pkFile" type="file" accept="audio/*" hidden></label><div class="pkfile" id="pkRec"><i></i><span>record a bar…</span></div><div class="pkfile" id="pkBar"><i></i><span>bar view ›</span></div><div id="pkNote"></div></div>
 <div id="bar" class="ui"><div class="bh"><input id="barName" maxlength="14" spellcheck="false" autocomplete="off"><span id="barInfo"></span><span id="barClose">close</span></div><canvas id="barCv"></canvas><div class="bc"><span id="bRec">rec</span><span id="bBars">1 bar</span><span id="bPlay">play</span><span id="bLoop">loop</span><span id="bRev">reverse</span><span id="bUndo">undo</span><span id="bDel">remove</span></div><div id="barNote"></div></div>
-<div id="win" class="ui"><div class="wbox"><div class="wh"><span id="wName"></span><span id="wInfo"></span><span id="wTap" title="tap tempo (t)">tap</span><span id="wClose">close</span></div><div class="wb"><div class="wl"><div class="wt">fx</div><div id="wFx"></div></div><div class="wr"><div class="wt">play</div><canvas id="wRing"></canvas><div id="wPad"><span>hit</span><small></small></div><div id="wCtl"></div><div id="wNote"></div></div></div></div></div>
+<div id="win" class="ui"><div class="wbox"><div class="wh"><span id="wName"></span><span id="wInfo"></span><span id="wTap" title="tap tempo (t)">tap</span><span id="wClose" title="close (esc · click outside)" aria-label="close">×</span></div><div id="wTabs"><span data-tab="sound">sound</span><span data-tab="fx">fx</span><span data-tab="pattern">pattern</span><span data-tab="moons">moons</span><span class="hint">esc · click outside to close</span></div><div class="wb"><div class="wl"><div id="wFx"></div></div><div class="wr"><div class="wt">play</div><canvas id="wRing"></canvas><div id="wPad"><span>hit</span><small></small></div><div id="wCtl"></div><div id="wNote"></div></div></div></div></div>
 <div id="start" class="ui"><b>tap to start</b><small>no sound on iphone? turn off silent mode</small></div>
 <script>
 /* ===== orbs fx batch 1 (inlined from fx/batch1.js) ===== */
@@ -5629,6 +5679,7 @@ function applyView() { CX = CX0 + VIEW.px; CY = CY0 + VIEW.py; RMAX = RMAX0 * VI
 function resize() {
   DPR = Math.min(2, window.devicePixelRatio || 1);
   W = innerWidth; H = innerHeight; cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR); M = Math.min(W, H);
+  document.documentElement.style.setProperty('--tb', Math.round(topEl.getBoundingClientRect().bottom) + 'px'); // the side sheet and more panel sit below the top bar
   const sr = sheet.getBoundingClientRect(), tb = topEl.getBoundingClientRect().bottom; { const pk = document.getElementById('picker'); if (pk) pk.style.top = Math.round(tb) + 'px'; } // the picker opens below the top bar, so fit · 1:1 · more stay visible (qa)
   SIDE = sr.left > 40;
   SA = SIDE ? { x: 0, y: tb, w: sr.left, h: H - tb } : { x: 0, y: tb, w: W, h: Math.max(160, sr.top - tb) };
@@ -6018,6 +6069,14 @@ const ICON = {
   verb: '<svg viewBox="0 0 42 30" fill="none" stroke="#fff" stroke-width=".9" stroke-dasharray="1.6 2"><path d="M9 22a5 5 0 0 1 1-9.8 7 7 0 0 1 13-2 6 6 0 0 1 9 5.2 4 4 0 0 1-1 6.6z"/></svg>',
   cut: '<svg viewBox="0 0 42 30" fill="none" stroke="#fff" stroke-width=".9"><path d="M3 20h10l8-12 8 12h10"/><circle cx="21" cy="8" r="2" fill="#fff"/><circle cx="21" cy="25" r="2.4"/></svg>',
 };
+/* ---- overlays v2: collapsible sections (state kept per id) ---- */
+let SECS = {}; try { SECS = JSON.parse(localStorage.getItem('orbs-solar-secs') || '{}') || {}; } catch (x) {}
+let UI_ALL = false; // tests: every section open and every window tab shown (the old one-long-list layout)
+const secOpen = (id, def) => UI_ALL || (SECS[id] == null ? !!def : !!SECS[id]);
+function setSec(id, on) { SECS[id] = !!on; try { localStorage.setItem('orbs-solar-secs', JSON.stringify(SECS)); } catch (x) {} }
+const secHTML = (id, title, sum, inner, def) => '<div class="sec' + (secOpen(id, def) ? '' : ' col') + '" data-sec="' + id + '"><div class="sec-h"><b>' + title + '</b><span class="sum">' + (sum || '') + '</span><span class="chev">▾</span></div><div class="sec-b">' + inner + '</div></div>';
+const hint = s => '<div class="hint">' + s + '</div>';
+document.addEventListener('click', ev => { const h = ev.target.closest('.sec-h'); if (!h) return; const s = h.parentElement, id = s.dataset.sec; s.classList.toggle('col'); if (id) setSec(id, !s.classList.contains('col')); }, true);
 const SLIDERS = [
   { k: 'vol', name: 'volume', get: e => e.vol, set: (e, t) => e.vol = t, show: e => Math.round(e.vol * 100) },
   { k: 'pn', name: 'pan', get: e => (e.pn + 1) / 2, set: (e, t) => e.pn = Math.abs(t - 0.5) < 0.03 ? 0 : t * 2 - 1, show: e => Math.abs(e.pn) < 0.02 ? 'c' : (e.pn < 0 ? 'l' : 'r') + Math.round(Math.abs(e.pn) * 50) },
@@ -6026,20 +6085,22 @@ const SLIDERS = [
   { k: 'prob', name: 'chance', get: e => (e.prob == null ? 1 : e.prob), set: (e, t) => e.prob = t > 0.985 ? 1 : Math.round(t * 100) / 100, show: e => Math.round((e.prob == null ? 1 : e.prob) * 100) + '%' },
   { k: 'drift', name: 'drift', get: e => e.drift || 0, set: (e, t) => e.drift = t < 0.02 ? 0 : Math.round(t * 100) / 100, show: e => e.drift ? Math.round(e.drift * 100) + '' : 'off' },
   { k: 'cut', name: 'filter', get: e => e.cut, set: (e, t) => e.cut = t, show: e => e.cut > 0.985 ? 'open' : fmtHz(cutHz(e.cut)) },
+  { k: 'size', name: 'size', get: e => (e.size == null ? 0.5 : e.size), set: (e, t) => { e.size = Math.abs(t - 0.5) < 0.02 ? 0.5 : t; }, show: e => { const s = sizeSemis(e); return s ? (s > 0 ? '+' : '') + s + ' st' : '0 st'; } },
 ];
+const slOf = k => SLIDERS.find(s => s.k === k);
 const panTxt = p => Math.abs(p) < 0.02 ? 'c' : (p < 0 ? 'l' : 'r') + Math.round(Math.abs(p) * 50);
 const ORB_SL = [ // per-orbit fx batch 1 rows; every set goes through orbSet → OrbsFX setters
   { k: 'offset', grp: 'clip', name: 'offset', get: s => s.offset, set: (i, t) => orbSet(i, 'offset', t), show: s => OrbsFX.formatOffset(s.offset) },
   { k: 'gain', grp: 'util', name: 'gain', get: s => isFinite(s.gainDb) ? clamp((s.gainDb + 48) / 54, 0, 1) : 0, set: (i, t) => { const db = -48 + 54 * t; orbSet(i, 'gain', t < 0.02 ? -Infinity : Math.abs(db) < 0.75 ? 0 : db); }, show: s => OrbsFX.formatDb(s.gainDb) + ' db' },
   { k: 'pan', grp: 'util', name: 'pan', get: s => (s.pan + 1) / 2, set: (i, t) => orbSet(i, 'pan', Math.abs(t - 0.5) < 0.03 ? 0 : t * 2 - 1), show: s => panTxt(s.pan) },
-  { k: 'amount', grp: 'flt', name: 'lp · hp', get: s => (OrbsFX.filterAmountOf(s.filterType, s.cutoff) + 1) / 2, set: (i, t) => orbSet(i, 'amount', t * 2 - 1), show: s => s.filterType === 'bypass' ? 'off' : (s.filterType === 'lowpass' ? 'lp ' : 'hp ') + OrbsFX.formatHz(s.cutoff) },
-  { k: 'q', grp: 'flt', name: 'res', get: s => OrbsFX.logNorm(s.q, OrbsFX.Q_MIN, OrbsFX.Q_MAX), set: (i, t) => orbSet(i, 'q', OrbsFX.expScale(OrbsFX.Q_MIN, OrbsFX.Q_MAX, t)), show: s => s.q.toFixed(1) },
+  { k: 'amount', grp: 'flt', name: 'cutoff', get: s => (OrbsFX.filterAmountOf(s.filterType, s.cutoff) + 1) / 2, set: (i, t) => orbSet(i, 'amount', t * 2 - 1), show: s => s.filterType === 'bypass' ? 'off' : (s.filterType === 'lowpass' ? 'lp ' : 'hp ') + OrbsFX.formatHz(s.cutoff) },
+  { k: 'q', grp: 'flt', name: 'resonance', get: s => OrbsFX.logNorm(s.q, OrbsFX.Q_MIN, OrbsFX.Q_MAX), set: (i, t) => orbSet(i, 'q', OrbsFX.expScale(OrbsFX.Q_MIN, OrbsFX.Q_MAX, t)), show: s => s.q.toFixed(1) },
 ];
 const DLY_NOTES = OrbsFX2.NOTE_BEATS;
 const ORB2_SL = [
-  { k: 'lo', grp: 'eq', name: 'lo', get: s => (s.lo + 15) / 30, set: (i, t) => orb2Set(i, 'eq', { lo: eqSnap(t) }), show: s => fmtDb2(s.lo) },
+  { k: 'lo', grp: 'eq', name: 'low', get: s => (s.lo + 15) / 30, set: (i, t) => orb2Set(i, 'eq', { lo: eqSnap(t) }), show: s => fmtDb2(s.lo) },
   { k: 'mid', grp: 'eq', name: 'mid', get: s => (s.mid + 15) / 30, set: (i, t) => orb2Set(i, 'eq', { mid: eqSnap(t) }), show: s => fmtDb2(s.mid) },
-  { k: 'hi', grp: 'eq', name: 'hi', get: s => (s.hi + 15) / 30, set: (i, t) => orb2Set(i, 'eq', { hi: eqSnap(t) }), show: s => fmtDb2(s.hi) },
+  { k: 'hi', grp: 'eq', name: 'high', get: s => (s.hi + 15) / 30, set: (i, t) => orb2Set(i, 'eq', { hi: eqSnap(t) }), show: s => fmtDb2(s.hi) },
   { k: 'drive', grp: 'sat', name: 'drive', get: s => s.drive / OrbsFX2.DRIVE_MAX, set: (i, t) => orb2Set(i, 'sat', { drive: t < 0.02 ? 0 : t * OrbsFX2.DRIVE_MAX }), show: s => s.drive < 0.05 ? 'off' : s.drive.toFixed(1) + ' db' },
   { k: 'time', grp: 'delay', name: 'time', get: s => Math.max(0, DLY_NOTES.indexOf(OrbsFX2.snapDelayBeats(s.delayBeats, true))) / (DLY_NOTES.length - 1), set: (i, t) => orb2Set(i, 'delay', { beats: DLY_NOTES[Math.round(t * (DLY_NOTES.length - 1))], sync: true }), show: s => OrbsFX2.formatDelayBeats(s.delayBeats) },
   { k: 'fb', grp: 'delay', name: 'feedback', get: s => s.feedback / OrbsFX2.FB_MAX, set: (i, t) => orb2Set(i, 'delay', { feedback: t * OrbsFX2.FB_MAX }), show: s => Math.round(s.feedback * 100) + '' },
@@ -6055,10 +6116,12 @@ const ROOM_SL = [ // batch 3 room: one shared reverb; size rebuilds its impulse 
   { k: 'wet', name: 'wet', get: r => r.wet, set: t => setRoom({ wet: t < 0.02 ? 0 : t }), show: r => Math.round(r.wet * 100) + '' },
   { k: 'pre', name: 'predelay', get: r => r.predelay / OrbsFX3.PRE_MAX, set: t => setRoom({ predelay: Math.round(t * OrbsFX3.PRE_MAX) }), show: r => OrbsFX3.formatMs(r.predelay) },
 ];
-const roomHTML = () => '<div class="grp"><b>room</b><span class="gv">shared reverb · planets send by their reverb · groups by send</span></div>' + ROOM_SL.map(q => slHTML('data-rsl="' + q.k + '"', q.name, q.get(ROOM), q.show(ROOM))).join('');
+const roomSl = () => ROOM_SL.map(q => slHTML('data-rsl="' + q.k + '"', q.name, q.get(ROOM), q.show(ROOM))).join('') + hint('shared reverb · planets send by their reverb · groups by send');
+const roomSum = () => 'wet ' + Math.round(ROOM.wet * 100) + ' · ' + OrbsFX3.formatSec(ROOM.size);
+const roomHTML = id => secHTML(id || 'room', 'room', roomSum(), roomSl());
 const depthTxt = d => { const db = OrbsFX3.depthToDb(d); return isFinite(db) ? OrbsFX3.formatDb(db) + ' db' : '-inf'; };
 function duckHTML(i, target) { // tethers into or out of this group; chips add "x ducks this planet"
-  const o = ORB[i], mem = new Set(membersOf(o).map(e => e.id)); let h = '<div class="grp"><b>duck</b><span class="gv">' + (COARSE ? 'add below' : 'shift-drag planet → planet') + '</span></div>';
+  const o = ORB[i], mem = new Set(membersOf(o).map(e => e.id)); let h = hint(COARSE ? 'add below' : 'shift-drag planet → planet, or add below');
   TETH.forEach((t, j) => { if (!mem.has(t.src) && !mem.has(t.tgt)) return;
     h += '<div class="tth"><span>' + esc(E[t.src].label || t.src) + ' → ' + esc(E[t.tgt].label || t.tgt) + (t.live ? '' : ' · same group (off)') + '</span><span data-act="tdel" data-t="' + j + '">remove</span></div>';
     h += slHTML('data-tsl="depth" data-t="' + j + '"', 'depth', t.depth, depthTxt(t.depth)) + slHTML('data-tsl="rel" data-t="' + j + '"', 'release', (t.release - OrbsFX3.REL_MIN) / (OrbsFX3.REL_MAX - OrbsFX3.REL_MIN), OrbsFX3.formatMs(t.release)); });
@@ -6066,18 +6129,18 @@ function duckHTML(i, target) { // tethers into or out of this group; chips add "
   if (tg && cands.length) h += '<div class="laps duckadd"><span class="lb">' + esc(E[tg].label || tg) + ' ducks under</span>' + cands.map(id => '<span data-act="tadd" data-src="' + id + '" data-tgt="' + tg + '">' + esc(E[id].label || id) + '</span>').join('') + '</div>';
   return h;
 }
-function orbFxHTML(i, target) {
-  const o = ORB[i], s = o.st, tg = (k, label, on) => '<span class="tg' + (on ? ' on' : '') + '" data-act="otog" data-k="' + k + '" data-i="' + i + '">' + label + '</span>';
-  let h = '<div class="grp"><b>clip</b><span class="gv">' + lapTxt(o.lap) + ' · ' + OrbsFX.formatOffset(s.offset) + (swing > 0 ? ' · swing ' + Math.round(swing) + '%' : '') + '</span></div>' + ORB_SL.filter(q => q.grp === 'clip').map(q => orbSliderHTML(i, q)).join('');
-  h += '<div class="grp"><b>util</b>' + tg('mute', 'mute', s.muted) + '<span class="tg' + (o.solo ? ' on' : '') + '" data-act="solo" data-i="' + i + '">solo</span>' + tg('phase', 'ø phase', s.phase === 180) + tg('mono', 'mono', s.mono) + '</div>' + ORB_SL.filter(q => q.grp === 'util').map(q => orbSliderHTML(i, q)).join('');
-  const t2 = o.t2, row2 = (grp, gv) => '<div class="grp"><b>' + grp + '</b><span class="gv">' + gv + '</span></div>' + ORB2_SL.filter(q => q.grp === grp).map(q => orb2SliderHTML(i, q)).join('');
-  h += '<div class="grp"><b>flt</b><span class="gv">' + (s.filterType === 'bypass' ? 'off · left lowpass, right highpass' : s.filterType) + '</span></div>' + ORB_SL.filter(q => q.grp === 'flt').map(q => orbSliderHTML(i, q)).join('');
-  const eqOn = Math.abs(t2.lo) + Math.abs(t2.mid) + Math.abs(t2.hi) > 0.05;
-  h += row2('eq', eqOn ? 'shelf 200 · peak 1k · shelf 5k' : 'flat');
-  h += '<div class="grp"><b>sat</b><span class="tg' + (t2.curve === 'soft' ? ' on' : '') + '" data-act="scurve" data-c="soft" data-i="' + i + '">soft</span><span class="tg' + (t2.curve === 'hard' ? ' on' : '') + '" data-act="scurve" data-c="hard" data-i="' + i + '">hard</span></div>' + ORB2_SL.filter(q => q.grp === 'sat').map(q => orb2SliderHTML(i, q)).join('');
-  h += row2('delay', 'synced · planet echo sends here too');
-  h += '<div class="grp"><b>reverb</b><span class="gv">room ' + OrbsFX3.formatSec(ROOM.size) + '</span></div>' + slHTML('data-rsend="1" data-i="' + i + '"', 'send', o.rsend, Math.round(o.rsend * 100) + '');
-  h += duckHTML(i, target);
+function orbFxHTML(i, target, pre) { // group processing in sections (overlays v2): group filter · equalizer · saturator · delay · group reverb · duck · clip · utility
+  pre = pre || ''; const o = ORB[i], s = o.st, t2 = o.t2, tg = (k, label, on) => '<span class="tg' + (on ? ' on' : '') + '" data-act="otog" data-k="' + k + '" data-i="' + i + '">' + label + '</span>';
+  const sl1 = grp => ORB_SL.filter(q => q.grp === grp).map(q => orbSliderHTML(i, q)).join(''), sl2 = grp => ORB2_SL.filter(q => q.grp === grp).map(q => orb2SliderHTML(i, q)).join('');
+  const eqOn = Math.abs(t2.lo) + Math.abs(t2.mid) + Math.abs(t2.hi) > 0.05, nT = TETH.filter(t => membersOf(o).some(e => e.id === t.src || e.id === t.tgt)).length;
+  let h = secHTML(pre + 'gfilter', 'group filter', s.filterType === 'bypass' ? 'off' : s.filterType + ' ' + OrbsFX.formatHz(s.cutoff), sl1('flt') + hint('left lowpass · right highpass'));
+  h += secHTML(pre + 'eq', 'equalizer', eqOn ? 'shelf 200 · peak 1k · shelf 5k' : 'flat', sl2('eq'));
+  h += secHTML(pre + 'sat', 'saturator', t2.drive < 0.05 ? 'off' : t2.curve + ' ' + t2.drive.toFixed(1) + ' db', '<div class="laps"><span class="tg' + (t2.curve === 'soft' ? ' on' : '') + '" data-act="scurve" data-c="soft" data-i="' + i + '">soft</span><span class="tg' + (t2.curve === 'hard' ? ' on' : '') + '" data-act="scurve" data-c="hard" data-i="' + i + '">hard</span></div>' + sl2('sat'));
+  h += secHTML(pre + 'delay', 'delay', t2.send > 0.01 ? OrbsFX2.formatDelayBeats(t2.delayBeats) + ' · send ' + Math.round(t2.send * 100) : 'synced', sl2('delay') + hint('planet echo sends here too'));
+  h += secHTML(pre + 'greverb', 'group reverb', 'send ' + Math.round(o.rsend * 100), slHTML('data-rsend="1" data-i="' + i + '"', 'send', o.rsend, Math.round(o.rsend * 100) + '') + hint('shared room ' + OrbsFX3.formatSec(ROOM.size) + ' · planets also send with the reverb slider'));
+  h += secHTML(pre + 'duck', 'duck', nT ? nT + (nT > 1 ? ' ducks' : ' duck') : 'none', duckHTML(i, target));
+  h += secHTML(pre + 'clip', 'clip', lapTxt(o.lap) + ' · ' + OrbsFX.formatOffset(s.offset) + (swing > 0 ? ' · swing ' + Math.round(swing) + '%' : ''), sl1('clip'));
+  h += secHTML(pre + 'util', 'utility', (s.muted ? 'muted' : '') + (o.solo ? ' solo' : ''), '<div class="laps">' + tg('mute', 'mute', s.muted) + '<span class="tg' + (o.solo ? ' on' : '') + '" data-act="solo" data-i="' + i + '">solo</span>' + tg('phase', 'invert phase', s.phase === 180) + tg('mono', 'mono', s.mono) + '</div>' + sl1('util'));
   return h;
 }
 const fmtHz = f => f >= 1000 ? (f / 1000).toFixed(f < 10000 ? 1 : 0) + 'k' : Math.round(f) + '';
@@ -6091,28 +6154,30 @@ const planetsIn = o => membersOf(o).map(e => e.id).sort((a, b) => frac(-aEff(E[a
 const lapChips = i => '<div class="laps">' + LAPS.map(L => '<span data-act="lap" data-i="' + i + '" data-l="' + L + '" class="' + (L === ORB[i].lap ? 'on' : '') + '">' + lapTxt(L) + '</span>').join('') + '</div>'
   + '<div class="laps poly" title="polymeter: laps of 3, 5 or 7 beats drift against the 4/4 bar and line up again later"><span class="pt">poly</span>' + POLY.map(L => '<span data-act="lap" data-i="' + i + '" data-l="' + L + '" class="' + (L === ORB[i].lap ? 'on' : '') + '">' + L + '</span>').join('') + '<span class="pt">beats</span></div>';
 const patTxt = (e, L) => e.pat && e.pat.length ? e.pat.length + (e.pat.length > 1 ? ' hits' : ' hit') + ' / ' + lapTxt(L) : hitsTxt(L);
+const sBody = document.getElementById('sBody'), sMeta = document.getElementById('sMeta');
 function renderSheet() {
-  sheetDirty = false; let h = '<div class="hd"><span>groups</span><span>' + IDS.filter(id => !E[id].muted).length + ' planets · ' + bpm + ' bpm</span></div>';
+  sheetDirty = false; sMeta.textContent = IDS.filter(id => !E[id].muted).length + ' · ' + bpm + ' bpm'; let h = '';
   { const t = swing / 60; h += '<div class="sl gsl" data-gsl="swing"><b>swing</b><div class="tr"><div class="fi" style="width:' + (t * 100) + '%"></div><div class="kn" style="left:' + (t * 100) + '%"></div></div><em>' + Math.round(swing) + '%</em></div>'; }
-  h += '<div class="room">' + roomHTML() + '</div>' + midiHTML();
+  h += '<div class="room">' + roomHTML('room') + '</div>' + secHTML('midi', 'midi', !MIDI_OK ? 'n/a' : (midiPorts.find(p => p.selected) || {}).name ? esc(midiPorts.find(p => p.selected).name.toLowerCase()) : midiPorts.length ? 'off' : 'no ports', midiHTML());
   ORB.forEach((o, i) => {
     const ps = planetsIn(o), open = openG === o.id;
-    h += '<div class="orb' + (open ? ' open' : '') + (E[selId] && E[selId].orbit === i ? ' sel' : '') + '" data-orb="' + i + '"><div class="row" data-act="orb" data-i="' + i + '">' + ICON_ORB + '<span class="nm">' + (ps.length > 1 ? 'group: ' : '') + esc(groupName(o)) + '</span><span class="lap">' + (o.st.muted ? 'muted · ' : '') + (o.solo ? 'solo · ' : '') + (o.st.filterType !== 'bypass' ? (o.st.filterType === 'lowpass' ? 'lp · ' : 'hp · ') : '') + lapTxt(o.lap) + '</span></div><div class="body">';
+    h += '<div class="orb' + (open ? ' open' : '') + (E[selId] && E[selId].orbit === i ? ' sel' : '') + '" data-orb="' + i + '"><div class="row" data-act="orb" data-i="' + i + '"><span class="nm">' + (ps.length > 1 ? 'group: ' : '') + esc(groupName(o)) + '</span><span class="lap">' + (o.st.muted ? 'muted · ' : '') + (o.solo ? 'solo · ' : '') + (o.st.filterType !== 'bypass' ? (o.st.filterType === 'lowpass' ? 'lp · ' : 'hp · ') : '') + lapTxt(o.lap) + '</span></div><div class="body">';
     h += lapChips(i);
     for (const id of ps) {
       const e = E[id];
-      h += '<div class="pl' + (id === selId ? ' sel' : '') + (e.muted ? ' mut' : '') + '" data-act="pl" data-id="' + id + '"><i></i><span>' + esc(e.label || id) + '</span><span class="st">' + (e.muted ? 'muted' : 'at ' + whereTxt(e) + ' · ' + patTxt(e, o.lap) + ' · vol ' + Math.round(e.vol * 100)) + '</span></div>';
+      h += '<div class="pl' + (id === selId ? ' sel' : '') + (e.muted ? ' mut' : '') + '" data-act="pl" data-id="' + id + '"><i></i><span>' + esc(e.label || id) + '</span><span class="st">' + (e.muted ? 'muted' : whereTxt(e) + ' · vol ' + Math.round(e.vol * 100)) + '</span></div>';
       if (id === selId) {
-        h += '<div class="det">' + SLIDERS.map(s => sliderHTML(e, s)).join('');
-        h += '<div class="acts"><span data-act="win" data-id="' + id + '">window ›</span><span data-act="pick" data-id="' + id + '">sounds ›</span><span data-act="bar" data-id="' + id + '">bar ›</span><span data-act="copy" data-id="' + id + '">copy</span><span data-act="mute" data-id="' + id + '">' + (e.muted ? 'unmute' : 'mute') + '</span>' + partnersOf(id).map(p => '<span data-act="unlink" data-id="' + id + '" data-p="' + p + '">cut ' + esc(E[p].label || p) + '</span>').join('') + (e.side === 'rec' || e.base ? '<span data-act="del" data-id="' + id + '">remove</span>' : '') + '</div></div>';
+        h += '<div class="det">' + ['vol', 'pn'].map(k => sliderHTML(e, slOf(k))).join('');
+        h += '<div class="acts"><span data-act="win" data-id="' + id + '">window ›</span><span data-act="pick" data-id="' + id + '">sounds ›</span><span data-act="bar" data-id="' + id + '">bar ›</span><span data-act="copy" data-id="' + id + '">copy</span><span data-act="mute" data-id="' + id + '">' + (e.muted ? 'unmute' : 'mute') + '</span>' + partnersOf(id).map(p => '<span data-act="unlink" data-id="' + id + '" data-p="' + p + '">cut ' + esc(E[p].label || p) + '</span>').join('') + (e.side === 'rec' || e.base ? '<span data-act="del" data-id="' + id + '">remove</span>' : '') + '</div>';
+        h += secHTML('more', 'more sliders', 'echo · reverb · chance · drift · filter', ['echo', 'verb', 'prob', 'drift', 'cut'].map(k => sliderHTML(e, slOf(k))).join('')) + '</div>';
       }
     }
-    h += '<div class="ofx">' + orbFxHTML(i, selId) + '</div>';
+    h += '<div class="ofx">' + secHTML('gfx', 'group fx', 'equalizer, delay, duck…', hint('the same group processing as the planet window · fx tab') + orbFxHTML(i, selId, 's')) + '</div>';
     h += '</div></div>';
   });
-  h += '<div class="foot">' + (still ? 'still: planets stay put and a hand sweeps from the sun at each group\'s lap; a planet plays when its hand passes it' : 'moving: each planet plays once per lap, when it crosses the line at 12') + ' · distance from the sun sets the lap · drop a planet on another to connect · drag it away or double-click the line to cut · shift-drag to duck · off the edge mutes · click a planet for its window · hold for its bar · ▷ or space plays · tap the sun to step the chords (bass, chords, pad, lead follow), hold it for auto · drop a planet in the black hole (bottom left) to silence it, drag it out again · drift makes its hits wander a little each lap · wheel / pinch zooms, + / − too, space-drag or middle-drag pans, fit · 1:1 up top · in a planet\'s window: moons add ghost notes, chance thins its hits, click a tick on the ring to set that hit\'s chance · poly laps (3 · 5 · 7 beats) drift against the bar · more: comets, scenes (save intro / drop / break, morph over bars), mutate (keeps kick + bass, undoable), jam keys (1–9 play planets, ← → nudge), share link (with scenes; your own system is backed up when you open one: more › back to my system) · scenes keep group fx too · more → export .mid / wav mix / wav stems, binaural (headphones), eclipses, gravity (slow drag inward while playing = a build), mood light · shift + wheel over a planet = its size = its pitch (bigger is lower) · planet window: trail (draw a filter / volume curve over the lap), build, export its clip or stem, chop a recording into hits, practice its part on the pad for a score</div>';
-  sheet.innerHTML = h;
-  if (scrollSel && selId) { scrollSel = false; const el = sheet.querySelector('.pl.sel'); if (el) { const r = el.getBoundingClientRect(), sr = sheet.getBoundingClientRect(); if (r.top < sr.top + 30 || r.bottom > sr.bottom - 120) sheet.scrollTop += r.top - sr.top - 40; } }
+  h += secHTML('help', 'how it works', '', '<div class="foot">' + (still ? 'still: planets stay put and a hand sweeps from the sun at each group\'s lap; a planet plays when its hand passes it' : 'moving: each planet plays once per lap, when it crosses the line at 12') + ' · distance from the sun sets the lap · drop a planet on another to connect · drag it away or double-click the line to cut · shift-drag to duck · off the edge mutes · click a planet for its window · hold for its bar · ▷ or space plays · tap the sun to step the chords (bass, chords, pad, lead follow), hold it for auto · drop a planet in the black hole (bottom left) to silence it, drag it out again · drift makes its hits wander a little each lap · wheel / pinch zooms, + / − too, space-drag or middle-drag pans, fit · 1:1 up top · in a planet\'s window: moons add ghost notes, chance thins its hits, click a tick on the ring to set that hit\'s chance · poly laps (3 · 5 · 7 beats) drift against the bar · more: comets, scenes (save intro / drop / break, morph over bars), mutate (keeps kick + bass, undoable), jam keys (1–9 play planets, ← → nudge), share link (with scenes; your own system is backed up when you open one: more › back to my system) · scenes keep group fx too · more → export .mid / wav mix / wav stems, binaural (headphones), eclipses, gravity (slow drag inward while playing = a build), mood light · shift + wheel over a planet = its size = its pitch (bigger is lower) · planet window: trail (draw a filter / volume curve over the lap), build, export its clip or stem, chop a recording into hits, practice its part on the pad for a score' + '</div>');
+  sBody.innerHTML = h;
+  if (scrollSel && selId) { scrollSel = false; const el = sBody.querySelector('.pl.sel'); if (el) { const r = el.getBoundingClientRect(), sr = sBody.getBoundingClientRect(); if (r.top < sr.top + 30 || r.bottom > sr.bottom - 120) sBody.scrollTop += r.top - sr.top - 40; } }
 }
 function panelClick(ev) {
   const t = ev.target.closest('[data-act]'); if (!t) return; const act = t.dataset.act, id = t.dataset.id, i = +t.dataset.i;
@@ -6162,13 +6227,15 @@ bindSliders(sheet);
 /* ---------------- planet window: fx (left) + play pad (right) ---------------- */
 const winEl = document.getElementById('win'), wFx = document.getElementById('wFx'), wName = document.getElementById('wName'), wInfo = document.getElementById('wInfo'), wPad = document.getElementById('wPad'), wRing = document.getElementById('wRing'), wCtl = document.getElementById('wCtl'), wNote = document.getElementById('wNote');
 const wr = wRing.getContext('2d');
-let winId = null;
+let winId = null, WTAB = 'sound'; try { WTAB = localStorage.getItem('orbs-solar-wtab') || 'sound'; } catch (x) {}
+function setWinTab(t) { if (!['sound', 'fx', 'pattern', 'moons'].includes(t)) return; WTAB = t; try { localStorage.setItem('orbs-solar-wtab', t); } catch (x) {} if (winId) { wFx.scrollTop = 0; renderWin(); } }
+document.getElementById('wTabs').addEventListener('click', ev => { const b = ev.target.closest('[data-tab]'); if (b) setWinTab(b.dataset.tab); });
 const PAD = { len: 'lap', q: 0.25, overdub: false, vel: 'pos' }; // record length · quantize (beats, 0 = off) · overdub · velocity from click position or fixed
 function openWin(id) {
   if (!E[id]) return; initAudio(); winId = id; select(id); if (pickId) closePicker();
-  winEl.classList.add('open'); renderWin(); sizeRing();
+  winEl.classList.add('open'); document.body.classList.add('win-open'); renderWin(); sizeRing();
 }
-function closeWin() { if (!winId) return; if (prec) endPadRec(true); winId = null; winEl.classList.remove('open'); sheetDirty = true; }
+function closeWin() { if (!winId) return; if (prec) endPadRec(true); winId = null; winEl.classList.remove('open'); document.body.classList.remove('win-open'); sheetDirty = true; }
 document.getElementById('wClose').addEventListener('click', closeWin);
 document.getElementById('wTap').addEventListener('pointerdown', ev => { ev.preventDefault(); tapTempo(); });
 winEl.addEventListener('pointerdown', ev => { if (ev.target === winEl) closeWin(); });
@@ -6176,25 +6243,31 @@ function renderWin() {
   const e = E[winId]; if (!e) { closeWin(); return; } const i = e.orbit, o = ORB[i], base = baseOf(e.id);
   wName.textContent = e.label || e.id;
   wInfo.textContent = (membersOf(o).length > 1 ? 'group: ' + groupName(o) + ' · ' : '') + lapTxt(o.lap) + ' lap · ' + patTxt(e, o.lap) + ' · bpm ' + bpm;
-  let h = '<div class="grp"><b>planet</b><span class="gv">' + esc(e.label || e.id) + '</span></div>' + SLIDERS.map(s => sliderHTML(e, s)).join('');
+  const T = { sound: '', fx: '', pattern: '', moons: '' }, X2 = winExtrasHTML(e);
+  T.sound += ['vol', 'pn'].map(k => sliderHTML(e, slOf(k))).join('');
   const vars = (VAR_NAMES[base] || []).slice(); if (E[base].buf && !vars.includes('file')) vars.push('file');
-  if (vars.length) h += '<div class="grp"><b>sound</b><span class="gv"><span data-act="pick" data-id="' + e.id + '">all samples ›</span></span></div><div class="laps vars">' + vars.map(v => '<span data-act="var" data-id="' + e.id + '" data-v="' + v + '" class="' + (E[base].variant === v ? 'on' : '') + '">' + esc(v === 'file' ? (E[base].fileName || 'file') : v) + '</span>').join('') + '</div>';
-  h += '<div class="grp"><b>moons</b><span class="gv">ghost notes around each hit</span></div><div class="laps">' + [0, 1, 2, 3].map(n => '<span data-act="moons" data-id="' + e.id + '" data-n="' + n + '" class="' + ((e.moons | 0) === n ? 'on' : '') + '">' + (n ? n + (n > 1 ? ' moons' : ' moon') : 'none') + '</span>').join('') + '</div>';
-  h += '<div class="grp"><b>lap</b><span class="gv">' + (membersOf(o).length > 1 ? 'whole group' : 'distance from the sun') + '</span></div>' + lapChips(i);
-  h += winExtrasHTML(e) + orbFxHTML(i, e.id) + roomHTML();
-  if (!(slDrag && wFx.contains(slDrag)) && !trDrag) { const st = wFx.scrollTop; wFx.innerHTML = h; wFx.scrollTop = st; }
+  if (vars.length) T.sound += '<div class="grp"><b>sound</b><span class="gv"><span data-act="pick" data-id="' + e.id + '">all samples ›</span></span></div><div class="laps vars">' + vars.map(v => '<span data-act="var" data-id="' + e.id + '" data-v="' + v + '" class="' + (E[base].variant === v ? 'on' : '') + '">' + esc(v === 'file' ? (E[base].fileName || 'file') : v) + '</span>').join('') + '</div>';
+  T.sound += sliderHTML(e, slOf('size')) + hint('bigger is lower · or shift + wheel over the planet');
+  T.fx += ['echo', 'verb', 'cut'].map(k => sliderHTML(e, slOf(k))).join('') + orbFxHTML(i, e.id, 'w') + roomHTML('wroom');
+  T.pattern += '<div class="grp"><b>lap</b><span class="gv">' + (membersOf(o).length > 1 ? 'whole group' : 'distance from the sun') + '</span></div>' + lapChips(i) + hint('3, 5 or 7 beat laps drift against the bar and line up again later');
+  T.pattern += X2.trail + X2.build + X2.export + X2.chop;
   const chip = (k, v, label, on) => '<span data-pk="' + k + '" data-v="' + v + '" class="' + (on ? 'on' : '') + '">' + label + '</span>';
-  wCtl.innerHTML = '<div class="pr"><span id="wRec" class="' + (prec ? 'on' : '') + '">' + (prec ? (prec.phase === 'count' ? 'count-in' : 'recording') : 'rec') + '</span>' + chip('od', 1, 'overdub', PAD.overdub) + '<span data-pa="undo" class="' + ((e.patUndo || []).length ? '' : 'off') + '">undo</span><span data-pa="clear" class="' + (e.pat && e.pat.length ? '' : 'off') + '">clear</span><span data-pa="wave">wave ›</span></div>'
-    + '<div class="pr"><b>length</b>' + chip('len', 'lap', '1 lap', PAD.len === 'lap') + chip('len', '2', '2 bars', PAD.len === '2') + chip('len', '4', '4 bars', PAD.len === '4') + '</div>'
+  T.pattern += '<div class="grp"><b>record</b><span class="gv">the pad on the right</span></div><div class="prs">' + '<div class="pr"><b>length</b>' + chip('len', 'lap', '1 lap', PAD.len === 'lap') + chip('len', '2', '2 bars', PAD.len === '2') + chip('len', '4', '4 bars', PAD.len === '4') + '</div>'
     + '<div class="pr"><b>quantize</b>' + chip('q', 0, 'off', PAD.q === 0) + chip('q', 0.5, '1/8', PAD.q === 0.5) + chip('q', 0.25, '1/16', PAD.q === 0.25) + chip('q', 0.125, '1/32', PAD.q === 0.125) + '</div>'
     + '<div class="pr"><b>practice</b><span data-pa="practice" class="' + (prac && prac.id === e.id ? 'on' : '') + '">' + (prac && prac.id === e.id ? 'stop' : 'practice its part') + '</span>' + (lastPractice && lastPractice.id === e.id ? '<span class="off" id="wScore">score ' + Math.round(lastPractice.score) + '</span>' : '') + '</div>'
-    + '<div class="pr"><b>velocity</b>' + chip('vel', 'pos', 'from click', PAD.vel === 'pos') + chip('vel', 'fixed', 'fixed', PAD.vel === 'fixed') + '</div>';
+    + '<div class="pr"><b>velocity</b>' + chip('vel', 'pos', 'from click', PAD.vel === 'pos') + chip('vel', 'fixed', 'fixed', PAD.vel === 'fixed') + '</div>' + '</div>';
+  T.moons += '<div class="grp"><b>moons</b><span class="gv">ghost notes around each hit</span></div><div class="laps">' + [0, 1, 2, 3].map(n => '<span data-act="moons" data-id="' + e.id + '" data-n="' + n + '" class="' + ((e.moons | 0) === n ? 'on' : '') + '">' + (n ? n + (n > 1 ? ' moons' : ' moon') : 'none') + '</span>').join('') + '</div>';
+  T.moons += ['prob', 'drift'].map(k => sliderHTML(e, slOf(k))).join('') + hint('chance thins its hits · click a tick on the ring to set that hit’s chance · drift wanders a little each lap');
+  const h = ['sound', 'fx', 'pattern', 'moons'].map(k => '<div class="tabp' + (WTAB === k || UI_ALL ? ' on' : '') + '" data-tabp="' + k + '">' + T[k] + '</div>').join('');
+  document.querySelectorAll('#wTabs [data-tab]').forEach(b => b.classList.toggle('on', b.dataset.tab === WTAB));
+  if (!(slDrag && wFx.contains(slDrag)) && !trDrag) { const st = wFx.scrollTop; wFx.innerHTML = h; wFx.scrollTop = st; }
+  wCtl.innerHTML = '<div class="pr"><span id="wRec" class="' + (prec ? 'on' : '') + '">' + (prec ? (prec.phase === 'count' ? 'count-in' : 'recording') : 'rec') + '</span>' + chip('od', 1, 'overdub', PAD.overdub) + '<span data-pa="undo" class="' + ((e.patUndo || []).length ? '' : 'off') + '">undo</span><span data-pa="clear" class="' + (e.pat && e.pat.length ? '' : 'off') + '">clear</span><span data-pa="wave">wave ›</span></div>';
   wPad.querySelector('small').textContent = 'click · or keys ' + padKeys(e).join(' ').toLowerCase();
 }
-wFx.addEventListener('click', ev => { if (ev.target.id === 'wTrail') return; panelClick(ev); if (winId) renderWin(); }); // the trail editor keeps its canvas (double-click needs it)
+wFx.addEventListener('click', ev => { if (ev.target.id === 'wTrail') return; if (ev.target.closest('[data-pk],[data-pa]')) { ctlClick(ev); return; } panelClick(ev); if (winId) renderWin(); }); // the trail editor keeps its canvas (double-click needs it)
 bindSliders(wFx);
-wCtl.addEventListener('click', ev => {
-  const t = ev.target.closest('[data-pk],[data-pa],#wRec'); if (!t) return; const e = E[winId]; if (!e) return; initAudio();
+function ctlClick(ev) {
+  const t = ev.target.closest('[data-pk],[data-pa],#wRec'); if (!t) return false; const e = E[winId]; if (!e) return; initAudio();
   if (t.id === 'wRec') { prec ? endPadRec(true) : startPadRec(); }
   else if (t.dataset.pa === 'practice') { prac ? endPractice(true) : startPractice(); }
   else if (t.dataset.pk === 'od') PAD.overdub = !PAD.overdub;
@@ -6204,8 +6277,9 @@ wCtl.addEventListener('click', ev => {
   else if (t.dataset.pa === 'undo') padUndo(e);
   else if (t.dataset.pa === 'clear') { pushPat(e); e.pat = []; save(); }
   else if (t.dataset.pa === 'wave') { openBar(e.id); }
-  renderWin(); sheetDirty = true;
-});
+  renderWin(); sheetDirty = true; return true;
+}
+wCtl.addEventListener('click', ctlClick);
 const padKeys = e => { const k = ((e.label || e.id).match(/[a-z]/i) || ['j'])[0].toLowerCase(); return [...new Set([k === 't' ? 'y' : k, 'j', 'k', 'l'])]; };
 function padKey(ev) { // the window's planet plays on its initial letter and j / k / l (t stays tap tempo)
   const e = E[winId]; if (!e || ev.repeat) return false; const k = (ev.key || '').toLowerCase();
@@ -6402,7 +6476,7 @@ function renderMidi() {
   const sel = midiPorts.find(p => p.selected);
   midiEl.textContent = !MIDI_OK ? 'midi n/a' : sel ? 'midi · ' + sel.name.toLowerCase().slice(0, 18) : 'midi'; midiEl.classList.toggle('on', !!sel);
 }
-function midiClick() { initAudio(); openG = 'midi'; sheetDirty = true; renderSheet(); const el = sheet.querySelector('.midi'); if (el) el.scrollIntoView({ block: 'nearest' }); }
+function midiClick() { initAudio(); openG = 'midi'; setSec('midi', true); sheetCollapse(false); sheetDirty = true; renderSheet(); const el = sheet.querySelector('.midi'); if (el) el.scrollIntoView({ block: 'nearest' }); }
 function allOff() { if (bridge) bridge.panic(); }
 function midiNote(e, ev, t, dur) { if (bridge) bridge.noteAt(e.id, ev.n, clamp(ev.v * e.vol, 0.01, 1), t, dur * bpm / 60); } // durBeats from seconds
 function ccResend() { IDS.forEach(id => { if (E[id]) E[id]._cc = {}; }); } // on connect: every planet's cc goes out once
@@ -6529,7 +6603,7 @@ async function shareLink() {
   const z = await zipStr(js); if (z) { tag = 'z'; body = b64u(z); } else body = b64u(new TextEncoder().encode(js));
   const url = location.href.split('#')[0] + '#s=' + tag + body;
   let copied = false; try { await navigator.clipboard.writeText(url); copied = true; } catch (x) {}
-  lastShare = url; if (!copied) { renderMore(); mmenu.classList.add('open'); const inp = mmenu.querySelector('input'); if (inp) { inp.focus(); inp.select(); } } // no clipboard: show it to copy by hand
+  lastShare = url; if (!copied) { moreOpen(true); const inp = mmenu.querySelector('input'); if (inp) { inp.focus(); inp.select(); } } // no clipboard: show it to copy by hand
   recMsg((copied ? 'link copied' : 'copy the link from the menu') + (dropped ? ' · recordings not included' : '') + ' · ' + Math.round(url.length / 100) / 10 + 'k chars');
   return url;
 }
@@ -6554,24 +6628,36 @@ try { if (sessionStorage.getItem('orbs-restored')) { sessionStorage.removeItem('
 
 /* ---------------- more menu: the extra toggles, so the top bar stays small ---------------- */
 const moreEl = document.getElementById('more'), mmenu = document.getElementById('mmenu');
-function renderMore() {
-  const ch = (k, v, on, label) => '<span class="ch' + (on ? ' on' : '') + '" data-mk="' + k + '" data-v="' + v + '">' + label + '</span>';
-  mmenu.innerHTML = '<div class="mi' + (COMET.on ? ' on' : '') + '" data-m="comet"><i class="ck"></i><b>comets</b>' + ch('every', 8, COMET.every === 8, '8') + ch('every', 16, COMET.every === 16, '16') + '<span style="opacity:.3">bars</span></div>'
-    + '<div class="mn">a riser sweeps in, a crash lands on the downbeat</div><div class="ms"></div>'
-    + '<div class="mi" style="cursor:default;opacity:.8"><b>scenes</b><span style="opacity:.3">morph</span>' + [0, 1, 2, 4, 8].map(b => ch('sbars', b, SCENE_BARS === b, b ? b + '' : 'cut')).join('') + '</div>'
-    + SCENE_SLOTS.map(sl => '<div class="mi' + (sceneOn === sl ? ' on' : '') + '" data-m="scene" data-s="' + sl + '"><i class="ck"' + (SCENES[sl] ? ' style="background:rgba(255,255,255,.55)"' : '') + '></i><b>' + sl + '</b>' + ch('sstore', sl, false, SCENES[sl] ? 'save over' : 'save') + '</div>').join('')
-    + '<div class="mn">click a saved scene to morph to it · morph runs over the chosen bars from the next downbeat</div><div class="ms"></div>'
-    + '<div class="mi" data-m="mutate"><i class="ck" style="border-style:dotted"></i><b>mutate</b>' + (MUT_UNDO.length ? ch('mundo', 1, false, 'undo') : '') + '</div><div class="mn">a variation of the groove · kick and bass stay</div>'
-    + '<div class="mi' + (JAM ? ' on' : '') + '" data-m="jam"><i class="ck"></i><b>jam keys</b></div><div class="mn">1–9 play planets · ← → nudge the selected planet a 16th (none selected: the transport)</div><div class="ms"></div>'
-    + '<div class="mi" style="cursor:default;opacity:.8"><b>export</b><span style="opacity:.3">bars</span>' + [4, 8, 16].map(b => ch('xbars', b, XS.xbars === b, b + '')).join('') + '</div>'
-    + '<div class="mi" style="cursor:default"><i class="ck" style="border-style:dotted"></i>' + ch('xmid', 1, false, '.mid') + ch('xwav', 'mix', false, 'wav mix') + ch('xwav', 'stems', false, 'wav stems') + '</div><div class="mn">the loop as midi (one track per planet) or audio · stems = one wav per planet + the mix</div><div class="ms"></div>'
-    + '<div class="mi' + (XS.binaural ? ' on' : '') + '" data-m="xs" data-k="binaural"><i class="ck"></i><b>binaural</b></div><div class="mn">3d sound on headphones · planets circle around your head</div>'
-    + '<div class="mi' + (XS.eclipse ? ' on' : '') + '" data-m="xs" data-k="eclipse"><i class="ck"></i><b>eclipses</b></div><div class="mn">a planet passing behind another (seen from the sun) dips and darkens</div>'
-    + '<div class="mi' + (XS.gravity ? ' on' : '') + '" data-m="xs" data-k="gravity"><i class="ck"></i><b>gravity</b></div><div class="mn">while playing, a slow drag toward the sun speeds the lap up over bars like a build</div>'
-    + '<div class="mi' + (XS.mood ? ' on' : '') + '" data-m="xs" data-k="mood"><i class="ck"></i><b>mood light</b></div><div class="mn">the dark tints with the genre and the energy of the mix</div><div class="ms"></div>'
-    + '<div class="mi" data-m="share"><i class="ck" style="border-style:dashed"></i><b>share link</b></div><div class="mn">copies a link with the whole system and its scenes · recordings are not included</div>' + (hasBackup() ? '<div class="mi" data-m="restore"><i class="ck" style="border-style:dashed"></i><b>back to my system</b></div><div class="mn">undo opening a share link</div>' : '') + (lastShare ? '<div class="mn"><input readonly value="' + esc(lastShare) + '" style="width:100%;background:#000;color:#fff;border:0;border-bottom:1px solid rgba(255,255,255,.3);font:inherit;font-size:10px;padding:3px 0;opacity:.8"></div>' : '');
+function renderMore() { // overlays v2: a grouped list (play · scenes · share & export · view) with on / off switches
+  const ch = (k, v, on, label) => '<span class="ch' + (on ? ' on' : '') + '" data-mk="' + k + '" data-v="' + v + '">' + label + '</span>', tog = on => '<span class="tog' + (on ? ' on' : '') + '"><i></i></span>', gr = '<span style="flex:1"></span>', lb = t => '<span style="opacity:.3;margin:0 4px">' + t + '</span>';
+  let h = '<div class="mhead"><span class="ttl">more</span><span class="hint">esc · click outside</span><span class="ib" data-m="close" aria-label="close">×</span></div>';
+  h += '<div class="lab">play</div>'
+    + '<div class="mi' + (COMET.on ? ' on' : '') + '" data-m="comet"><b>comets</b>' + gr + ch('every', 8, COMET.every === 8, '8') + ch('every', 16, COMET.every === 16, '16') + lb('bars') + tog(COMET.on) + '</div>'
+    + '<div class="mi' + (JAM ? ' on' : '') + '" data-m="jam"><b>jam keys</b>' + gr + tog(JAM) + '</div>'
+    + '<div class="mi" data-m="mutate"><b>mutate</b>' + gr + (MUT_UNDO.length ? ch('mundo', 1, false, 'undo') : '') + '</div>'
+    + '<div class="mn">comets: a riser then a crash on the downbeat · jam: 1–9 play planets, ← → nudge · mutate varies the groove, keeps kick + bass</div>';
+  h += '<div class="lab">scenes</div>'
+    + '<div class="mi" style="cursor:default"><b>morph</b>' + gr + [0, 1, 2, 4, 8].map(b => ch('sbars', b, SCENE_BARS === b, b ? b + '' : 'cut')).join('') + lb('bars') + '</div>'
+    + SCENE_SLOTS.map(sl => '<div class="mi' + (sceneOn === sl ? ' on' : '') + '" data-m="scene" data-s="' + sl + '"><b>' + sl + '</b>' + gr + ch('sstore', sl, false, SCENES[sl] ? 'save over' : 'save') + tog(!!SCENES[sl] && sceneOn === sl) + '</div>').join('')
+    + '<div class="mn">click a saved scene to morph to it from the next downbeat · scenes keep group fx too</div>';
+  h += '<div class="lab">share &amp; export</div>'
+    + '<div class="mi" data-m="share"><b>share link</b></div>'
+    + (hasBackup() ? '<div class="mi" data-m="restore"><b>back to my system</b></div>' : '')
+    + (lastShare ? '<div class="mn"><input readonly value="' + esc(lastShare) + '" style="width:100%;background:#000;color:#fff;border:0;border-bottom:1px solid rgba(255,255,255,.3);font:inherit;font-size:10px;padding:3px 0;opacity:.8"></div>' : '')
+    + '<div class="mi" style="cursor:default"><b>length</b>' + gr + [4, 8, 16].map(b => ch('xbars', b, XS.xbars === b, b + '')).join('') + lb('bars') + '</div>'
+    + '<div class="mi" style="cursor:default"><b>export</b>' + gr + ch('xmid', 1, false, 'midi') + ch('xwav', 'mix', false, 'wav mix') + ch('xwav', 'stems', false, 'wav stems') + '</div>'
+    + '<div class="mn">share copies a link with the system and its scenes (recordings stay here) · midi is one track per planet · stems = one wav per planet + the mix</div>';
+  h += '<div class="lab">view</div>' + [['binaural', 'binaural', '3d sound on headphones'], ['eclipse', 'eclipses', 'a planet behind another dips and darkens'], ['gravity', 'gravity', 'slow drag toward the sun while playing = a build'], ['mood', 'mood light', 'the dark tints with genre and energy']]
+    .map(([k, l, n]) => '<div class="mi' + (XS[k] ? ' on' : '') + '" data-m="xs" data-k="' + k + '" title="' + n + '"><b>' + l + '</b>' + gr + tog(XS[k]) + '</div>').join('')
+    + '<div class="mn">binaural: 3d sound on headphones · eclipses: a planet passing behind another dips · gravity: slow drag inward while playing = a build · mood light: the dark tints with the genre and energy</div>';
+  mmenu.innerHTML = h;
 }
-moreEl.addEventListener('click', ev => { ev.stopPropagation(); renderMore(); const r = moreEl.getBoundingClientRect(); mmenu.style.left = Math.max(8, Math.min(innerWidth - 230, r.right - 200)) + 'px'; mmenu.style.top = (r.bottom + 4) + 'px'; mmenu.classList.toggle('open'); gmenu.classList.remove('open'); });
+const DESK = () => matchMedia('(min-width:820px) and (min-aspect-ratio:1/1)').matches;
+function moreOpen(on) {
+  if (on) { renderMore(); const desk = DESK(); mmenu.classList.toggle('panel', desk); if (!desk) { const r = moreEl.getBoundingClientRect(); mmenu.style.left = Math.max(8, Math.min(innerWidth - 250, r.right - 230)) + 'px'; mmenu.style.top = (r.bottom + 4) + 'px'; } else { mmenu.style.left = ''; mmenu.style.top = ''; } gmenu.classList.remove('open'); }
+  mmenu.classList.toggle('open', !!on); document.body.classList.toggle('more-open', !!on && mmenu.classList.contains('panel')); moreEl.classList.toggle('on', !!on);
+}
+moreEl.addEventListener('click', ev => { ev.stopPropagation(); moreOpen(!mmenu.classList.contains('open')); });
 mmenu.addEventListener('click', ev => { ev.stopPropagation(); const k = ev.target.closest('[data-mk]'), m = ev.target.closest('[data-m]');
   if (k) { const v = k.dataset.v; initAudio();
     if (k.dataset.mk === 'every') setComet({ every: +v, on: true });
@@ -6582,15 +6668,15 @@ mmenu.addEventListener('click', ev => { ev.stopPropagation(); const k = ev.targe
     else if (k.dataset.mk === 'xmid') exportMidi();
     else if (k.dataset.mk === 'xwav') exportWav(v);
     return; }
-  if (!m) return; initAudio();
+  if (!m) return; if (m.dataset.m === 'close') { moreOpen(false); return; } initAudio();
   if (m.dataset.m === 'comet') setComet({ on: !COMET.on });
   else if (m.dataset.m === 'scene') { const sl = m.dataset.s; if (SCENES[sl]) gotoScene(sl); else storeScene(sl); }
   else if (m.dataset.m === 'mutate') mutate();
   else if (m.dataset.m === 'jam') setJam(!JAM);
   else if (m.dataset.m === 'xs') setXS(m.dataset.k, !XS[m.dataset.k]);
   else if (m.dataset.m === 'restore') restoreBackup();
-  else if (m.dataset.m === 'share') { mmenu.classList.remove('open'); shareLink(); } });
-addEventListener('pointerdown', ev => { if (!ev.target.closest('#mmenu,#more')) mmenu.classList.remove('open'); });
+  else if (m.dataset.m === 'share') { moreOpen(false); shareLink(); } });
+addEventListener('pointerdown', ev => { if (!ev.target.closest('#mmenu,#more') && mmenu.classList.contains('open')) moreOpen(false); });
 
 /* ---------------- snapshots: shared by scenes and mutate ---------------- */
 const SNAP_KEYS = ['rad', 'a', 'vol', 'pn', 'cut', 'verb', 'echo', 'muted', 'inHole', 'moons', 'prob', 'drift'];
@@ -6920,16 +7006,15 @@ function endPractice(abort) {
 let lastPractice = null;
 
 /* ---- window rows (fx side: trail · build · export · chop; play side: practice) ---- */
-function winExtrasHTML(e) {
-  const i = e.orbit, o = ORB[i], k = e.trail ? e.trail.kind : 'off';
-  let h = '<div class="grp"><b>trail</b><span class="gv">a curve over its lap · drag points, double-click removes, shift-drag bends</span></div><div class="laps">' + ['off', 'cut', 'vol'].map(v => '<span data-act="trail" data-id="' + e.id + '" data-v="' + v + '" class="' + (k === v ? 'on' : '') + '">' + (v === 'cut' ? 'filter' : v === 'vol' ? 'volume' : 'off') + '</span>').join('') + '</div>';
-  if (e.trail) h += '<canvas id="wTrail" style="width:100%;height:58px;display:block;margin:4px 0 10px;cursor:crosshair;touch-action:none"></canvas>';
+function winExtrasHTML(e) { // window parts for the pattern tab (overlays v2)
+  const i = e.orbit, o = ORB[i], k = e.trail ? e.trail.kind : 'off', out = {};
+  out.trail = '<div class="grp"><b>trail</b><span class="gv">a curve over its lap</span></div><div class="laps">' + ['off', 'cut', 'vol'].map(v => '<span data-act="trail" data-id="' + e.id + '" data-v="' + v + '" class="' + (k === v ? 'on' : '') + '">' + (v === 'cut' ? 'filter' : v === 'vol' ? 'volume' : 'off') + '</span>').join('') + '</div>'
+    + (e.trail ? '<canvas id="wTrail" style="width:100%;height:58px;display:block;margin:4px 0 4px;cursor:crosshair;touch-action:none"></canvas>' + hint('click adds a point · drag moves · double-click removes · shift-drag bends') : '');
   const gr = o && GRAV[o.id], tl = o ? BANDS.filter(L => L < o.lap) : [];
-  h += '<div class="grp"><b>build</b><span class="gv">' + (gr ? 'pulling in · ' + lapTxt(Math.round(gr.lap)) : 'gravity: the lap speeds up over bars') + '</span></div><div class="laps">' + (gr ? '<span data-act="gstop" data-i="' + i + '">stop</span>' : tl.length ? [4, 8].map(b => '<span data-act="build" data-i="' + i + '" data-b="' + b + '">to ' + lapTxt(tl[0]) + ' · ' + b + ' bars</span>').join('') : '<span class="off">already fastest</span>') + '</div>';
-  h += '<div class="grp"><b>export</b><span class="gv">its pattern</span></div><div class="laps"><span data-act="xmid" data-id="' + e.id + '">.mid clip</span><span data-act="xstem" data-id="' + e.id + '">stem .wav</span></div>';
-  if (e.side === 'rec' || e.variant === 'file') h += '<div class="grp"><b>chop</b><span class="gv">' + (e.chops ? e.chops.length + ' slices' : 'cut the recording at its transients') + '</span></div><div class="laps"><span data-act="chop" data-id="' + e.id + '" class="' + (e.buf ? '' : 'off') + '">chop into hits</span></div>';
-  h += '<div class="grp"><b>size</b><span class="gv">shift + wheel over the planet · ' + (sizeSemis(e) ? (sizeSemis(e) > 0 ? '+' : '') + sizeSemis(e) + ' st' : 'original pitch') + '</span></div>';
-  return h;
+  out.build = '<div class="grp"><b>build</b><span class="gv">' + (gr ? 'pulling in · ' + lapTxt(Math.round(gr.lap)) : 'gravity: the lap speeds up over bars') + '</span></div><div class="laps">' + (gr ? '<span data-act="gstop" data-i="' + i + '">stop</span>' : tl.length ? [4, 8].map(b => '<span data-act="build" data-i="' + i + '" data-b="' + b + '">to ' + lapTxt(tl[0]) + ' · ' + b + ' bars</span>').join('') : '<span class="off">already fastest</span>') + '</div>';
+  out.export = '<div class="grp"><b>export</b><span class="gv">its pattern</span></div><div class="laps"><span data-act="xmid" data-id="' + e.id + '">midi clip</span><span data-act="xstem" data-id="' + e.id + '">stem wav</span><span data-act="bar" data-id="' + e.id + '">wave ›</span></div>';
+  out.chop = '<div class="grp"><b>chop</b><span class="gv">' + (e.side === 'rec' || e.variant === 'file' ? (e.chops ? e.chops.length + ' slices' : 'cut the recording at its transients') : 'recordings only') + '</span></div><div class="laps"><span data-act="chop" data-id="' + e.id + '" class="' + (e.buf && (e.side === 'rec' || e.variant === 'file') ? '' : 'off') + '">chop into hits</span></div>';
+  return out;
 }
 function extrasAct(act, t, id) {
   const e = E[id];
@@ -6942,6 +7027,32 @@ function extrasAct(act, t, id) {
   return false;
 }
 function extrasTick(dt) { gravTick(); binTick(); eclTick(dt); moodTick(dt); pracTick(); if (winId) drawTrailEd(); }
+
+/* ================= batch D: overlays v2 — side sheet below the top bar: drag its left edge, collapse it (– / esc) ================= */
+let SHEET = { w: 300, col: false }; try { const v = JSON.parse(localStorage.getItem('orbs-solar-sheet') || 'null'); if (v && typeof v === 'object') SHEET = Object.assign(SHEET, v); } catch (x) {}
+const sCol = document.getElementById('sCol'), sResize = document.getElementById('sResize');
+const sheetMaxW = () => Math.max(240, Math.min(Math.floor(innerWidth * 0.42), innerWidth - 2 * (Math.min(innerWidth, innerHeight - 48) * 0.18 + 24)));
+function applySheet(noResize) {
+  SHEET.w = clamp(Math.round(SHEET.w), 240, sheetMaxW()); document.documentElement.style.setProperty('--sw', SHEET.w + 'px');
+  sheet.classList.toggle('collapsed', !!SHEET.col); sCol.textContent = SHEET.col ? '‹' : '–'; sCol.title = SHEET.col ? 'open the sheet' : 'collapse (esc)';
+  try { localStorage.setItem('orbs-solar-sheet', JSON.stringify(SHEET)); } catch (x) {}
+  if (!noResize) { resize(); sheetDirty = true; } // the system recenters in the space that is left
+}
+function sheetCollapse(v) { v = !!v; if (SHEET.col === v) return; SHEET.col = v; applySheet(); }
+sCol.addEventListener('click', ev => { ev.stopPropagation(); sheetCollapse(!SHEET.col); });
+document.getElementById('sHead').addEventListener('click', ev => { if (SHEET.col && !ev.target.closest('#sCol')) sheetCollapse(false); });
+let sDrag = null;
+sResize.addEventListener('pointerdown', ev => { ev.preventDefault(); ev.stopPropagation(); if (SHEET.col) return; sDrag = { x: ev.clientX, w: SHEET.w }; sResize.setPointerCapture(ev.pointerId); });
+sResize.addEventListener('pointermove', ev => { if (!sDrag) return; SHEET.w = sDrag.w + (sDrag.x - ev.clientX); applySheet(); });
+const sDragEnd = () => { sDrag = null; }; sResize.addEventListener('pointerup', sDragEnd); sResize.addEventListener('pointercancel', sDragEnd);
+addEventListener('keydown', ev => { // esc: closes the more panel, else (nothing else open) collapses / opens the sheet
+  if (ev.key !== 'Escape' || typingIn(ev.target)) return;
+  if (mmenu.classList.contains('open')) { moreOpen(false); ev.stopImmediatePropagation(); return; }
+  if (winId || pickId || barId || gmenu.classList.contains('open')) return;
+  sheetCollapse(!SHEET.col);
+}, true);
+addEventListener('resize', () => applySheet(true));
+applySheet(true);
 
 
 /* ---------------- sample picker ---------------- */
@@ -7293,7 +7404,7 @@ window.SS = { E, get ORB() { return ORB; }, IDS, links, get TETH() { return TETH
   geom: () => ({ CX, CY, K, RMAX, SA }),
   get VIEW() { return VIEW; }, zoomAt, setView, zoomFit, zoom11, get COMET() { return COMET; }, setComet, comets, shareLink, shareState, chanceOk, MOON_OFF, POLY, renderMore, get spaceDown() { return spaceDown; },
   sysSnap, applyDiscrete, storeScene, gotoScene, get SCENES() { return SCENES; }, get MORPH() { return MORPH; }, set SCENE_BARS(v) { SCENE_BARS = v; }, mutate, undoMutate, MUT_UNDO, setJam, get JAM() { return JAM; }, jamHit, jamNudge, driftOff, swallow, get HOLE() { return HOLE; }, sunTap, get CHORD() { return CHORD; }, chordIdx, chordName, hitEvent,
-  get XS() { return XS; }, setXS, hitsIn, midiFor, exportMidi, exportWav, renderInto, get bin() { return bin; }, binauralOn, get ECL() { return ECL; }, GRAV, startGravity, sizeSemis, sizeWheel, get MOODCSS() { return MOODCSS; }, setTrailKind, trailOf, trailMix, chopPlanet, playSlice, startPractice, endPractice, pracTap, get prac() { return prac; }, get lastPractice() { return lastPractice; }, gravGesture, X, save };
+  get XS() { return XS; }, setXS, hitsIn, midiFor, exportMidi, exportWav, renderInto, get bin() { return bin; }, binauralOn, get ECL() { return ECL; }, GRAV, startGravity, sizeSemis, sizeWheel, get MOODCSS() { return MOODCSS; }, setTrailKind, trailOf, trailMix, chopPlanet, playSlice, startPractice, endPractice, pracTap, get prac() { return prac; }, get lastPractice() { return lastPractice; }, gravGesture, X, save, setWinTab, get WTAB() { return WTAB; }, setSec, secOpen, set UI_ALL(v) { UI_ALL = !!v; sheetDirty = true; if (winId) renderWin(); }, get SHEET() { return SHEET; }, sheetCollapse, applySheet, moreOpen, get SECS() { return SECS; } };
 })();
 </script>
 </body>
