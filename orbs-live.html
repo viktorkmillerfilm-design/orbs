@@ -242,14 +242,14 @@ body.live #bar,body.live #win{z-index:8}
 body.live #mmenu,body.live #gmenu{z-index:12}
 body.live.clean #lv{display:none}
 #lv{--top:36px;--stat:24px;--brw:208px;--mix:248px;--det:248px;--l:rgba(255,255,255,.14);--l2:rgba(255,255,255,.26);--dim:.5;--row:24px;
-  position:fixed;inset:0;z-index:3;display:grid;grid-template-rows:var(--top) minmax(0,1fr) var(--stat);grid-template-columns:minmax(0,1fr);pointer-events:none;color:#fff;
+  position:fixed;inset:0;z-index:3;display:flex;flex-direction:column;pointer-events:none;color:#fff;
   font:11px/1.3 ui-monospace,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;font-variant-numeric:tabular-nums;letter-spacing:.01em;user-select:none;-webkit-user-select:none}
 #lv,#lv *{box-sizing:border-box}
 #lv>*{pointer-events:auto;background:#000;min-width:0;min-height:0}
 #lv .dim{opacity:var(--dim)}
 #lv .ch{cursor:pointer;opacity:.6;padding:0 1px;white-space:nowrap} #lv .ch:hover{opacity:.9} #lv .ch.on{opacity:1;border-bottom:1px solid rgba(255,255,255,.75)} #lv .ch.off{opacity:.3;pointer-events:none}
 #lv .box{border:1px solid var(--l2);padding:0 6px;height:20px;display:inline-flex;align-items:center;gap:6px}
-#ltop{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;border-bottom:1px solid var(--l2);padding:0 8px}
+#ltop{height:var(--top);flex-shrink:0;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;border-bottom:1px solid var(--l2);padding:0 8px}
 #lv .zone{display:flex;align-items:center;gap:14px;height:100%;min-width:0}
 #lv .zone.r{justify-content:flex-end} #lv .zone.c{padding:0 16px;border-left:1px solid var(--l);border-right:1px solid var(--l);gap:10px}
 #lv .tb{opacity:.7;cursor:pointer;display:inline-flex;align-items:center;gap:5px;height:20px;white-space:nowrap} #lv .tb:hover,#lv .tb.on{opacity:1}
@@ -261,7 +261,7 @@ body.live.clean #lv{display:none}
 #lv .pos{min-width:76px;justify-content:center;cursor:default}
 #lv .meter{display:inline-flex;flex-direction:column;gap:2px;width:44px} #lv .meter i{display:block;height:3px;background:rgba(255,255,255,.12);position:relative} #lv .meter i b{position:absolute;left:0;top:0;bottom:0;background:rgba(255,255,255,.75);width:0}
 #lv .dot{width:6px;height:6px;border-radius:50%;border:1px solid rgba(255,255,255,.75);display:inline-block;flex-shrink:0} #lv .dot.on{background:#fff}
-#lmid{display:flex;overflow:hidden;background:transparent!important;pointer-events:none!important}
+#lmid{flex:1;display:flex;overflow:hidden;background:transparent!important;pointer-events:none!important}
 #lmid>*{pointer-events:auto}
 #brw{width:var(--brw);border-right:1px solid var(--l2);display:flex;flex-direction:column;flex-shrink:0;background:#000}
 #lv .hd{height:var(--row);display:flex;align-items:center;gap:8px;padding:0 8px;border-bottom:1px solid var(--l);flex-shrink:0;white-space:nowrap;overflow:hidden}
@@ -379,6 +379,27 @@ body.live #mmenu.lmenu select{background:#000;color:#fff;border:1px solid rgba(2
 body.live #mmenu.lmenu a{color:#fff}
 body.live #gmenu{font:11px/1.3 ui-monospace,Menlo,Consolas,monospace;top:35px!important}
 
+/* ===== batch G: minimal · the system fills the screen, 4 edge boxes open the panels (all closed on open) ===== */
+body.noT #ltop{display:none}
+body.live.noT #picker{top:0!important}
+#sysHd,#railL,#railR,#detBar{display:none!important}
+#lv{--l:rgba(255,255,255,.1);--l2:rgba(255,255,255,.2)}
+#brw,#mix,#det,#ltop{background:rgba(0,0,0,.94)!important}
+#ltop{animation:lvInT .14s ease-out} #brw{animation:lvInL .14s ease-out} #mix{animation:lvInR .14s ease-out} #det{animation:lvInB .14s ease-out}
+@keyframes lvInT{from{transform:translateY(-100%)}} @keyframes lvInL{from{transform:translateX(-100%)}} @keyframes lvInR{from{transform:translateX(100%)}} @keyframes lvInB{from{transform:translateY(100%)}}
+#lv>.lbx{position:fixed;z-index:6;background:#000;border:1px solid #fff;color:#fff;opacity:.28;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;
+  padding:0 7px;height:16px;font-size:10px;letter-spacing:.06em;white-space:nowrap;transition:opacity .15s;pointer-events:auto;min-width:0}
+#lv>.lbx:hover,#lv>.lbx.on:hover{opacity:1} #lv>.lbx.on{opacity:.6}
+#lv>.lbx.v{height:auto;width:16px;padding:7px 0;writing-mode:vertical-rl}
+#lv>#bxL .lb{transform:rotate(180deg)}
+#lv>.lbx .pl{display:inline-flex;align-items:center;justify-content:center;width:12px;height:12px;margin-left:-4px;opacity:.85} #lv>.lbx .pl.on svg path{fill:none;stroke:#fff}
+#lv>.lbx .pl:hover{opacity:1}
+#lv>.lbx .sd{display:none;width:5px;height:5px;border-radius:50%;background:#fff} #lv>.lbx.sel .sd{display:inline-block}
+#lv>#lstat{position:fixed;z-index:6;left:50%;transform:translateX(-50%);border:0;background:transparent!important;height:auto;padding:0;pointer-events:none;opacity:0;transition:opacity .3s;max-width:min(720px,90vw);text-align:center;display:block;white-space:normal}
+#lv>#lstat.show{opacity:1} #lstat .r{display:none!important} #lstat .h{opacity:.55;font-size:10px;line-height:1.4;display:block}
+#lv .strips{overflow-x:auto;overflow-y:hidden;scrollbar-width:thin} #lv .st{min-width:42px;flex-shrink:0;flex-basis:0;flex-grow:1}
+#lv .st.master{position:sticky;right:0;z-index:1;background:#000;border-left:1px solid var(--l)}
+
 </style>
 </head>
 <body>
@@ -441,9 +462,14 @@ body.live #gmenu{font:11px/1.3 ui-monospace,Menlo,Consolas,monospace;top:35px!im
    </div>
   </div>
  </div>
+ <div class="lbx" id="bxT" data-bx="T" title="top bar · transport, bpm, genre, view, share, midi (ctrl-alt-t)"><span class="pl" id="bxPlay" title="play / stop (space)"><svg width="7" height="8"><path d="M.5 .5v7l6-3.5z" fill="#fff"/></svg></span><span class="lb">transport</span></div>
+ <div class="lbx v" id="bxL" data-bx="B" title="browser · sounds, samples, genres, scenes, pad (ctrl-alt-b)"><span class="lb">browser</span></div>
+ <div class="lbx v" id="bxR" data-bx="M" title="mixer · faders, sends, room (ctrl-alt-m)"><span class="lb">mixer</span></div>
+ <div class="lbx" id="bxB" data-bx="D" title="detail · devices, clip, pad (ctrl-alt-l) · double-click a planet"><span class="sd" id="bxSel"></span><span class="lb">detail</span></div>
  <div id="lstat"><span class="h" id="lHint"></span><span class="r" id="lStatR"></span></div>
 </div>
 <div id="lghost"></div>
+
 
 <div id="top" class="ui">
   <button id="play" aria-label="play / stop"><svg viewBox="0 0 22 22"><path id="playIcon" fill="none" stroke="#fff" stroke-width="1.2" stroke-linejoin="round" d="M6 4 L17 11 L6 18 Z"/></svg></button>
@@ -7222,7 +7248,7 @@ function resize() {
   K = clamp(hh / hw, 0.55, SIDE ? 0.8 : 0.72);
   RMAX0 = Math.max(50, Math.min(hw, hh / K)); applyView();
   DS = clamp(M / 700, 0.9, 1.3); SUNR = 5.5 * DS;
-  ctlZone = document.getElementById('lsys') ? { x: SA.x + 16, y: SA.y + 44 } : { x: 0, y: tb + 16 };
+  ctlZone = document.getElementById('lsys') ? { x: SA.x + 16, y: SA.y + 16 } : { x: 0, y: tb + 16 };
   placeHole();
 }
 resize(); addEventListener('resize', () => { resize(); sheetDirty = true; });
@@ -8794,16 +8820,40 @@ pad9Btn.addEventListener('click', ev => { ev.stopPropagation(); pad9Toggle(); })
 document.body.classList.add('live');
 const LV = id => document.getElementById(id);
 const lvEsc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-let LVP = { B: true, M: true, D: true, det: 248, cat: 'sounds' }; try { Object.assign(LVP, JSON.parse(localStorage.getItem('orbs-live-panels') || '{}')); } catch (x) {}
+let LVP = { det: 248, cat: 'sounds' }; try { const sv = JSON.parse(localStorage.getItem('orbs-live-panels') || '{}') || {}; if (sv.det) LVP.det = sv.det; if (sv.cat) LVP.cat = sv.cat; } catch (x) {}
+Object.assign(LVP, { T: false, B: false, M: false, D: false }); // batch G: always opens clean (the system fills the screen); open panels are never remembered
 let LVOFF = {}; try { LVOFF = JSON.parse(localStorage.getItem('orbs-live-off') || '{}') || {}; } catch (x) {} // device on / off: the values a switched-off device had
 let LVMASTER = 48 / 54; try { const v = +localStorage.getItem('orbs-live-master'); if (localStorage.getItem('orbs-live-master') != null && isFinite(v)) LVMASTER = clamp(v, 0, 1); } catch (x) {}
 let LVD = true, lvDrag = null, lvMenu = null, lvMenuT = 0, lvOpenSnd = new Set(['kick']), lvOd = null, lvTemp = new Set(), lvLastSel = undefined, lvAn = null, lvHelp = false;
-const lvSave = () => { try { localStorage.setItem('orbs-live-panels', JSON.stringify(LVP)); localStorage.setItem('orbs-live-off', JSON.stringify(LVOFF)); } catch (x) {} };
+const lvSave = () => { try { localStorage.setItem('orbs-live-panels', JSON.stringify({ det: LVP.det, cat: LVP.cat })); localStorage.setItem('orbs-live-off', JSON.stringify(LVOFF)); } catch (x) {} };
 function lvPanels() {
-  document.body.classList.toggle('noB', !LVP.B); document.body.classList.toggle('noM', !LVP.M); document.body.classList.toggle('noD', !LVP.D);
-  LV('lv').style.setProperty('--det', clamp(LVP.det | 0, 170, Math.max(170, innerHeight - 260)) + 'px'); resize(); LVD = true;
+  document.body.classList.toggle('noT', !LVP.T); document.body.classList.toggle('noB', !LVP.B); document.body.classList.toggle('noM', !LVP.M); document.body.classList.toggle('noD', !LVP.D);
+  LV('lv').style.setProperty('--det', clamp(LVP.det | 0, 170, Math.max(170, innerHeight - 260)) + 'px'); resize(); LVD = true; lvBoxes();
 }
-function lvCollapse(k, on) { LVP[k] = on == null ? !LVP[k] : !!on; lvSave(); lvPanels(); }
+const LV_BXH = { T: 'transport · bpm · genre · view · share · midi', B: 'drag a sound onto an orbit · distance from the sun sets the lap', M: 'drag a fader · m / s · rev sends · room', D: 'click a device dot to switch it off · drag knobs · click a hit to set its chance' };
+function lvCollapse(k, on) { const was = LVP[k]; LVP[k] = on == null ? !LVP[k] : !!on; lvSave(); lvPanels(); if (LVP[k] && !was) lvHint(LV_BXH[k]); }
+const lvAnyOpen = () => LVP.T || LVP.B || LVP.M || LVP.D;
+function lvCloseAll() { LVP.T = LVP.B = LVP.M = LVP.D = false; lvPanels(); }
+let lvBxK = '';
+function lvBoxes() { // the 4 edge boxes sit centred on the system's edges = the open panels' inner edges
+  const r = LV('lsys').getBoundingClientRect(), k = [r.left, r.top, r.right, r.bottom, LVP.T, LVP.B, LVP.M, LVP.D].map(v => typeof v === 'number' ? Math.round(v) : +v).join();
+  if (k === lvBxK) return; lvBxK = k; const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+  const S = (id, x, y, tx, ty, on) => { const b = LV(id); b.style.left = x + 'px'; b.style.top = y + 'px'; b.style.transform = 'translate(' + tx + ',' + ty + ')'; b.classList.toggle('on', on); };
+  S('bxT', cx, r.top, '-50%', '0', LVP.T); S('bxB', cx, r.bottom, '-50%', '-100%', LVP.D); S('bxL', r.left, cy, '0', '-50%', LVP.B); S('bxR', r.right, cy, '-100%', '-50%', LVP.M);
+  LV('lstat').style.bottom = (innerHeight - r.bottom + 24) + 'px'; LV('lstat').style.left = cx + 'px';
+}
+let lvHintT = 0;
+function lvHint(t, ms) { const el = LV('lstat'); LV('lHint').textContent = t; lvBoxes(); el.classList.add('show'); clearTimeout(lvHintT); lvHintT = setTimeout(() => el.classList.remove('show'), ms || 2600); }
+document.querySelectorAll('#lv>.lbx').forEach(b => {
+  b.addEventListener('click', ev => { ev.stopPropagation(); if (ev.target.closest('#bxPlay')) { initAudio(); if (!playing) play(); else stop(); lvLive(); return; } lvCollapse(b.dataset.bx); });
+  b.addEventListener('pointerenter', () => lvHint(b.title.split(' (')[0], 1800));
+});
+cv.addEventListener('pointerdown', ev => { // a click on empty system closes the open panels
+  if (ev.button !== 0 || spaceDown || !lvAnyOpen() || CLEAN) return; const x = ev.clientX, y = ev.clientY;
+  if (hitDot(x, y, 4) || hitLabel(x, y) || linkAt(x, y) || Math.hypot(x - CX, y - CY) < SUNR + 12) return;
+  setTimeout(lvCloseAll, 0);
+});
+cv.addEventListener('dblclick', ev => { const h = hitDot(ev.clientX, ev.clientY, 4); if (h && !CLEAN) { select(h.e.id); lvCollapse('D', true); } }); // double-click a planet: its detail
 /* ---- knobs (svg like the mockup), faders and the one value path (slApply) ---- */
 function lvGet(d) { // {t, txt} of a control without changing it
   if (d.master) return { t: LVMASTER, txt: LVMASTER < 0.02 ? '-inf' : OrbsFX.formatDb(-48 + 54 * LVMASTER) };
@@ -9164,7 +9214,7 @@ addEventListener('pointerdown', () => setTimeout(lvStartAudio, 0), true); addEve
 const LV_HINTS = { main: 'drag a sound from the browser onto an orbit · distance from the sun sets the lap · drop a planet on another to link · shift-drag = duck', planet: ' · click a device dot to switch it off · drag knobs up / down · click a hit in the clip to set its chance · esc deselects', collapsed: 'ctrl-alt-b browser · ctrl-alt-l detail · ctrl-alt-m mixer · h hides everything · f full screen' };
 function lvStatus() {
   const e = E[selId], col = !LVP.B && !LVP.M && !LVP.D;
-  LV('lHint').textContent = col ? LV_HINTS.collapsed : e ? (e.label || e.id) + LV_HINTS.planet : LV_HINTS.main;
+  LV('bxB').classList.toggle('sel', !!e); LV('bxB').querySelector('.lb').textContent = e ? 'detail · ' + (e.label || e.id) : 'detail'; lvBxK = ''; lvBoxes();
   const sp = midiPorts.find(p => p.selected);
   LV('lStatR').innerHTML = '<span class="ch' + (!still ? ' on' : '') + '" data-ls="motion">' + (still ? 'still' : 'moving') + '</span><span class="sepv"></span><span><span class="ch" data-ls="fit">fit</span> <span class="ch" data-ls="z1">1:1</span></span><span class="sepv"></span><span class="dim">midi · ' + (sp ? lvEsc(sp.name.toLowerCase().slice(0, 20)) : 'off') + ' · clock ' + (CLOCK ? 'on' : 'off') + '</span><span class="sepv"></span><a href="orbs-solar.html" title="the classic orbs solar layout">classic ›</a>';
 }
@@ -9178,9 +9228,9 @@ LV('lHandle').addEventListener('pointerdown', ev => { ev.preventDefault(); const
   el.addEventListener('pointermove', mv); el.addEventListener('pointerup', up); });
 addEventListener('keydown', ev => {
   if (typingIn(ev.target)) return;
-  if (ev.ctrlKey && ev.altKey && !ev.metaKey) { const k = { KeyB: 'B', KeyL: 'D', KeyM: 'M' }[ev.code]; if (k) { ev.preventDefault(); ev.stopImmediatePropagation(); lvCollapse(k); } return; }
+  if (ev.ctrlKey && ev.altKey && !ev.metaKey) { const k = { KeyB: 'B', KeyL: 'D', KeyM: 'M', KeyT: 'T' }[ev.code]; if (k) { ev.preventDefault(); ev.stopImmediatePropagation(); lvCollapse(k); } return; }
   if (ev.code === 'Escape' && !CLEAN) { ev.preventDefault(); ev.stopImmediatePropagation(); // esc: close the top floating thing, else deselect (never closes the docked pad)
-    if (mmenu.classList.contains('open')) moreOpen(false); else if (gmenu.classList.contains('open')) gmenu.classList.remove('open'); else if (winId) closeWin(); else if (barId) closeBar(); else if (pickId) closePicker(); else if (selId) select(null); LVD = true; return; }
+    if (mmenu.classList.contains('open')) moreOpen(false); else if (gmenu.classList.contains('open')) gmenu.classList.remove('open'); else if (winId) closeWin(); else if (barId) closeBar(); else if (pickId) closePicker(); else if (lvAnyOpen()) lvCloseAll(); else if (selId) select(null); LVD = true; return; }
   if (ev.code === 'KeyL' && !CLEAN && !winId && !ev.metaKey && !ev.ctrlKey && !ev.altKey) { LABELS_ON = !LABELS_ON; }
 }, true);
 /* ---- per-frame bits (cheap) + panel rendering when something changed ---- */
@@ -9191,7 +9241,7 @@ const lvRms = an => { an.getFloatTimeDomainData(lvAn.buf); let s = 0, pk = 0; fo
 let lvPrevSel = null;
 function lvLive() { // values that change every frame
   LV('lBpm').querySelector('.v').textContent = bpm.toFixed(2); LV('lSwing').querySelector('.v').textContent = Math.round(swing) + '%';
-  LV('lSnap').classList.toggle('on', snapOn); LV('lPlay').classList.toggle('on', playing); LV('lKeys').classList.toggle('on', !!JAM);
+  LV('lSnap').classList.toggle('on', snapOn); LV('lPlay').classList.toggle('on', playing); LV('bxPlay').classList.toggle('on', playing); LV('lKeys').classList.toggle('on', !!JAM);
   LV('lRec').classList.toggle('live', !!recState); LV('lOd').classList.toggle('live', !!lvOd); LV('lOd').classList.toggle('on', !!lvOd);
   LV('lBars').querySelectorAll('[data-rb]').forEach(c => c.classList.toggle('on', +c.dataset.rb === recBarsN));
   const p = playing && ac ? posNow() : 0, b = Math.floor(p / 4), bt = Math.floor(p % 4), sx = Math.floor((p * 4) % 4); LV('lPos').textContent = (b + 1) + '.' + (bt + 1) + '.' + (sx + 1);
@@ -9215,7 +9265,7 @@ function lvTick() {
   requestAnimationFrame(lvTick);
 }
 const lvLvl = { l: 0, r: 0 };
-function liveInit() { lvPanels(); if (master) master.gain.value = LVMASTER < 0.02 ? 0 : 0.8 * Math.pow(10, (-48 + 54 * LVMASTER) / 20); requestAnimationFrame(lvTick); }
+function liveInit() { lvPanels(); addEventListener('resize', () => { lvBxK = ''; lvBoxes(); }); setTimeout(() => lvHint('the boxes on the edges open the panels · space plays · double-click a planet for its detail · h hides', 4200), 600); if (master) master.gain.value = LVMASTER < 0.02 ? 0 : 0.8 * Math.pow(10, (-48 + 54 * LVMASTER) / 20); requestAnimationFrame(lvTick); }
 const lvInitAudio0 = initAudio; initAudio = function () { const fresh = !ac; lvInitAudio0(); if (fresh && master) master.gain.value = LVMASTER < 0.02 ? 0 : 0.8 * Math.pow(10, (-48 + 54 * LVMASTER) / 20); };
 
 
@@ -9569,7 +9619,7 @@ window.SS = { E, get ORB() { return ORB; }, IDS, links, get TETH() { return TETH
   get VIEW() { return VIEW; }, zoomAt, setView, zoomFit, zoom11, get COMET() { return COMET; }, setComet, comets, shareLink, shareState, chanceOk, MOON_OFF, POLY, renderMore, get spaceDown() { return spaceDown; },
   sysSnap, applyDiscrete, storeScene, gotoScene, get SCENES() { return SCENES; }, get MORPH() { return MORPH; }, set SCENE_BARS(v) { SCENE_BARS = v; }, mutate, undoMutate, MUT_UNDO, setJam, get JAM() { return JAM; }, jamHit, jamNudge, driftOff, swallow, get HOLE() { return HOLE; }, sunTap, get CHORD() { return CHORD; }, chordIdx, chordName, hitEvent,
   get XS() { return XS; }, setXS, hitsIn, midiFor, exportMidi, exportWav, renderInto, get bin() { return bin; }, binauralOn, get ECL() { return ECL; }, GRAV, startGravity, sizeSemis, sizeWheel, get MOODCSS() { return MOODCSS; }, setTrailKind, trailOf, trailMix, chopPlanet, playSlice, startPractice, endPractice, pracTap, get prac() { return prac; }, get lastPractice() { return lastPractice; }, gravGesture, X, save, setWinTab, get WTAB() { return WTAB; }, setSec, secOpen, set SEC_ALL(v) { SEC_ALL = !!v; sheetDirty = true; }, set UI_ALL(v) { UI_ALL = !!v; sheetDirty = true; if (winId) renderWin(); }, get SHEET() { return SHEET; }, sheetCollapse, applySheet, moreOpen, get SECS() { return SECS; }, get SKIN() { return SKIN; }, setSkin, SKIN_IDS, SKINS, drawScene, SKC, SKSTAT, get fieldBuilds() { return fieldBuilds; }, get CLEAN() { return CLEAN; }, setClean, get CLEAN_LABELS() { return CLEAN_LABELS; }, get XFADE() { return XFADE; }, get GRAV_DONE() { return GRAV_DONE; }, releaseGravity, linked, get lastShare() { return lastShare; }, get PAD9() { return PAD9; }, pad9Init, pad9Toggle, pad9Open, pad9Commit, playPlanetSound, P9V, posAt, timeAtPos, get recCount() { return recCount; } };
-liveInit(); Object.defineProperties(window.SS, Object.getOwnPropertyDescriptors({ LIVE: true, get LVP() { return LVP; }, lvCollapse, lvAddPlanet, lvDevToggle, lvDevOn: (dev, id) => { const e = E[id]; return !!e && lvDevOn(dev, e, ORB[e.orbit]); }, lvGet, lvSet, get LVOFF() { return LVOFF; }, lvPadSlot, get lvTemp() { return lvTemp; }, lvOverdub, get lvOd() { return lvOd; }, get master() { return master; }, get LVMASTER() { return LVMASTER; }, get LABELS_ON() { return LABELS_ON; }, get lvMenu() { return lvMenu; }, lvOpenMenu, get recBarsN() { return recBarsN; } }));
+liveInit(); Object.defineProperties(window.SS, Object.getOwnPropertyDescriptors({ LIVE: true, get LVP() { return LVP; }, lvCollapse, lvAddPlanet, lvDevToggle, lvDevOn: (dev, id) => { const e = E[id]; return !!e && lvDevOn(dev, e, ORB[e.orbit]); }, lvGet, lvSet, get LVOFF() { return LVOFF; }, lvPadSlot, get lvTemp() { return lvTemp; }, lvOverdub, get lvOd() { return lvOd; }, get master() { return master; }, get LVMASTER() { return LVMASTER; }, get LABELS_ON() { return LABELS_ON; }, get lvMenu() { return lvMenu; }, lvOpenMenu, get recBarsN() { return recBarsN; }, hitDotAt: (x, y) => !!(hitDot(x, y, 4) || hitLabel(x, y) || linkAt(x, y) || Math.hypot(x - CX, y - CY) < SUNR + 12), lvBoxes, lvCloseAll }));
 })();
 </script>
 </body>
