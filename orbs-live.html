@@ -556,6 +556,34 @@ body.sp-draw #c{cursor:crosshair}
 body:not(.lvPhone) #ltop .zone.r{gap:8px}
 @media (max-width:1180px){body:not(.lvPhone) #ltop #lOut,body:not(.lvPhone) #ltop .zone.r .sepv{display:none} body:not(.lvPhone) #ltop .zone.r{gap:5px}}
 #mmenu.lmenu .mi > b{white-space:nowrap}
+/* ---- batch M: the planet bubble (nested) ---- */
+#lv>#bub{position:fixed;inset:0;z-index:40;pointer-events:none!important;background:transparent!important;display:none}
+#lv>#bub.on{display:block}
+#lv>#bubDim{position:fixed;inset:0;z-index:39;background:rgba(0,0,0,.58)!important;display:none;pointer-events:auto}
+#lv>#bubDim.on{display:block}
+#bubTeth{position:absolute;left:0;top:0;pointer-events:none;overflow:visible} #bubTeth path{stroke:#fff;stroke-opacity:.45;stroke-width:1;fill:none}
+#bub .bub{position:absolute;border-radius:50%;background:rgba(0,0,0,.9);pointer-events:auto;transition:transform .25s ease,opacity .25s ease,left .25s ease,top .25s ease,width .25s ease,height .25s ease;font:11px/1.25 ui-monospace,"SF Mono",Menlo,Consolas,monospace;text-transform:lowercase}
+#bub .bub.anc{filter:brightness(.42);cursor:pointer} #bub .bub.anc:hover{filter:brightness(.62)} #bub .bub.anc .bx{display:none} #bub .bub.anc *{pointer-events:none}
+#bub .bfr{position:absolute;left:0;top:0;pointer-events:none} #bub .bfr circle{fill:none;stroke:#fff;stroke-opacity:.7;stroke-width:1} #bub .bfr circle.in{stroke-opacity:.1;stroke-dasharray:2 4}
+#bub .btl{position:absolute;left:22%;right:22%;text-align:center;pointer-events:none} #bub .btl .nm{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis} #bub .btl .sb{display:block;opacity:.45;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#bub .bx{position:absolute;left:50%;top:2px;transform:translateX(-50%);width:28px;height:28px;display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:.6;font-size:13px} #bub .bx:hover{opacity:1}
+#bub .bi{position:absolute;transform:translate(-50%,-50%);display:flex;align-items:center;justify-content:center;cursor:pointer;white-space:nowrap}
+#bub .bi.bo{min-width:40px;height:26px;padding:0 6px;border:1px solid rgba(255,255,255,.32);border-radius:13px;opacity:.85} #bub .bi.bo::after{content:" ›";opacity:.5;white-space:pre}
+#bub .bi.bo.on{border-color:rgba(255,255,255,.75)} #bub .bi.bo.open{border-color:#fff;background:rgba(255,255,255,.12);opacity:1} #bub .bi.bo:hover{opacity:1}
+#bub .bi.bb{min-width:30px;height:26px;padding:0 4px;opacity:.65} #bub .bi.bb:hover{opacity:.95} #bub .bi.bb{border:1px solid transparent;border-radius:13px} #bub .bi.bb.on{opacity:1;border-color:rgba(255,255,255,.8)} #bub .bi.bb.off{opacity:.25;pointer-events:none}
+#bub .bi.bk .k{min-width:40px} #bub .bi.bk .k .ksv{transform:scale(1.25);margin:3px 0}
+#bub .bc{position:absolute;left:50%;top:52%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:6px}
+#bub .bpads{display:grid;grid-template-columns:repeat(2,52px);gap:6px} #bub .bpads .bpd{height:34px;border:1px solid rgba(255,255,255,.32);display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:.8} #bub .bpd.on{border-color:#fff;background:rgba(255,255,255,.12);opacity:1} #bub .bpd.hit{background:rgba(255,255,255,.4)}
+#bub .bmore{cursor:pointer;opacity:.5;padding:4px 6px} #bub .bmore:hover{opacity:1}
+#bub .bbig{font-size:22px;opacity:.9} #bub .bnote{opacity:.45;max-width:120px;text-align:center}
+#bub .bgrid{width:150px;height:48px;border:1px solid rgba(255,255,255,.14);cursor:pointer}
+#bub select{background:#000;color:#fff;border:1px solid rgba(255,255,255,.3);font:inherit;padding:2px 4px;max-width:130px}
+#bub .bub.dot{border-radius:50%;display:flex;align-items:center;justify-content:center;opacity:.55;background:rgba(0,0,0,.85);box-shadow:0 0 0 1px rgba(255,255,255,.6) inset}
+#bub .bub.dot .dl{font-size:10px;max-width:46px;overflow:hidden;text-overflow:clip;white-space:nowrap}
+body.lvPhone #bub .bi.bo,body.lvPhone #bub .bi.bb{min-width:44px;height:44px;border-radius:22px} body.lvPhone #bub .bi.bk .k{min-width:44px;min-height:44px} body.lvPhone #bub .bi.bk .k::after{inset:-2px}
+body.lvPhone #bub .bx{width:44px;height:44px;top:0} body.lvPhone #bub .bpads{grid-template-columns:repeat(2,56px)} body.lvPhone #bub .bpads .bpd{height:44px} body.lvPhone #bub .bmore{min-height:44px;display:flex;align-items:center}
+body.lvPhone #bub select{min-height:44px} body.lvPhone #bub .bgrid{width:170px;height:56px}
+body.lvPhone #lv #bub .bi{position:absolute} body.lvPhone #lv #bub .bi[data-ldev]::after{content:none}
 
 </style>
 </head>
@@ -10627,7 +10655,7 @@ function lvBoxes() { // the 4 edge boxes: centred on the system's real edges (sa
 let lvHintT = 0;
 function lvHint(t, ms) { const el = LV('lstat'); LV('lHint').textContent = t; lvBoxes(); el.classList.add('show'); clearTimeout(lvHintT); lvHintT = setTimeout(() => el.classList.remove('show'), ms || 2600); }
 document.querySelectorAll('#lv>.lbx').forEach(b => {
-  b.addEventListener('click', ev => { ev.stopPropagation(); if (ev.target.closest('#bxPlay')) { initAudio(); if (!playing) play(); else stop(); lvLive(); return; } lvCollapse(b.dataset.bx); });
+  b.addEventListener('click', ev => { ev.stopPropagation(); if (ev.target.closest('#bxPlay')) { initAudio(); if (!playing) play(); else stop(); lvLive(); return; } if (b.dataset.bx === 'D' && lvBoxD()) return; lvCollapse(b.dataset.bx); });
   b.addEventListener('pointerenter', () => lvHint(b.title.split(' (')[0], 1800));
 });
 cv.addEventListener('pointerdown', ev => { // a click on empty system closes the open panels
@@ -10635,9 +10663,12 @@ cv.addEventListener('pointerdown', ev => { // a click on empty system closes the
   if (hitDot(x, y, 4) || hitLabel(x, y) || linkAt(x, y) || Math.hypot(x - CX, y - CY) < SUNR + 12) return;
   setTimeout(lvCloseAll, 0);
 });
-let lvTap = { t: 0, id: null }, lvDbl = null; cv.addEventListener('pointerup', () => { if (!lvDbl) return; const id = lvDbl; lvDbl = null; setTimeout(() => { if (E[id]) { select(id); lvCollapse('D', true); } }, 0); });
+function lvOpenPlanet(id) { select(id); lvCollapse('D', true); } /* batch M: s.js points this at the bubble */
+function lvBoxD() { return false; }
+function lvEscHook() { return false; }
+let lvTap = { t: 0, id: null }, lvDbl = null; cv.addEventListener('pointerup', () => { if (!lvDbl) return; const id = lvDbl; lvDbl = null; setTimeout(() => { if (E[id]) lvOpenPlanet(id); }, 0); });
  cv.addEventListener('pointerdown', ev => { if (ev.pointerType === 'mouse' || CLEAN) return; const h = hitDot(ev.clientX, ev.clientY, 6), now = performance.now(); if (h && h.e.id === lvTap.id && now - lvTap.t < 380) { lvTap.t = 0; lvDbl = h.e.id; return; } lvTap = { t: now, id: h ? h.e.id : null }; }); // double-tap a planet (touch: no dblclick on ios)
-cv.addEventListener('dblclick', ev => { const h = hitDot(ev.clientX, ev.clientY, 4); if (h && !CLEAN) { select(h.e.id); lvCollapse('D', true); } }); // double-click a planet: its detail
+cv.addEventListener('dblclick', ev => { const h = hitDot(ev.clientX, ev.clientY, 4); if (h && !CLEAN) lvOpenPlanet(h.e.id); }); // double-click a planet: its detail
 /* ---- knobs (svg like the mockup), faders and the one value path (slApply) ---- */
 function lvGet(d) { // {t, txt} of a control without changing it
   if (d.master) return { t: LVMASTER, txt: LVMASTER < 0.02 ? '-inf' : OrbsFX.formatDb(-48 + 54 * LVMASTER) };
@@ -10732,7 +10763,7 @@ function lvOverdub(on) { // overdub: the pad recorder runs on the selected plane
 /* ---- menus: the only floating things (reuse #mmenu and its data-m / data-mk handlers, #gmenu for genres) ---- */
 const lvTog = on => '<span class="tog' + (on ? ' on' : '') + '"><i></i></span>';
 const lvMch = (k, v, on, label) => '<span class="ch' + (on ? ' on' : '') + '" data-mk="' + k + '" data-v="' + v + '">' + label + '</span>';
-const LV_HELP = 'drag a sound from the browser onto an orbit · distance from the sun sets the lap · drop a planet on another to link · drag away or double-click a line to cut · shift-drag planet → planet = duck · off the edge mutes · tap the sun to step chords, hold for auto · black hole bottom left silences · wheel / pinch zooms, space-drag pans · click a planet: its devices, clip and pad slot below · hold a planet 1.2 s: supernova · space menu: day and night, second sun, visitors, constellations · keys: space play · t tap · h hide · f full screen · [ ] skins · q w e a s d z x c pad · ctrl-alt-b / l / m panels';
+const LV_HELP = 'drag a sound from the browser onto an orbit · distance from the sun sets the lap · drop a planet on another to link · drag away or double-click a line to cut · shift-drag planet → planet = duck · off the edge mutes · tap the sun to step chords, hold for auto · black hole bottom left silences · wheel / pinch zooms, space-drag pans · double-click a planet: its bubble (rim items open smaller bubbles · tap an earlier one to go back · esc one level · × all) · hold a planet 1.2 s and let go: supernova · space menu: day and night, second sun, visitors, constellations · keys: space play · t tap · h hide · f full screen · [ ] skins · q w e a s d z x c pad · ctrl-alt-b / l / m panels';
 renderMore = function () {
   const k = lvMenu; let h = '';
   if (k === 'view') {
@@ -10967,8 +10998,8 @@ function lvDetail() {
   lvGridDraw();
 }
 const lvGridReps = L => { const st = Math.round(L * 4); return st >= 16 || st < 1 ? 1 : Math.max(1, Math.floor(16 / st)); };
-function lvGridDraw() {
-  const cvs = LV('lGrid'), e = E[selId]; if (!cvs || !e) return; const r = cvs.getBoundingClientRect(); if (!r.width) return;
+function lvGridDraw(cv0) {
+  const cvs = cv0 || LV('lGrid'), e = E[selId]; if (!cvs || !e) return; const r = cvs.getBoundingClientRect(); if (!r.width) return;
   if (cvs.width !== Math.round(r.width * DPR) || cvs.height !== Math.round(r.height * DPR)) { cvs.width = Math.round(r.width * DPR); cvs.height = Math.round(r.height * DPR); }
   const c = cvs.getContext('2d'), W2 = r.width, H2 = r.height, L = lapOf(e), reps = lvGridReps(L), N = Math.max(1, Math.min(128, Math.round(L * 4) * reps)), sw = W2 / N; /* short laps repeat across one bar of 16 steps */ c.setTransform(DPR, 0, 0, DPR, 0, 0); c.clearRect(0, 0, W2, H2);
   for (let j = 0; j <= N; j++) { const x = Math.round(j * sw) + 0.5; c.strokeStyle = 'rgba(255,255,255,' + (j % 16 === 0 ? 0.4 : j % 4 === 0 ? 0.16 : 0.06) + ')'; c.beginPath(); c.moveTo(x, 2); c.lineTo(x, H2 - 2); c.stroke(); }
@@ -10983,13 +11014,15 @@ function lvGridDraw() {
   c.globalAlpha = 1;
   const p0 = posNow() / L + aEff(e), ph = ((((Math.floor(p0) % reps) + reps) % reps) + frac(p0)) / reps * W2; c.strokeStyle = '#fff'; c.beginPath(); c.moveTo(Math.round(ph) + 0.5, 0); c.lineTo(Math.round(ph) + 0.5, H2); c.stroke();
 }
-LV('lClip').addEventListener('click', ev => { // a hit in the clip: chance 100 → 75 → 50 → 25
-  if (ev.target.id !== 'lGrid') return; const e = E[selId]; if (!e) return; const r = ev.target.getBoundingClientRect(), reps = lvGridReps(lapOf(e)), u = frac((ev.clientX - r.left) / r.width * reps); // any repeat maps to the lap
+LV('lClip').addEventListener('click', ev => lvGridClick(ev));
+function lvGridClick(ev) { /* a hit in the clip: chance 100 → 75 → 50 → 25 · also the bubble's grid */
+  if (ev.target.id !== 'lGrid' && ev.target.id !== 'bGrid') return; const e = E[selId]; if (!e) return; const r = ev.target.getBoundingClientRect(), reps = lvGridReps(lapOf(e)), u = frac((ev.clientX - r.left) / r.width * reps); // any repeat maps to the lap
   if (!e.pat || !e.pat.length) e.pat = ONE.map(h => Object.assign({}, h)); let best = null, bd = Math.max(0.02, 8 * reps / r.width);
   for (const h of e.pat) { const d = Math.min(Math.abs(h.o - u), 1 - Math.abs(h.o - u)); if (d < bd) { bd = d; best = h; } } if (!best) return;
   pushPat(e); const c = best.c == null ? 1 : best.c, nx = c > 0.8 ? 0.75 : c > 0.6 ? 0.5 : c > 0.3 ? 0.25 : 1; if (nx >= 1) delete best.c; else best.c = nx; recMsg('hit chance ' + Math.round(nx * 100) + '%'); save(); sheetDirty = true;
-});
-LV('det').addEventListener('click', ev => {
+}
+LV('det').addEventListener('click', ev => lvDetClick(ev));
+function lvDetClick(ev) {
   const dv = ev.target.closest('[data-ldev]'), lf = ev.target.closest('[data-lflt]'), lq = ev.target.closest('[data-lq]'), la = ev.target.closest('[data-lact]');
   if (dv) { const [dev, id] = dv.dataset.ldev.split(':'); lvDevToggle(dev, id); LVD = true; return; }
   if (lf) { const i = +lf.dataset.i, s = ORB[i].st, a = Math.abs(OrbsFX.filterAmountOf(s.filterType, s.cutoff)) || 0.4; orbSet(i, 'amount', lf.dataset.lflt === 'lp' ? -a : a); LVD = true; return; }
@@ -10998,11 +11031,12 @@ LV('det').addEventListener('click', ev => {
   if (la) { const e = E[selId]; if (!e) return; if (la.dataset.lact === 'editor') lvEditor(e.id, 'sound'); else if (la.dataset.lact === 'practice') { if (prac) endPractice(true); else { lvEditor(e.id, 'pattern'); startPractice(); } } LVD = true; return; }
   if (ev.target.closest('#padc')) return;
   if (ev.target.closest('[data-act]')) { panelClick(ev); LVD = true; }
-});
-LV('det').addEventListener('change', ev => { const t = ev.target;
+}
+LV('det').addEventListener('change', ev => lvDetChange(ev));
+function lvDetChange(ev) { const t = ev.target;
   if (t.dataset.lvar) { const b = t.dataset.lvar; E[b].variant = t.value; save(); initAudio(); audition(b, t.value); if (barId === b) refreshBar(); }
   else if (t.dataset.lduck && t.value) addTetherP(t.value, t.dataset.lduck);
-  sheetDirty = true; });
+  sheetDirty = true; }
 /* the planet window stays as a floating editor (trail drawing, per-hit chance ring, practice pad) — clicking a planet now selects it into the detail view */
 const lvOpenWinReal = openWin; let lvEditorOn = false;
 function lvEditor(id, tab) { lvEditorOn = true; if (tab) WTAB = tab; lvOpenWinReal(id); }
@@ -11050,6 +11084,7 @@ LV('lHandle').addEventListener('pointerdown', ev => { ev.preventDefault(); const
 addEventListener('keydown', ev => {
   if (typingIn(ev.target)) return;
   if (ev.ctrlKey && ev.altKey && !ev.metaKey) { const k = { KeyB: 'B', KeyL: 'D', KeyM: 'M', KeyT: 'T' }[ev.code]; if (k) { ev.preventDefault(); ev.stopImmediatePropagation(); lvCollapse(k); } return; }
+  if (ev.code === 'Escape' && lvEscHook()) { ev.preventDefault(); ev.stopImmediatePropagation(); return; }
   if (ev.code === 'Escape' && spEsc()) { ev.preventDefault(); ev.stopImmediatePropagation(); return; }
   if (ev.code === 'Escape' && lvSndDrag) { ev.preventDefault(); ev.stopImmediatePropagation(); lvSndDrag = null; lvGhost.style.display = 'none'; LV('lChain').classList.remove('drop'); return; }
   if (ev.code === 'Escape' && !CLEAN) { ev.preventDefault(); ev.stopImmediatePropagation(); // esc: close the top floating thing, else deselect (never closes the docked pad)
@@ -11094,7 +11129,7 @@ const lvLvl = { l: 0, r: 0 };
 addEventListener('pointerdown', ev => { if (ev.target === cv && LV_PHONE && lvAnyOpen() && !CLEAN) { ev.stopImmediatePropagation(); ev.preventDefault(); lvCloseAll(); lvSwallow = performance.now(); } }, true);
 addEventListener('click', ev => { if (performance.now() - lvSwallow < 600) { lvSwallow = 0; ev.stopImmediatePropagation(); ev.preventDefault(); } }, true); // the tap's click must not land on a box that just came back // phone: a tap on the system next to an open sheet only closes it
 ['pointerdown', 'touchend'].forEach(t => addEventListener(t, () => { const st = document.getElementById('start'); if (st && st.isConnected && !st.classList.contains('gone')) dismissStart(); }, true)); // live: tap-to-start never blocks the first tap (it still unlocks ios audio)
-function liveInit() { lvPanels(); requestAnimationFrame(() => requestAnimationFrame(() => { LVD_READY = true; })); const lvRs = () => { lvPanels(); lvBxK = ''; lvBoxes(); }; addEventListener('resize', lvRs); addEventListener('orientationchange', () => setTimeout(lvRs, 250)); if (window.visualViewport) visualViewport.addEventListener('resize', lvRs); const lvHello = () => { const st = document.getElementById('start'); if (st && st.isConnected && !st.classList.contains('gone')) return setTimeout(lvHello, 400); lvHint(LV_PHONE ? 'the boxes on the edges open the panels · double-tap a planet for its detail' : 'the boxes on the edges open the panels · space plays · double-click a planet for its detail · h hides', 4200); }; setTimeout(lvHello, 600); if (master) master.gain.value = LVMASTER < 0.02 ? 0 : 0.8 * Math.pow(10, (-48 + 54 * LVMASTER) / 20); requestAnimationFrame(lvTick); }
+function liveInit() { lvPanels(); requestAnimationFrame(() => requestAnimationFrame(() => { LVD_READY = true; })); const lvRs = () => { lvPanels(); lvBxK = ''; lvBoxes(); }; addEventListener('resize', lvRs); addEventListener('orientationchange', () => setTimeout(lvRs, 250)); if (window.visualViewport) visualViewport.addEventListener('resize', lvRs); const lvHello = () => { const st = document.getElementById('start'); if (st && st.isConnected && !st.classList.contains('gone')) return setTimeout(lvHello, 400); lvHint(LV_PHONE ? 'the boxes on the edges open the panels · double-tap a planet for its bubble' : 'the boxes on the edges open the panels · space plays · double-click a planet for its bubble · h hides', 4200); }; setTimeout(lvHello, 600); if (master) master.gain.value = LVMASTER < 0.02 ? 0 : 0.8 * Math.pow(10, (-48 + 54 * LVMASTER) / 20); requestAnimationFrame(lvTick); }
 const lvInitAudio0 = initAudio; initAudio = function () { const fresh = !ac; lvInitAudio0(); if (fresh && master) master.gain.value = LVMASTER < 0.02 ? 0 : 0.8 * Math.pow(10, (-48 + 54 * LVMASTER) / 20); };
 /* ================= space (live only): supernova · constellations · day and night · second sun · tidal lock · gesture orbit · visitors ================= */
 const SP_KEY = 'orbs-live-space', SPC_KEY = 'orbs-live-constellations', NOVA_HOLD = 1200, NOVA_RE = 3.2, NOVA_SPAN = 2;
@@ -11167,13 +11202,15 @@ updateMix = function () {
   spMix0();
 };
 
-/* ---- supernova: hold a planet 1.2 s ---- */
+/* ---- supernova: hold a planet 1.2 s, then let go (batch M: any move cancels the charge; it fires on release, never mid-hold) ---- */
+const NOVA_MOVE = 4;
 cv.addEventListener('pointerdown', ev => {
-  if (SP.drawArm || !drag || !drag.e || drag.tether || ev.button) return; const d0 = drag, e = d0.e, x0 = ev.clientX, y0 = ev.clientY;
-  SP.charge = { e, t0: performance.now() };
-  const mv = m => { if (Math.hypot(m.clientX - x0, m.clientY - y0) > 9) stop(); }, stop = () => { clearTimeout(tm); if (SP.charge && SP.charge.e === e) SP.charge = null; removeEventListener('pointermove', mv); removeEventListener('pointerup', stop); removeEventListener('pointercancel', stop); };
-  const tm = setTimeout(() => { stop(); if (drag === d0 && !d0.moved) { drag = null; spNova(e.id); } }, NOVA_HOLD);
-  addEventListener('pointermove', mv); addEventListener('pointerup', stop); addEventListener('pointercancel', stop);
+  if (SP.drawArm || !drag || !drag.e || drag.tether || ev.button) return; const d0 = drag, e = d0.e, x0 = ev.clientX, y0 = ev.clientY, pid = ev.pointerId;
+  const ch = SP.charge = { e, t0: performance.now() };
+  const off = () => { if (SP.charge === ch) SP.charge = null; removeEventListener('pointermove', mv); removeEventListener('pointerup', up); removeEventListener('pointercancel', off); };
+  const mv = m => { if (m.pointerId === pid && (Math.hypot(m.clientX - x0, m.clientY - y0) > NOVA_MOVE || d0.moved)) off(); };
+  const up = u => { if (u.pointerId !== pid) return; const held = performance.now() - ch.t0, ok = SP.charge === ch && !d0.moved && held >= NOVA_HOLD; off(); if (ok && E[e.id]) spNova(e.id); };
+  addEventListener('pointermove', mv); addEventListener('pointerup', up); addEventListener('pointercancel', off);
 });
 function spNova(id) {
   const e = E[id]; if (!e) return false; initAudio(); const sd = 60 / bpm / 4, t0 = spT0(), span = NOVA_SPAN * 4 * sd, N = 16;
@@ -11562,6 +11599,286 @@ skinOrbits = function (skin, hair, skip) {
 };
 function w3Init() { resize(); sheetDirty = true; }
 
+/* ================= batch M: the planet bubble — nested bubbles ================= */
+/* the planet bubble is the hub (knobs on the rim, pads in the middle, rim items); a rim item grows a smaller child bubble out of that spot,
+   tethered by a thin line; a child can open its own child. earlier bubbles stay, dim and a little smaller; tapping one goes back to it.
+   esc / tap outside: one level back · ×: all closed · phone: the newest bubble takes the centre spot, the earlier ones become dots at the top */
+const BUB = { id: null, st: [], open: false, anim: 250 };
+const BUB_MAX = 6;
+let bubRoot = null, bubDimEl = null, bubTeth = null;
+const bubPhone = () => document.body.classList.contains('lvPhone');
+const bubEsc = s => lvEsc(String(s));
+const bubLap = L => lapTxt(L).replace(' bars', '').replace(' bar', '');
+const bubClone = v => { try { return structuredClone(v); } catch (x) { return JSON.parse(JSON.stringify(v)); } };
+
+/* ---- items: { k: knob html } · { o: label, key, arg } opens a child · { b: label, a: 'data-… attrs', on, off } a button ---- */
+const bK = (label, d, bip) => ({ k: lvKnob(label, d, bip) });
+const bO = (label, key, arg) => ({ o: label, key, arg: arg == null ? '' : String(arg) });
+const bB = (label, a, on, off) => ({ b: label, a, on: !!on, off: !!off });
+function bubPage(items, key, arg, page) { /* at most 6 per bubble: 5 + more › */
+  page = page | 0; if (items.length <= BUB_MAX && !page) return items;
+  const per = BUB_MAX - 1, sl = items.slice(page * per, page * per + per);
+  if ((page + 1) * per < items.length) sl.push(bO('more', key, (arg || '') + '#' + (page + 1)));
+  return sl;
+}
+const bubArgPage = arg => { const m = /#(\d+)$/.exec(arg || ''); return m ? [arg.slice(0, m.index), +m[1]] : [arg || '', 0]; };
+
+const BUB_FX = [['sends', 'sends'], ['utility', 'utility'], ['filter', 'filter'], ['eq', 'eq'], ['sat', 'saturator'], ['delay', 'delay'], ['reverb', 'reverb'], ['duck', 'duck']];
+const BUB_NODES = {
+  planet(e) { const id = e.id, o = ORB[e.orbit];
+    return { t: e.label || id, sub: 'lap ' + lapTxt(o.lap) + ' · ch ' + e.ch, hub: true,
+      items: [bK('vol', { sl: 'vol', id }), bK('pan', { sl: 'pn', id }, true), bO('sound', 'sound'), bO('fx', 'fx'), bO('pattern', 'pattern'), bO('space', 'space'), bO('mix', 'mix')],
+      center: '<div class="bpads">' + [['play', 'data-bub="hit"', false], [e.muted ? 'unmute' : 'mute', 'data-act="mute" data-id="' + id + '"', e.muted], ['solo', 'data-act="solo" data-i="' + e.orbit + '"', o.solo], ['nova', 'data-sp="nova"', !!e.nova]].map(([l, a, on]) => '<span class="bpd' + (on ? ' on' : '') + '" ' + a + '>' + l + '</span>').join('') + '</div>'
+        + '<span class="bmore" data-bopen="edit" data-barg="">planet ⋯</span>' };
+  },
+  edit(e) { const id = e.id, ps = partnersOf(id);
+    return { t: 'planet', items: [bB('copy', 'data-act="copy" data-id="' + id + '"'), ps.length ? bO('unlink', 'unlink') : bB('unlink', '', false, true), bB('remove', 'data-act="del" data-id="' + id + '"', false, !(e.side === 'rec' || e.base)), bO('midi ch', 'midich'), bB('panel ›', 'data-bub="panel"'), bB('editor ›', 'data-lact="editor"')] };
+  },
+  unlink(e, arg) { const [a, pg] = bubArgPage(arg); return { t: 'unlink', items: bubPage(partnersOf(e.id).map(p => bB(E[p].label || p, 'data-act="unlink" data-id="' + e.id + '" data-p="' + p + '"')), 'unlink', a, pg) }; },
+  midich(e) { return { t: 'midi ch', items: [bB('−', 'data-bub="ch" data-d="-1"'), bB('+', 'data-bub="ch" data-d="1"')], center: '<div class="bbig">' + e.ch + '</div>' }; },
+  sound(e) { const id = e.id, b = baseOf(id), cur = E[b].variant === 'file' ? (E[b].fileName || 'file') : (E[b].variant || (e.side === 'rec' ? (e.fileName || 'recording') : b));
+    return { t: 'sound', sub: b + ' · ' + cur, items: [bO('swap', 'swap'), bK('size', { sl: 'size', id }, true), bB('wave ›', 'data-act="bar" data-id="' + id + '"'), bB(recState ? 'stop rec' : 're-record', 'data-act="rec" data-id="' + id + '"', !!recState), bB(MOD.hum && MOD.hum.id === id ? 'humming…' : 'hum', 'data-lmod="hum"', !!(MOD.hum && MOD.hum.id === id), !modHas('humStart')), bB('load file', 'data-bub="file"')] };
+  },
+  swap(e) { const b = baseOf(e.id);
+    return { t: 'swap sample', sub: 'now ' + b, items: [bO('variants', 'vars'), bO('library', 'lib'), bO('recordings', 'recs'), bO('genre', 'genre')] };
+  },
+  vars(e, arg) { const b = baseOf(e.id), [a, pg] = bubArgPage(arg), vs = lvVars(b);
+    if (!vs.length) return { t: 'variants', items: [bB('load file', 'data-bub="file"')], center: '<div class="bnote">this sound has no variants</div>' };
+    return { t: 'variants', sub: b, items: bubPage(vs.map(v => bB(v === 'file' ? (E[b].fileName || 'file') : v, 'data-act="var" data-id="' + e.id + '" data-v="' + bubEsc(v) + '"', E[b].variant === v)), 'vars', a, pg) };
+  },
+  lib(e, arg) { const [a, pg] = bubArgPage(arg), cur = baseOf(e.id);
+    return { t: 'library', sub: 'swap the sound', items: bubPage(lvBases().map(b => bB(b, 'data-bub="swap" data-b="' + b + '"', b === cur)), 'lib', a, pg) };
+  },
+  recs(e, arg) { const [a, pg] = bubArgPage(arg), rs = lvRecs().filter(r => r !== e.id);
+    if (!rs.length) return { t: 'recordings', items: [bB(recState ? 'stop rec' : 'record', 'data-act="rec" data-id="' + e.id + '"', !!recState), bB('load file', 'data-bub="file"')], center: '<div class="bnote">no takes yet</div>' };
+    return { t: 'recordings', sub: 'use a take', items: bubPage(rs.map(r => bB(E[r].label || r, 'data-bub="userec" data-r="' + r + '"', E[baseOf(e.id)].fileName === (E[r].label || r).slice(0, 18))), 'recs', a, pg) };
+  },
+  genre(e, arg) { const [a, pg] = bubArgPage(arg);
+    return { t: 'genre', sub: 'all planets', items: bubPage(G_NAMES.map(g => bB(g, 'data-bub="genre" data-g="' + g + '"', GENRE === g)), 'genre', a, pg) };
+  },
+  fx(e, arg) { const o = ORB[e.orbit], [a, pg] = bubArgPage(arg);
+    return { t: 'fx', sub: groupName(o), items: bubPage(BUB_FX.map(([k, n]) => Object.assign(bO(n, 'dev', k), { on: lvDevOn(k, e, o) })), 'fx', a, pg) };
+  },
+  dev(e, k) { const id = e.id, i = e.orbit, o = ORB[i], s = o.st, t2 = o.t2, on = lvDevOn(k, e, o), name = (BUB_FX.find(f => f[0] === k) || [k, k])[1];
+    const tog = bB(on ? 'on' : 'off', 'data-ldev="' + k + ':' + id + '"', on), ot = (kk, l, act) => bB(l, 'data-act="otog" data-k="' + kk + '" data-i="' + i + '"', act);
+    let items = [tog], center = '';
+    if (k === 'sends') items.push(bK('echo', { sl: 'echo', id }), bK('verb', { sl: 'verb', id }), bK('tone', { sl: 'cut', id }));
+    else if (k === 'utility') items.push(bK('gain', { osl: 'gain', i }), bK('pan', { osl: 'pan', i }, true), bB('s', 'data-act="solo" data-i="' + i + '"', o.solo), ot('phase', 'ø', s.phase === 180), ot('mono', 'mono', s.mono));
+    else if (k === 'filter') items.push(bB('lp', 'data-lflt="lp" data-i="' + i + '"', s.filterType === 'lowpass'), bB('hp', 'data-lflt="hp" data-i="' + i + '"', s.filterType === 'highpass'), bK('freq', { osl: 'amount', i }, true), bK('res', { osl: 'q', i }));
+    else if (k === 'eq') { items.push(bK('low', { o2sl: 'lo', i }, true), bK('mid', { o2sl: 'mid', i }, true), bK('high', { o2sl: 'hi', i }, true)); center = '<div class="bsvg">' + lvEqSvg(t2) + '</div>'; }
+    else if (k === 'sat') items.push(bB('soft', 'data-act="scurve" data-c="soft" data-i="' + i + '"', t2.curve === 'soft'), bB('hard', 'data-act="scurve" data-c="hard" data-i="' + i + '"', t2.curve === 'hard'), bK('drive', { o2sl: 'drive', i }));
+    else if (k === 'delay') items.push(bK('time', { o2sl: 'time', i }), bK('fb', { o2sl: 'fb', i }), bK('send', { o2sl: 'send', i }));
+    else if (k === 'reverb') items.push(bK('send', { rsend: 1, i }), bK('room', { rsl: 'size' }));
+    else if (k === 'duck') { const mem = membersOf(o), dk = TETH.map((t, j) => [t, j]).filter(([t]) => E[t.tgt] && E[t.tgt].orbit === i), dj = dk.length ? dk[0][1] : -1, cands = IDS.filter(x => !mem.includes(E[x]) && !TETH.some(t => t.src === x && t.tgt === id));
+      if (dj >= 0) items.push(bK('depth', { tsl: 'depth', t: dj }), bK('rel', { tsl: 'rel', t: dj }), bB('× ' + (E[TETH[dj].src].label || TETH[dj].src), 'data-act="tdel" data-t="' + dj + '"'));
+      if (cands.length) center = '<select data-lduck="' + id + '"><option value="">' + (dj >= 0 ? '+ source' : 'ducked by ▾') + '</option>' + cands.map(x => '<option value="' + x + '">' + bubEsc(E[x].label || x) + '</option>').join('') + '</select>'; }
+    return { t: name, sub: on ? 'on' : 'off', items, center };
+  },
+  pattern(e) { const id = e.id;
+    return { t: 'pattern', sub: patTxt(e, ORB[e.orbit].lap), items: [bO('hits', 'hits'), bO('lap', 'lap'), bK('chance', { sl: 'prob', id }), bK('drift', { sl: 'drift', id }), bO('trail', 'trail'), bO('more', 'pmore')] };
+  },
+  hits(e) { const i = e.orbit, q = ORB[i].st.quantize;
+    return { t: 'hits', sub: 'tap a hit: chance', big: true, items: [bB('snap off', 'data-lq="0" data-i="' + i + '"', !q), bB('1/16', 'data-lq="1" data-i="' + i + '"', !!q), bO('moons', 'moons')], center: '<canvas id="bGrid" class="bgrid"></canvas>' };
+  },
+  moons(e) { return { t: 'moons', items: [0, 1, 2, 3].map(n => bB(n + '', 'data-act="moons" data-id="' + e.id + '" data-n="' + n + '"', (e.moons | 0) === n)) }; },
+  lap(e, arg) { const [a, pg] = bubArgPage(arg), i = e.orbit, o = ORB[i];
+    if (a === 'poly') return { t: 'poly', sub: 'beats', items: bubPage(POLY.map(L => bB(L + '', 'data-act="lap" data-i="' + i + '" data-l="' + L + '"', L === o.lap)), 'lap', a, pg) };
+    const ls = LAPS.map(L => bB(bubLap(L), 'data-act="lap" data-i="' + i + '" data-l="' + L + '"', L === o.lap));
+    return { t: 'lap', sub: 'bars', items: pg ? bubPage(ls, 'lap', a, pg) : (ls.length + 1 <= BUB_MAX ? ls.concat([bO('poly', 'lap', 'poly')]) : bubPage(ls, 'lap', a, 0).slice(0, BUB_MAX - 2).concat([bO('poly', 'lap', 'poly'), bO('more', 'lap', '#1')])) };
+  },
+  trail(e) { const tk = e.trail ? e.trail.kind : 'off'; return { t: 'trail', items: ['off', 'cut', 'vol'].map(v => bB(v === 'cut' ? 'filter' : v, 'data-act="trail" data-id="' + e.id + '" data-v="' + v + '"', tk === v)) }; },
+  pmore(e) { const id = e.id, i = e.orbit, o = ORB[i], gr = GRAV[o.id], tl = BANDS.filter(L => L < o.lap);
+    const build = gr ? bB('release', 'data-act="grev" data-i="' + i + '"') : GRAV_DONE[o.id] && GRAV_DONE[o.id].toLap === o.lap ? bB('release', 'data-act="grev" data-i="' + i + '"') : bB('build', 'data-act="build" data-i="' + i + '" data-b="4"', false, !tl.length);
+    return { t: 'more', items: [build, bB('drag', 'data-lgrav="1"', !!XS.gravity), bB('chop', 'data-act="chop" data-id="' + id + '"', false, !(e.buf && (e.side === 'rec' || e.variant === 'file'))), bB(prac && prac.id === id ? 'stop' : 'practice', 'data-lact="practice"', !!(prac && prac.id === id)), bB('midi ↓', 'data-act="xmid" data-id="' + id + '"'), bB('stem ↓', 'data-act="xstem" data-id="' + id + '"')] };
+  },
+  space(e) { const id = e.id, b = e.sun === 'b', armed = SP.drawArm === id;
+    return { t: 'space', items: [bB('sun a', 'data-sp="sun" data-v="a"', !b), bB('sun b', 'data-sp="sun" data-v="b"', b), bO(e.lock ? 'lock · ' + (E[e.lock] ? (E[e.lock].label || e.lock) : 'off') : 'lock', 'lock'), e.path ? bB('round', 'data-sp="clear"') : bB(armed ? 'drawing…' : 'draw orbit', 'data-sp="draw"', armed), bB('supernova', 'data-sp="nova"', !!e.nova)] };
+  },
+  lock(e, arg) { const [a, pg] = bubArgPage(arg), id = e.id;
+    const opts = IDS.filter(x => { if (x === id) return false; let y = E[x], n = 0; while (y && n++ < 20) { if (y.id === id) return false; y = lockOf(y); } return true; });
+    return { t: 'tidal lock', sub: 'hit when it hits', items: bubPage([bB('off', 'data-bub="lock" data-v=""', !e.lock)].concat(opts.map(x => bB(E[x].label || x, 'data-bub="lock" data-v="' + x + '"', e.lock === x))), 'lock', a, pg) };
+  },
+  mix(e) { const id = e.id, i = e.orbit, o = ORB[i];
+    return { t: 'mix', sub: groupName(o), items: [bK('vol', { sl: 'vol', id }), bK('pan', { sl: 'pn', id }, true), bK('echo', { sl: 'echo', id }), bK('verb', { sl: 'verb', id }), bK('grp gain', { osl: 'gain', i }), bK('grp pan', { osl: 'pan', i }, true)],
+      center: '<div class="bpads two">' + '<span class="bpd' + (e.muted ? ' on' : '') + '" data-act="mute" data-id="' + id + '">mute</span><span class="bpd' + (o.solo ? ' on' : '') + '" data-act="solo" data-i="' + i + '">solo</span></div>' };
+  }
+};
+
+/* ---- geometry ---- */
+function bubSize(lv, node) { const W = innerWidth, H = innerHeight;
+  if (bubPhone()) { const port = H >= W; return Math.round(Math.min(port ? W - 16 : H - 16, port ? H - 160 : 400, 360)); }
+  return Math.round(Math.max(210, (lv === 0 ? 300 : 250 - 12 * Math.min(3, lv - 1)) + (node && node.big ? 50 : 0)));
+}
+function bubPlanetXY(e) { return { x: e.x, y: e.y }; }
+function bubClampC(cx, cy, D) { const r = D / 2, W = innerWidth, H = innerHeight, top = 40; return { x: clamp(cx, r + 8, Math.max(r + 8, W - r - 8)), y: clamp(cy, r + top, Math.max(r + top, H - r - 8)) }; }
+function bubPlace(lv, D, from, parent) { /* desktop: the hub grows near the planet; a child fans away from the screen edges and its ancestors */
+  const W = innerWidth, H = innerHeight;
+  if (bubPhone()) { const port = H >= W; return port ? { x: W / 2, y: Math.max(D / 2 + 110, H - D / 2 - 20) } : { x: Math.max(W / 2, D / 2 + 80), y: H / 2 }; }
+  if (!parent) { const dx = W / 2 - from.x, dy = H / 2 - from.y, d = Math.hypot(dx, dy) || 1, k = Math.min(d, D * 0.42); const c = bubClampC(from.x + dx / d * k, from.y + dy / d * k, D); return c; }
+  const pr = parent.D / 2 * 0.85, a0 = Math.atan2(from.y - parent.cy, from.x - parent.cx), dist = pr * 0.9 + D / 2 * 0.8;
+  let best = null;
+  for (const da of [0, 0.45, -0.45, 0.9, -0.9, 1.35, -1.35, 1.8, -1.8, 2.4, -2.4, Math.PI]) {
+    const a = a0 + da, raw = { x: parent.cx + Math.cos(a) * dist, y: parent.cy + Math.sin(a) * dist }, c = bubClampC(raw.x, raw.y, D);
+    let score = Math.hypot(c.x - raw.x, c.y - raw.y) * 2 + Math.abs(da) * 20;
+    for (const s of BUB.st) { const rr = s.D / 2 * 0.85 + D / 2, d = Math.hypot(c.x - s.cx, c.y - s.cy); if (d < rr) score += (rr - d) * (s === parent ? 1.2 : 3); }
+    if (!best || score < best.score) best = { x: c.x, y: c.y, score };
+  }
+  return best;
+}
+function bubRingPos(n, D, hub) { /* items on the rim: the top arc stays free for the title and × */
+  const r = D / 2 - (bubPhone() ? 36 : 27), a0 = hub ? 52 : 58, a1 = 360 - a0, out = [];
+  for (let j = 0; j < n; j++) { const th = (n <= 4 && !hub ? 180 - (j - (n - 1) / 2) * 70 : a0 + (a1 - a0) * j / (n - 1)) * Math.PI / 180; out.push({ x: D / 2 + r * Math.sin(th), y: D / 2 - r * Math.cos(th) }); }
+  return out;
+}
+
+/* ---- render ---- */
+function bubInner(s, lv) {
+  const e = E[BUB.id], node = s.node = BUB_NODES[s.key](e, s.arg), D = s.D, pos = bubRingPos(node.items.length, D, node.hub);
+  let h = '<svg class="bfr" width="' + D + '" height="' + D + '"><circle cx="' + D / 2 + '" cy="' + D / 2 + '" r="' + (D / 2 - 0.5) + '"/><circle class="in" cx="' + D / 2 + '" cy="' + D / 2 + '" r="' + (D / 2 - (bubPhone() ? 54 : 48)) + '"/></svg>';
+  h += '<div class="btl" style="top:' + Math.round(D * 0.13) + 'px"><span class="nm">' + bubEsc(node.t) + '</span>' + (node.sub ? '<span class="sb">' + bubEsc(node.sub) + '</span>' : '') + '</div>';
+  h += '<span class="bx" data-bub="closeall" title="close all (×)">×</span>';
+  node.items.forEach((it, j) => { const p = pos[j], st = 'left:' + p.x.toFixed(1) + 'px;top:' + p.y.toFixed(1) + 'px';
+    if (it.k) h += '<div class="bi bk" style="' + st + '">' + it.k + '</div>';
+    else if (it.o) h += '<span class="bi bo' + (it.on ? ' on' : '') + (s.child && s.child.key === it.key && s.child.arg === it.arg ? ' open' : '') + '" style="' + st + '" data-bopen="' + it.key + '" data-barg="' + bubEsc(it.arg) + '">' + bubEsc(it.o) + '</span>';
+    else h += '<span class="bi bb' + (it.on ? ' on' : '') + (it.off ? ' off' : '') + '" style="' + st + '" ' + (it.a || '') + '>' + bubEsc(it.b) + '</span>'; });
+  if (node.center) h += '<div class="bc">' + node.center + '</div>';
+  s.el.innerHTML = h; s.el.dataset.key = s.key; s.el.dataset.lv = lv;
+  const g = s.el.querySelector('#bGrid'); if (g) lvGridDraw(g);
+}
+function bubLayout() { /* positions, sizes, dimming; phone: ancestors become dots at the top */
+  const ph = bubPhone(), n = BUB.st.length, W = innerWidth, H = innerHeight;
+  BUB.st.forEach((s, lv) => { const top = lv === n - 1, el = s.el; el.classList.toggle('top', top); el.classList.toggle('anc', !top);
+    if (ph && !top) { const port = H >= W, cs = 52, gap = 10, tot = (n - 1) * cs + (n - 2) * gap, x = port ? W / 2 - tot / 2 + lv * (cs + gap) + cs / 2 : 40, y = port ? BUB.st[n - 1].cy - BUB.st[n - 1].D / 2 - 40 : H / 2 - tot / 2 + lv * (cs + gap) + cs / 2;
+      el.classList.add('dot'); Object.assign(el.style, { width: cs + 'px', height: cs + 'px', left: (x - cs / 2) + 'px', top: (y - cs / 2) + 'px' }); s.dx = x; s.dy = y; el.style.transform = 'none'; el.innerHTML = '<span class="dl">' + bubEsc((s.node ? (s.key === 'planet' ? (E[BUB.id].label || BUB.id) : s.node.t) : s.key).split(' ')[0].slice(0, 7)) + '</span>'; el.dataset.lv = lv; return; }
+    el.classList.remove('dot'); Object.assign(el.style, { width: s.D + 'px', height: s.D + 'px', left: (s.cx - s.D / 2) + 'px', top: (s.cy - s.D / 2) + 'px' });
+    if (!s.growing) el.style.transform = top ? 'scale(1)' : 'scale(.85)';
+  });
+  bubTethers();
+}
+function bubTethers() { if (!bubTeth) return; const W = innerWidth, H = innerHeight, ph = bubPhone(); let d = '';
+  for (let j = 1; j < BUB.st.length; j++) { const p = BUB.st[j - 1], c = BUB.st[j], dotP = ph && j - 1 < BUB.st.length - 1;
+    const ax = dotP ? p.dx : p.cx + (c.fx - p.cx) * (j === BUB.st.length - 1 && !ph ? 0.85 : 0.85), ay = dotP ? p.dy : p.cy + (c.fy - p.cy) * 0.85;
+    const cx = (ph && j < BUB.st.length - 1) ? c.dx : c.cx, cy = (ph && j < BUB.st.length - 1) ? c.dy : c.cy, rr = (ph && j < BUB.st.length - 1) ? 26 : c.D / 2 * (j === BUB.st.length - 1 ? 1 : 0.85), L = Math.hypot(cx - ax, cy - ay) || 1;
+    const ex = cx - (cx - ax) / L * rr, ey = cy - (cy - ay) / L * rr; d += 'M' + ax.toFixed(1) + ' ' + ay.toFixed(1) + 'L' + ex.toFixed(1) + ' ' + ey.toFixed(1); }
+  bubTeth.setAttribute('width', W); bubTeth.setAttribute('height', H); bubTeth.innerHTML = d ? '<path d="' + d + '"/>' : '';
+}
+function bubRender() { if (!BUB.open || !E[BUB.id]) return; if (lvDrag) return; const ph = bubPhone(), n = BUB.st.length;
+  BUB.st.forEach((s, lv) => { if (ph && lv < n - 1) { s.node = BUB_NODES[s.key](E[BUB.id], s.arg); return; } bubInner(s, lv); }); bubLayout(); }
+
+/* ---- open / push / back / close ---- */
+function bubMake(key, arg, from, parent) {
+  const lv = BUB.st.length, node = BUB_NODES[key](E[BUB.id], arg), D = bubSize(lv, node), c = bubPlace(lv, D, from, parent);
+  const el = document.createElement('div'); el.className = 'bub'; bubRoot.appendChild(el);
+  const s = { key, arg: arg || '', D, cx: c.x, cy: c.y, fx: from.x, fy: from.y, el, child: null };
+  if (parent) parent.child = s; BUB.st.push(s); bubInner(s, lv);
+  el.style.transformOrigin = (from.x - (c.x - D / 2)).toFixed(1) + 'px ' + (from.y - (c.y - D / 2)).toFixed(1) + 'px';
+  el.style.transition = 'none'; el.style.transform = 'scale(.05)'; el.style.opacity = '0'; s.growing = true;
+  bubRender();
+  void el.offsetWidth; el.style.transition = 'transform ' + BUB.anim + 'ms ease, opacity ' + BUB.anim + 'ms ease'; el.style.transform = 'scale(1)'; el.style.opacity = '';
+  setTimeout(() => { s.growing = false; if (BUB.st.includes(s)) { el.style.transformOrigin = '50% 50%'; bubLayout(); } }, BUB.anim + 20);
+  return s;
+}
+function bubShrinkAway(s) { const el = s.el; el.style.transition = 'transform ' + BUB.anim + 'ms ease, opacity ' + BUB.anim + 'ms ease';
+  if (!el.classList.contains('dot')) el.style.transformOrigin = (s.fx - (s.cx - s.D / 2)).toFixed(1) + 'px ' + (s.fy - (s.cy - s.D / 2)).toFixed(1) + 'px';
+  el.style.transform = 'scale(.05)'; el.style.opacity = '0'; el.style.pointerEvents = 'none'; setTimeout(() => el.remove(), BUB.anim + 20); }
+function bubOpen(id) {
+  if (!E[id] || CLEAN) return; initAudio(); if (BUB.open) bubClose(true);
+  select(id); BUB.id = id; BUB.open = true; if (typeof hideHint === 'function') hideHint(); const lst = LV('lstat'); if (lst) lst.classList.remove('show'); LVP.D = false; lvPanels(true);
+  bubDimEl.classList.add('on'); bubRoot.classList.add('on');
+  bubMake('planet', '', bubPlanetXY(E[id]), null);
+}
+function bubPush(key, arg, fromEl) {
+  const lv = +fromEl.closest('.bub').dataset.lv, parent = BUB.st[lv]; if (!parent) return;
+  if (parent.child && parent.child.key === key && parent.child.arg === (arg || '') && lv === BUB.st.length - 2) { bubBack(lv); return; } /* tapping the open item again folds it */
+  bubBack(lv, true);
+  const r = fromEl.getBoundingClientRect(), from = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+  bubMake(key, arg, from, parent);
+}
+function bubBack(lv, quiet) { /* go back to that level: its descendants close */
+  while (BUB.st.length > lv + 1) bubShrinkAway(BUB.st.pop());
+  const s = BUB.st[lv]; if (s) s.child = null;
+  if (!quiet) bubRender(); }
+function bubClose(all) {
+  if (!BUB.open) return false;
+  if (!all && BUB.st.length > 1) { bubBack(BUB.st.length - 2); return true; }
+  while (BUB.st.length) bubShrinkAway(BUB.st.pop());
+  BUB.open = false; bubDimEl.classList.remove('on'); bubRoot.classList.remove('on'); if (bubTeth) bubTeth.innerHTML = '';
+  return true;
+}
+
+/* ---- actions ---- */
+function bubSwap(id, b) { /* swap the planet's sound for another library sound: a fresh planet of that sound takes its orbit, group, pattern and mix */
+  const e = E[id]; if (!e || !E[b] || baseOf(id) === b) return null; initAudio();
+  const n = IDS.filter(x => baseOf(x) === b).length + 1; cloneCount++;
+  const c = newPlanet(b + '~' + cloneCount, { base: b, label: b + ' ' + n, gid: e.gid, rad: e.rad, a: e.a, vol: e.vol, pn: e.pn, echo: e.echo, verb: e.verb, cut: e.cut, lvl: E[b].lvl, seed: (Math.random() * 1e6) | 0 });
+  for (const k of ['pat', 'moons', 'prob', 'drift', 'trail', 'sun', 'path', 'lock', 'size']) if (e[k] != null) { try { c[k] = bubClone(e[k]); } catch (x) { c[k] = e[k]; } }
+  const ps = partnersOf(id); for (const p of ps) { links.add(lkey(c.id, p)); links.delete(lkey(id, p)); }
+  TETH.forEach(t => { if (t.src === id) t.src = c.id; if (t.tgt === id) t.tgt = c.id; });
+  if (e.side === 'rec' || e.base) removeEl(id); else { swallow(e); recMsg((e.label || id) + ' → ' + (c.label || c.id) + ' · the old one waits in the black hole'); }
+  regroup(c.gid); layout(); select(c.id); BUB.id = c.id; save(); sheetDirty = true; LVD = true;
+  ripples.push({ x: c.x, y: c.y, t0: performance.now(), r0: 6, big: true }); try { audition(c.id); } catch (x) {}
+  return c;
+}
+function bubUseRec(id, r) { /* a recording becomes this planet's sample (its sound's file slot, like load file) */
+  const b = baseOf(id), e = E[b], R = E[r]; if (!e || !R) return false; if (!R.buf) { recMsg('that take has no audio yet'); return false; }
+  (e.takes = e.takes || []).push({ buf: e.buf, fileData: e.fileData, fileName: e.fileName, variant: e.variant, trimS: e.trimS, trimE: e.trimE, rev: e.rev, loop: e.loop, recorded: e.recorded });
+  Object.assign(e, { buf: R.buf, fileData: R.fileData || null, fileName: String(R.label || r).slice(0, 18), trimS: R.trimS || 0, trimE: R.trimE == null ? 1 : R.trimE, rev: !!R.rev, loop: false, _pbSrc: null, variant: 'file' });
+  if (R.fileData) idbPut({ id: b, name: e.fileName, data: R.fileData });
+  save(); if (barId === b) refreshBar(); audition(b, 'file'); recMsg(b + ' now plays ' + e.fileName); return true;
+}
+function bubHit(id) { const r = jamHit(id, 0.95); if (r && hitLog.length) hitLog[hitLog.length - 1].j = 'pad'; return r; }
+function bubClick(ev) {
+  const bub = ev.target.closest('.bub'); if (!bub) return;
+  if (bub.classList.contains('anc')) { ev.stopPropagation(); bubBack(+bub.dataset.lv); return; } /* an earlier bubble: back to that level */
+  const id = BUB.id, e = E[id]; if (!e) return; initAudio(); if (ac && ac.state !== 'running') ac.resume();
+  const op = ev.target.closest('[data-bopen]'); if (op) { bubPush(op.dataset.bopen, op.dataset.barg, op); return; }
+  const m = ev.target.closest('[data-bub]');
+  if (m) { const a = m.dataset.bub;
+    if (a === 'closeall') { bubClose(true); return; }
+    if (a === 'hit') { bubHit(id); m.classList.add('hit'); setTimeout(() => m.classList.remove('hit'), 120); return; }
+    if (a === 'panel') { bubClose(true); select(id); lvCollapse('D', true); return; }
+    if (a === 'file') { openPicker(baseOf(id)); if (typeof pkFile !== 'undefined' && pkFile) pkFile.click(); }
+    else if (a === 'swap') bubSwap(id, m.dataset.b);
+    else if (a === 'userec') bubUseRec(id, m.dataset.r);
+    else if (a === 'genre') applyGenre(m.dataset.g);
+    else if (a === 'lock') spSetLock(id, m.dataset.v);
+    else if (a === 'ch') { e.ch = clamp((e.ch | 0) + (+m.dataset.d), 1, 16); save(); }
+    LVD = true; setTimeout(bubRender, 0); return; }
+  const sp = ev.target.closest('[data-sp]');
+  if (sp) { const a = sp.dataset.sp; if (a === 'sun') spSetSun(id, sp.dataset.v); else if (a === 'draw') { if (SP.drawArm === id) spEsc(); else { spArm(id); bubClose(true); } } else if (a === 'clear') spClearPath(id); else if (a === 'nova') spNova(id); LVD = true; setTimeout(bubRender, 0); return; }
+  if (ev.target.closest('[data-lmod]')) { modHum(id); LVD = true; setTimeout(bubRender, 0); return; }
+  if (ev.target.id === 'bGrid') { lvGridClick(ev); setTimeout(bubRender, 0); return; }
+  if (ev.target.closest('[data-ldev],[data-lflt],[data-lq],[data-lgrav],[data-lact],[data-act]')) {
+    const act = ev.target.closest('[data-act]'), del = act && act.dataset.act === 'del';
+    lvDetClick(ev); if (del) { bubClose(true); return; }
+    if (!E[BUB.id]) { bubClose(true); return; }
+    setTimeout(bubRender, 0); }
+}
+function bubChange(ev) { const t = ev.target; if (t.dataset.lduck) { lvDetChange(ev); setTimeout(bubRender, 0); } }
+
+/* ---- wiring ---- */
+lvOpenPlanet = function (id) { bubOpen(id); };
+lvBoxD = function () { if (BUB.open) { bubClose(true); return true; } if (selId && E[selId]) { bubOpen(selId); return true; } return false; };
+lvEscHook = function () { return bubClose(false); };
+const bubDraw0 = drawScene;
+drawScene = function (...a) { const r = bubDraw0.apply(this, a); if (BUB.open) { const g = document.getElementById('bGrid'); if (g) lvGridDraw(g); } return r; };
+function bubInit() {
+  const lv = LV('lv'); if (!lv || bubRoot) return;
+  bubDimEl = document.createElement('div'); bubDimEl.id = 'bubDim'; lv.appendChild(bubDimEl);
+  bubRoot = document.createElement('div'); bubRoot.id = 'bub'; lv.appendChild(bubRoot);
+  bubTeth = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); bubTeth.id = 'bubTeth'; bubRoot.appendChild(bubTeth);
+  bubDimEl.addEventListener('pointerdown', ev => { ev.preventDefault(); ev.stopPropagation(); bubClose(false); });
+  bubRoot.addEventListener('pointerdown', ev => { const b = ev.target.closest('.bub.anc'); if (b) { ev.preventDefault(); ev.stopPropagation(); bubBack(+b.dataset.lv); BUB.ate = performance.now(); } }, true);
+  bubRoot.addEventListener('click', ev => { if (BUB.ate && performance.now() - BUB.ate < 600) { BUB.ate = 0; return; } BUB.ate = 0; bubClick(ev); });
+  bubRoot.addEventListener('change', bubChange);
+  addEventListener('resize', () => { if (!BUB.open) return; BUB.st.forEach((s, lv) => { s.D = bubSize(lv, s.node); const c = lv ? bubPlace(lv, s.D, { x: s.fx, y: s.fy }, BUB.st[lv - 1]) : bubPlace(0, s.D, bubPlanetXY(E[BUB.id]), null); s.cx = c.x; s.cy = c.y; }); bubRender(); });
+}
+function bubPushKey(key, arg) { /* test hook: open a rim item of the newest bubble by key (and arg) */
+  const t = BUB.st[BUB.st.length - 1]; if (!t) return false;
+  const it = [...t.el.querySelectorAll('[data-bopen]')].find(x => x.dataset.bopen === key && (arg == null || x.dataset.barg === String(arg)));
+  if (!it) return false; bubPush(key, it.dataset.barg, it); return true;
+}
+
 
 /* ---------------- sample picker ---------------- */
 const pk = document.getElementById('picker'), pkTabs = document.getElementById('pkTabs'), pkList = document.getElementById('pkList'), pkFile = document.getElementById('pkFile'), pkNote = document.getElementById('pkNote');
@@ -11913,7 +12230,7 @@ window.SS = { E, get ORB() { return ORB; }, IDS, links, get TETH() { return TETH
   get VIEW() { return VIEW; }, zoomAt, setView, zoomFit, zoom11, get COMET() { return COMET; }, setComet, comets, shareLink, shareState, chanceOk, MOON_OFF, POLY, renderMore, get spaceDown() { return spaceDown; },
   sysSnap, applyDiscrete, storeScene, gotoScene, get SCENES() { return SCENES; }, get MORPH() { return MORPH; }, set SCENE_BARS(v) { SCENE_BARS = v; }, mutate, undoMutate, MUT_UNDO, setJam, get JAM() { return JAM; }, jamHit, jamNudge, driftOff, swallow, get HOLE() { return HOLE; }, sunTap, get CHORD() { return CHORD; }, chordIdx, chordName, hitEvent,
   get XS() { return XS; }, setXS, hitsIn, midiFor, exportMidi, exportWav, renderInto, get bin() { return bin; }, binauralOn, get ECL() { return ECL; }, GRAV, startGravity, sizeSemis, sizeWheel, get MOODCSS() { return MOODCSS; }, setTrailKind, trailOf, trailMix, chopPlanet, playSlice, startPractice, endPractice, pracTap, get prac() { return prac; }, get lastPractice() { return lastPractice; }, gravGesture, X, save, setWinTab, get WTAB() { return WTAB; }, setSec, secOpen, set SEC_ALL(v) { SEC_ALL = !!v; sheetDirty = true; }, set UI_ALL(v) { UI_ALL = !!v; sheetDirty = true; if (winId) renderWin(); }, get SHEET() { return SHEET; }, sheetCollapse, applySheet, moreOpen, get SECS() { return SECS; }, get SKIN() { return SKIN; }, setSkin, SKIN_IDS, SKINS, drawScene, SKC, SKSTAT, get fieldBuilds() { return fieldBuilds; }, get CLEAN() { return CLEAN; }, setClean, get CLEAN_LABELS() { return CLEAN_LABELS; }, get XFADE() { return XFADE; }, get GRAV_DONE() { return GRAV_DONE; }, releaseGravity, linked, get lastShare() { return lastShare; }, get PAD9() { return PAD9; }, pad9Init, pad9Toggle, pad9Open, pad9Commit, playPlanetSound, P9V, posAt, timeAtPos, get recCount() { return recCount; } };
-liveInit(); spInit(); modInit(); w3Init(); Object.defineProperties(window.SS, Object.getOwnPropertyDescriptors({ LIVE: true, get space() { return SP; }, get mods() { return MOD; }, get V3D() { return V3D; }, set3D, get K() { return K; }, get RMAX() { return RMAX; }, get CX() { return CX; }, get CY() { return CY; }, hitDot, wireSphere, decorate, hitEvent, modHum, modHumApply, modTilt, modAuto, modSongPlay, modSongExport, modSongTemplate, modDuoHost, modDuoTick, get LVP() { return LVP; }, lvCollapse, lvAddPlanet, lvDevToggle, lvDevOn: (dev, id) => { const e = E[id]; return !!e && lvDevOn(dev, e, ORB[e.orbit]); }, lvGet, lvSet, get LVOFF() { return LVOFF; }, lvPadSlot, get lvTemp() { return lvTemp; }, lvOverdub, get lvOd() { return lvOd; }, get master() { return master; }, get LVMASTER() { return LVMASTER; }, get LABELS_ON() { return LABELS_ON; }, get lvMenu() { return lvMenu; }, lvOpenMenu, get recBarsN() { return recBarsN; }, hitDotAt: (x, y) => !!(hitDot(x, y, 4) || hitLabel(x, y) || linkAt(x, y) || Math.hypot(x - CX, y - CY) < SUNR + 12), lvBoxes, lvCloseAll, recMsg: s => recMsg(s), lvSnd: () => lvSndDrag }));
+liveInit(); spInit(); modInit(); w3Init(); bubInit(); Object.defineProperties(window.SS, Object.getOwnPropertyDescriptors({ LIVE: true, get space() { return SP; }, get mods() { return MOD; }, get bub() { return BUB; }, lkey, bubOpen, bubClose, bubPush: bubPushKey, bubBack, bubSwap, bubUseRec, bubRender, get V3D() { return V3D; }, set3D, get K() { return K; }, get RMAX() { return RMAX; }, get CX() { return CX; }, get CY() { return CY; }, hitDot, wireSphere, decorate, hitEvent, modHum, modHumApply, modTilt, modAuto, modSongPlay, modSongExport, modSongTemplate, modDuoHost, modDuoTick, get LVP() { return LVP; }, lvCollapse, lvAddPlanet, lvDevToggle, lvDevOn: (dev, id) => { const e = E[id]; return !!e && lvDevOn(dev, e, ORB[e.orbit]); }, lvGet, lvSet, get LVOFF() { return LVOFF; }, lvPadSlot, get lvTemp() { return lvTemp; }, lvOverdub, get lvOd() { return lvOd; }, get master() { return master; }, get LVMASTER() { return LVMASTER; }, get LABELS_ON() { return LABELS_ON; }, get lvMenu() { return lvMenu; }, lvOpenMenu, get recBarsN() { return recBarsN; }, hitDotAt: (x, y) => !!(hitDot(x, y, 4) || hitLabel(x, y) || linkAt(x, y) || Math.hypot(x - CX, y - CY) < SUNR + 12), lvBoxes, lvCloseAll, recMsg: s => recMsg(s), lvSnd: () => lvSndDrag }));
 })();
 </script>
 </body>
