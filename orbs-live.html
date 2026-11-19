@@ -8433,6 +8433,1147 @@ body.lvPhone #lv #bub .bi{position:absolute} body.lvPhone #lv #bub .bi[data-ldev
 
 </script>
 <script>
+/* ===== orbs extras: vsynths (inlined from fx/extras-vsynths.js) ===== */
+/* orbs extras: vsynths — play planets through the 15 browser synths (viktorkmillerfilm-design.github.io/vsynths).
+   one panel (bottom sheet) holds one synth in an iframe (allow autoplay; midi). chosen planets' notes go into it
+   over postMessage (vsynths note protocol v1, see fx/vsynths-note-protocol.md), timed against the orbs clock.
+   switching posts vsynths:panic + vsynths:stop to the old synth, waits 80 ms, then loads the new one.
+   no deps. merge-safe on window.OrbsExtras (adds the key `vsynths` only if it is missing). also CJS.
+*/
+(function (root, factory) {
+  const api = factory();
+  const scope = (typeof globalThis !== 'undefined') ? globalThis : (root && typeof root === 'object') ? root : (typeof self !== 'undefined' ? self : this);
+  const extras = (scope.OrbsExtras && typeof scope.OrbsExtras === 'object') ? scope.OrbsExtras : (scope.OrbsExtras = {});
+  Object.keys(api).forEach(k => { if (!Object.prototype.hasOwnProperty.call(extras, k)) extras[k] = api[k]; });
+  if (typeof module === 'object' && module.exports) module.exports = extras;
+}(typeof self !== 'undefined' ? self : this, function () {
+  'use strict';
+  const PROTO = 1;
+  const BASE = 'https://viktorkmillerfilm-design.github.io/vsynths/';
+  const LIST = [ // [slug, name, what] (same order + names as the vsynths picker)
+    ['fm7', 'fm-7', '6-operator fm'], ['pd-cz', 'pd-1', 'phase distortion'], ['wavemass', 'wavemass', 'wavetable'],
+    ['fair-cmi', 'cmi-8', '8-bit sampler'], ['supersaw-8k', 'vs-8k', 'supersaw va'], ['obx-a', 'obx-a', '8-voice analog poly'],
+    ['minimoog', 'trident', '3-osc mono'], ['moog-modular', 'patchwall', 'modular'], ['arp-soloist', 'tabula', 'preset mono'],
+    ['juno-60', 'ember-6', 'dco poly + arp'], ['juno-106', 'tide-6', 'dco poly'], ['alpha-juno', 'orbit-6', 'dco poly, dial'],
+    ['tb-303', 'acid line', 'bass line'], ['chip-2a03', 'pulsar 8', 'console chip'], ['chip-sid', 'trivox 64', '3-voice chip'], ['prism', 'prism', 'wavetable']];
+  const DRUMS = ['kick', 'snare', 'hats', 'perc'];
+  const baseOf = id => String(id).split('~')[0];
+  const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+  const nowMs = () => (typeof performance !== 'undefined' ? (performance.timeOrigin || 0) + performance.now() : Date.now());
+  const url = (base, slug) => { base = base == null ? BASE : String(base); if (base && !/\/$/.test(base)) base += '/'; return base + slug + '/index.html'; };
+
+  // pure: one orbs note -> one protocol message. t = orbs AudioContext time of the note, dur in seconds.
+  function noteMsg(n, vel, t, dur, ctx, o) {
+    o = o || {}; const delay = ctx && isFinite(t) ? Math.max(0, t - ctx.currentTime) + (o.latency || 0) : 0;
+    const ns = (Array.isArray(n) ? n : [n]).map(x => clamp(Math.round(+x + 12 * (o.oct || 0)), 0, 127)).filter(x => isFinite(x));
+    return { type: 'vsynths:note', note: ns.length === 1 ? ns[0] : ns, vel: clamp(+vel || 0.8, 0.01, 1), on: true, dur: clamp(+dur || 0.25, 0.03, 30), at: nowMs() + delay * 1000, src: o.src };
+  }
+  // pure: does a route take planet `id`? route = 'off' | 'all' | 'melodic' | planet id | [ids]
+  function routes(route, id) {
+    if (!route || route === 'off') return false; if (route === 'all') return true;
+    if (route === 'melodic') return DRUMS.indexOf(baseOf(id)) < 0;
+    if (Array.isArray(route)) return route.indexOf(id) >= 0 || route.indexOf(baseOf(id)) >= 0;
+    return route === id;
+  }
+
+  const CSS = `
+.ovs{position:fixed;left:0;right:0;bottom:0;z-index:60;background:#000;border-top:1px solid rgba(255,255,255,.18);font:11px/1.3 ui-monospace,Menlo,Consolas,monospace;color:rgba(255,255,255,.78);text-transform:lowercase;display:flex;flex-direction:column;height:var(--ovs-h,44vh);min-height:260px;max-height:94vh;transition:height .18s;box-sizing:border-box;padding-bottom:env(safe-area-inset-bottom)}
+.ovs[hidden]{display:none}.ovs.big{--ovs-h:88vh}
+.ovs *{box-sizing:border-box;font:inherit;color:inherit}
+.ovs-bar{display:flex;align-items:center;gap:6px;padding:6px 10px;border-bottom:1px solid rgba(255,255,255,.1);flex:0 0 auto;flex-wrap:wrap;min-height:36px}
+.ovs-t{letter-spacing:.08em;opacity:.55;margin-right:4px}
+.ovs select,.ovs button{background:#000;border:1px solid rgba(255,255,255,.22);border-radius:3px;height:24px;padding:0 7px;cursor:pointer;text-transform:lowercase;-webkit-appearance:none;appearance:none}
+.ovs select{padding-right:16px;background-image:linear-gradient(45deg,transparent 50%,rgba(255,255,255,.5) 50%),linear-gradient(-45deg,transparent 50%,rgba(255,255,255,.5) 50%);background-size:4px 4px;background-position:calc(100% - 8px) 10px,calc(100% - 4px) 10px;background-repeat:no-repeat;max-width:150px}
+.ovs button:hover,.ovs select:hover{border-color:rgba(255,255,255,.5)}
+.ovs button.on{border-color:rgba(255,255,255,.75);color:#fff}
+.ovs-lab{opacity:.4;margin-left:4px}
+.ovs-oct{display:inline-flex;align-items:center;gap:0}.ovs-oct button{width:24px;padding:0}.ovs-oct span{width:28px;text-align:center}
+.ovs-dot{width:7px;height:7px;border-radius:50%;border:1px solid rgba(255,255,255,.4);margin-left:2px;transition:background .12s}
+.ovs-dot.hit{background:#fff;transition:none}
+.ovs-st{opacity:.45;margin-left:auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:34vw}
+.ovs-x{width:24px;padding:0!important}
+.ovs-fr{flex:1 1 auto;width:100%;border:0;background:#000;display:block;min-height:0}
+@media (pointer:coarse){.ovs select,.ovs button{height:32px;min-width:32px}.ovs-oct button{width:32px}.ovs-bar{gap:6px;padding:6px 8px}.ovs{--ovs-h:56vh}.ovs.big{--ovs-h:92vh}}
+@media (max-width:520px){.ovs-st{flex-basis:100%;max-width:none;margin-left:0;order:9}.ovs select{max-width:none;flex:1 1 40%}.ovs-lab,.ovs-t{display:none}}
+@media (max-height:500px) and (pointer:coarse){.ovs{--ovs-h:82vh;min-height:0}.ovs.big{--ovs-h:96vh}.ovs-bar{flex-wrap:nowrap;padding:4px 8px}.ovs-lab{display:none}.ovs-st{flex:1 1 0;min-width:0;max-width:none}}
+`;
+
+  function create(opts) {
+    opts = Object.assign({ base: BASE, mount: null, ctx: null, slug: 'fm7', route: 'melodic', oct: 0, mode: 'layer', latency: 0,
+      planets: null, storeKey: 'orbs-vsynths', open: false, onChange: null, readyTimeout: 3000, switchDelay: 80 }, opts || {});
+    const doc = typeof document !== 'undefined' ? document : null; if (!doc) throw new Error('OrbsExtras.vsynths.create needs a document');
+    let saved = {}; try { saved = JSON.parse(localStorage.getItem(opts.storeKey) || '{}') || {}; } catch (e) {}
+    const S = { slug: saved.slug || opts.slug, route: saved.route != null ? saved.route : opts.route, oct: saved.oct != null ? saved.oct : opts.oct,
+      mode: saved.mode || opts.mode, ready: false, proto: 0, sent: 0, dropped: 0, loads: 0, stops: 0, open: false, big: false, base: opts.base };
+    if (!LIST.some(s => s[0] === S.slug)) S.slug = opts.slug;
+    const save = () => { try { localStorage.setItem(opts.storeKey, JSON.stringify({ slug: S.slug, route: S.route, oct: S.oct, mode: S.mode })); } catch (e) {} };
+    if (!doc.getElementById('ovs-css')) { const st = doc.createElement('style'); st.id = 'ovs-css'; st.textContent = CSS; doc.head.appendChild(st); }
+    const el = doc.createElement('div'); el.className = 'ovs'; el.hidden = true; el.setAttribute('role', 'region'); el.setAttribute('aria-label', 'synths');
+    el.innerHTML = `<div class="ovs-bar"><span class="ovs-t">synths</span><select class="ovs-syn" aria-label="synth"></select>
+<span class="ovs-lab">plays</span><select class="ovs-route" aria-label="which planets play the synth"></select>
+<span class="ovs-lab">oct</span><span class="ovs-oct"><button class="ovs-om" aria-label="octave down">−</button><span class="ovs-ov">0</span><button class="ovs-op" aria-label="octave up">+</button></span>
+<button class="ovs-mode" title="layer: orbs sound + synth · solo: synth only">layer</button><span class="ovs-dot" aria-hidden="true"></span>
+<span class="ovs-st"></span><button class="ovs-big" aria-label="bigger">▴</button><button class="ovs-x" aria-label="close synths">×</button></div>
+<iframe class="ovs-fr" title="synth" allow="autoplay; midi; fullscreen"></iframe>`;
+    (opts.mount || doc.body).appendChild(el);
+    const q = c => el.querySelector(c), fr = q('.ovs-fr'), syn = q('.ovs-syn'), rt = q('.ovs-route'), dot = q('.ovs-dot'), stEl = q('.ovs-st');
+    LIST.forEach(s => { const o = doc.createElement('option'); o.value = s[0]; o.textContent = s[1] + ' · ' + s[2]; syn.appendChild(o); });
+    let readyT = 0, dotT = 0, swT = 0, cur = null;
+    const status = t => { stEl.textContent = t; };
+    const emit = () => { renderBar(); if (opts.onChange) try { opts.onChange(api.state()); } catch (e) {} };
+    function planetList() { try { return (opts.planets ? opts.planets() : []) || []; } catch (e) { return []; } }
+    function renderRoute() {
+      const ps = planetList(), v = Array.isArray(S.route) ? S.route.join(',') : String(S.route); rt.innerHTML = '';
+      [['off', 'nothing'], ['melodic', 'all melodic'], ['all', 'all planets']].concat(ps.map(p => [typeof p === 'string' ? p : p.id, typeof p === 'string' ? p : (p.label || p.id)]))
+        .forEach(([val, lab]) => { const o = doc.createElement('option'); o.value = val; o.textContent = lab; rt.appendChild(o); });
+      if (![...rt.options].some(o => o.value === v)) { const o = doc.createElement('option'); o.value = v; o.textContent = v; rt.appendChild(o); }
+      rt.value = v;
+    }
+    function renderBar() { syn.value = S.slug; renderRoute(); q('.ovs-ov').textContent = (S.oct > 0 ? '+' : '') + S.oct; const m = q('.ovs-mode'); m.textContent = S.mode; m.classList.toggle('on', S.mode === 'solo'); el.classList.toggle('big', S.big); q('.ovs-big').textContent = S.big ? '▾' : '▴'; }
+    function onMsg(e) { const d = e.data; if (!d || typeof d !== 'object' || e.source !== fr.contentWindow) return;
+      if (d.type === 'vsynths:ready') { const first = !S.ready; S.ready = !!d.notes; S.proto = d.proto | 0; clearTimeout(readyT);
+        status(S.ready ? (COARSE ? 'ready · tap the synth once to wake its sound' : 'ready') : 'this synth takes no notes'); if (first) emit(); }
+      if (d.type === 'vsynths:ack' && api._ack) { api._ack(d); api._ack = null; } }
+    const COARSE = typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches;
+    addEventListener('message', onMsg);
+    function hello() { try { fr.contentWindow.postMessage({ type: 'vsynths:hello', proto: PROTO }, '*'); } catch (e) {} }
+    fr.addEventListener('load', () => { if (!fr.getAttribute('src')) return; S.loads++; hello(); setTimeout(hello, 400); clearTimeout(readyT);
+      readyT = setTimeout(() => { if (!S.ready) status('loaded · no note reply (old version?)'); }, opts.readyTimeout); });
+    function post(m) { try { fr.contentWindow && fr.contentWindow.postMessage(m, '*'); return true; } catch (e) { return false; } }
+    function load(slug) { S.ready = false; S.proto = 0; cur = slug; status('loading ' + slug + '…'); fr.setAttribute('src', url(S.base, slug)); }
+    const api = {
+      el, frame: fr, list: LIST,
+      open(slug) { if (slug && slug !== S.slug) return api.pick(slug).then(() => api.show()); api.show(); if (cur !== S.slug) load(S.slug); return api.whenReady(); },
+      show() { el.hidden = false; S.open = true; renderBar(); if (cur !== S.slug) load(S.slug); emit(); return api; },
+      hide() { el.hidden = true; S.open = false; api.stop(); emit(); return api; },
+      toggle() { return S.open ? api.hide() : api.show(); },
+      pick(slug) { if (!LIST.some(s => s[0] === slug)) return Promise.reject(new Error('unknown synth ' + slug)); S.slug = slug; save();
+        clearTimeout(swT);
+        if (!cur || !S.open && !fr.getAttribute('src')) { renderBar(); if (S.open) load(slug); emit(); return S.open ? api.whenReady() : Promise.resolve(api.state()); }
+        post({ type: 'vsynths:panic' }); post({ type: 'vsynths:stop' }); S.stops++; S.ready = false; renderBar();
+        return new Promise(res => { swT = setTimeout(() => { load(slug); emit(); res(api.whenReady()); }, opts.switchDelay); }); },
+      whenReady(ms) { ms = ms || opts.readyTimeout + 1000; return new Promise(res => { const t0 = Date.now(); (function w() { if (S.ready || Date.now() - t0 > ms) return res(api.state()); setTimeout(w, 50); })(); }); },
+      route(r) { if (r === undefined) return S.route; api.panic(); S.route = (typeof r === 'string' && r.indexOf(',') > 0) ? r.split(',') : r; save(); emit(); return api; },
+      oct(o) { if (o === undefined) return S.oct; api.panic(); S.oct = clamp(o | 0, -3, 3); save(); emit(); return api; },
+      mode(m) { if (m === undefined) return S.mode; S.mode = m === 'solo' ? 'solo' : 'layer'; save(); emit(); return api; },
+      base(b) { if (b === undefined) return S.base; S.base = b; if (cur) load(S.slug); return api; },
+      wants(id) { return S.open && S.ready && routes(S.route, id); },          // should planet `id` go to the synth?
+      owns(id) { return S.mode === 'solo' && api.wants(id); },                // solo: orbs should skip its own voice for this planet
+      // call from orbs' midiNote(e, ev, t, dur): id = planet id, n = midi (or [chord]), vel 0-1, t = ac time, dur = seconds
+      note(id, n, vel, t, dur) { if (n == null) return false; if (!api.wants(id)) { if (S.open && !S.ready && routes(S.route, id)) S.dropped++; return false; }
+        const m = noteMsg(n, vel, t, dur, typeof opts.ctx === 'function' ? opts.ctx() : opts.ctx, { oct: S.oct, latency: opts.latency, src: id }); if (!post(m)) return false; S.sent++;
+        const ms = Math.max(0, m.at - nowMs()); clearTimeout(dotT); setTimeout(() => { dot.classList.add('hit'); dotT = setTimeout(() => dot.classList.remove('hit'), 70); }, ms);
+        return true; },
+      panic() { post({ type: 'vsynths:panic' }); return api; },                  // all notes off (call when orbs stops)
+      stop() { post({ type: 'vsynths:panic' }); post({ type: 'vsynths:stop' }); S.stops++; return api; },
+      stats() { return new Promise(res => { api._ack = res; post({ type: 'vsynths:stats' }); setTimeout(() => { if (api._ack) { api._ack = null; res(null); } }, 800); }); },
+      refresh() { renderBar(); return api; },                                  // re-read opts.planets() (call after adding/removing planets)
+      state() { return { slug: S.slug, route: S.route, oct: S.oct, mode: S.mode, open: S.open, big: S.big, ready: S.ready, proto: S.proto, sent: S.sent, dropped: S.dropped, loads: S.loads, stops: S.stops, src: fr.getAttribute('src') || '' }; },
+      destroy() { api.stop(); removeEventListener('message', onMsg); el.remove(); }
+    };
+    syn.addEventListener('change', () => api.pick(syn.value));
+    rt.addEventListener('change', () => api.route(rt.value));
+    q('.ovs-om').addEventListener('click', () => api.oct(S.oct - 1));
+    q('.ovs-op').addEventListener('click', () => api.oct(S.oct + 1));
+    q('.ovs-mode').addEventListener('click', () => api.mode(S.mode === 'solo' ? 'layer' : 'solo'));
+    q('.ovs-big').addEventListener('click', () => { S.big = !S.big; emit(); });
+    q('.ovs-x').addEventListener('click', () => api.hide());
+    renderBar(); if (opts.open) api.show();
+    return api;
+  }
+  return { vsynths: { create, list: LIST, BASE, PROTO, url, noteMsg, routes, DRUMS } };
+}));
+
+</script>
+<script>
+/* ===== orbs extras: acid (inlined from fx/extras-acid.js) ===== */
+/* orbs extras — acid (#acid): 303-style acid voice, psytrance kick + rolling offbeat bass, presets.
+   plain umd / cjs, no deps. pure web audio (no iframe, no postMessage — does not touch the vsynths protocol).
+   publishes ONE key onto window.OrbsExtras: `acid` (creates OrbsExtras if missing, never overwrites keys).
+
+   voice model (mono, TB-303 style):
+     saw|square osc -> lowpass biquad -> lowpass biquad (24 dB cascade, Q split for a 303-ish peak)
+       -> vca -> drive (pre gain -> tanh -> post gain, resonance-compensated) -> level -> dest
+     -> accent gain (0.8, up to 1.1 on accents) -> level -> dest
+     the tanh stage bounds a voice's output to post(<=0.9)*accent(<=1.1)*level(<=1) < 1, so one voice can never reach 0 dBFS.
+
+   slide (303 semantics): `slide: true` on a note HOLDS its gate and makes the NEXT note on the same
+   voice glide to its pitch without retriggering the filter/amp envelope. consecutive playNote() calls
+   share one persistent mono voice per (ctx, dest) — or pass your own voice via opts.voice /
+   createVoice(). calls on one voice must be in time order. if no next note arrives the held note
+   releases on its own at time + len*1.6.
+
+   times are AudioContext seconds; `len` is the step length in seconds (gate ≈ 55% of it, like a 303).
+*/
+(function (root, factory) {
+  const api = factory();
+  function merge(dest) {
+    if (!dest || typeof dest !== 'object') return dest;
+    const keys = Object.keys(api);
+    for (let i = 0; i < keys.length; i++) {
+      if (dest[keys[i]] == null) dest[keys[i]] = api[keys[i]];
+    }
+    return dest;
+  }
+  if (typeof module === 'object' && module.exports) {
+    if (module.exports && typeof module.exports === 'object') merge(module.exports);
+    else module.exports = api;
+  }
+  if (root && typeof root === 'object') {
+    root.OrbsExtras = merge(root.OrbsExtras || (root.OrbsExtras = {}));
+  }
+}(typeof self !== 'undefined' ? self : this, function () {
+  'use strict';
+
+  const VERSION = 1;
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const num = (v, d) => (typeof v === 'number' && isFinite(v) ? v : d);
+  const mtof = m => 440 * Math.pow(2, (m - 69) / 12);
+  const sixteenth = bpm => 60 / clamp(num(bpm, 145), 40, 220) / 4;
+
+  /* ---------- defaults (all 0..1 knobs unless noted) ---------- */
+  const DEFAULTS = {
+    note: 45,          // midi (a2)
+    len: 0.105,        // step length in seconds (16th at ~143 bpm)
+    wave: 'sawtooth',  // 'sawtooth' | 'square' ('saw' accepted)
+    cutoff: 320,       // hz, base cutoff
+    res: 0.72,         // resonance 0..1 (no self-oscillation)
+    envMod: 0.55,      // env mod 0..1 (peak = cutoff * 2^(envMod*5))
+    decay: 0.35,       // seconds, filter env decay (accented notes clamp to <= 0.2 s like the 303)
+    accentAmt: 0.6,    // accent knob 0..1 (how much louder / brighter / snappier accented notes get, plus accent sweep)
+    drive: 0.3,        // 0..1 into the tanh stage
+    glide: 0.022,      // slide time constant (s)
+    gate: 0.55,        // fraction of len the gate stays open for an unslid note
+    level: 0.8         // output trim
+  };
+  const KICK = { f0: 320, f1: 50, sw: 0.045, dec: 0.26, click: 0.35, cd: 0.006, amp: 0.95, top: 1400, hold: 0.07 };
+  const ROLL = { note: 33, wave: 'sawtooth', cutoff: 360, res: 0.25, envMod: 0.45, decay: 0.07, gate: 0.62, level: 0.5 };
+  const STEM = 0.6;              // stem gain into the bus (keeps the sum in the tanh's soft region)
+  const KICK_TRANSIENT = 0.03;   // s — bass never starts inside this window after a kick
+  const PATTERNS = { KBBB: 'KBBB', 'K-BB': 'K-BB', 'KB-B': 'KB-B', 'KBB-': 'KBB-', OFF8: 'K-B-', 'K-B-': 'K-B-' };
+
+  function normWave(w) {
+    w = String(w || 'sawtooth').toLowerCase();
+    return w === 'saw' ? 'sawtooth' : (w === 'square' || w === 'sawtooth' || w === 'triangle' || w === 'sine') ? w : 'sawtooth';
+  }
+
+  /* ---------- curves / shared buffers ---------- */
+  let TANH = null, CLIP = null;
+  function tanhCurve(k, n) { const c = new Float32Array(n); const d = Math.tanh(k); for (let i = 0; i < n; i++) { const x = i / (n - 1) * 2 - 1; c[i] = Math.tanh(k * x) / d; } return c; }
+  const NOISE = typeof WeakMap !== 'undefined' ? new WeakMap() : null;
+  function noiseBuf(ctx) {
+    let b = NOISE && NOISE.get(ctx);
+    if (!b) {
+      b = ctx.createBuffer(1, Math.floor(ctx.sampleRate * 0.05), ctx.sampleRate);
+      const d = b.getChannelData(0); let s = 12345;
+      for (let i = 0; i < d.length; i++) { s = (s * 1103515245 + 12345) & 0x7fffffff; d[i] = s / 0x3fffffff - 1; }
+      if (NOISE) NOISE.set(ctx, b);
+    }
+    return b;
+  }
+
+  /* ---------- the acid voice ---------- */
+  function createVoice(ctx, dest, params) {
+    if (!ctx || typeof ctx.createOscillator !== 'function') throw new Error('OrbsExtras.acid.createVoice requires an AudioContext');
+    const P = Object.assign({}, DEFAULTS, params || {});
+    const osc = ctx.createOscillator(), f1 = ctx.createBiquadFilter(), f2 = ctx.createBiquadFilter();
+    const vca = ctx.createGain(), pre = ctx.createGain(), sh = ctx.createWaveShaper(), post = ctx.createGain(), ag = ctx.createGain(), out = ctx.createGain();
+    f1.type = f2.type = 'lowpass'; f1.frequency.value = f2.frequency.value = P.cutoff;
+    vca.gain.value = 0;
+    sh.curve = TANH || (TANH = tanhCurve(2.5, 2048)); sh.oversample = 'none'; // no oversampling: it rings past ±1 on hard drive
+    osc.type = normWave(P.wave); osc.frequency.value = mtof(P.note);
+    osc.connect(f1); f1.connect(f2); f2.connect(vca); vca.connect(pre); pre.connect(sh); sh.connect(post); post.connect(ag); ag.connect(out);
+    ag.gain.value = 0.8; // accent stage after the saturator: 0.8 normal, up to 1.1 accented
+    if (dest) out.connect(dest);
+    osc.start(0);
+
+    const V = {
+      ctx, output: out, params: P, nodes: { osc, f1, f2, vca, pre, shaper: sh, post, accent: ag, out },
+      held: false, holdUntil: -1, lastTime: -1, lastAccentT: -9, charge: 0, notes: 0, log: [], disposed: false,
+      /* static params (res / drive / level / wave) applied at time t */
+      set(o, t) {
+        if (o) Object.assign(P, o);
+        t = num(t, ctx.currentTime);
+        const r = clamp(num(P.res, 0.7), 0, 1), d = clamp(num(P.drive, 0.3), 0, 1);
+        f1.Q.setTargetAtTime(0.5 + Math.pow(r, 1.6) * 22, t, 0.005);
+        f2.Q.setTargetAtTime(0.5 + r * 2.5, t, 0.005);
+        pre.gain.setTargetAtTime(0.6 + d * 9, t, 0.005);
+        post.gain.setTargetAtTime(Math.min(0.9, 0.9 / (0.6 + d * 2.2) / (1 + r * 0.8) * 1.6), t, 0.005); // |tanh| <= 1, so post*accent*level <= 0.9*1.1*1 < 1
+        out.gain.setTargetAtTime(clamp(num(P.level, 0.8), 0, 1), t, 0.005);
+        const w = normWave(P.wave); if (osc.type !== w) osc.type = w;
+        return V;
+      },
+      play(time, o) {
+        if (V.disposed) return null;
+        o = o || {};
+        const q = Object.assign({}, P, o);
+        const t = Math.max(0, num(time, ctx.currentTime));
+        const len = clamp(num(q.len, DEFAULTS.len), 0.01, 8);
+        const f = mtof(clamp(num(q.note, 45), 0, 127));
+        // accent is a per-note flag: true, or a number > 0 (= the accent amount for this note)
+        const accent = o.accent === true || (typeof o.accent === 'number' && o.accent > 0);
+        const amt = accent ? clamp(typeof o.accent === 'number' ? o.accent : num(q.accentAmt, 0.6), 0, 1) : 0;
+        const cutoff = clamp(num(q.cutoff, 320), 30, 12000), envMod = clamp(num(q.envMod, 0.55), 0, 1);
+        const decay = clamp(num(q.decay, 0.35), 0.02, 3), glide = clamp(num(q.glide, 0.022), 0.003, 0.3);
+        // per-call static params (only if given)
+        if (o.res != null || o.drive != null || o.level != null || o.wave != null) V.set({ res: q.res, drive: q.drive, level: q.level, wave: q.wave }, t);
+        const glideIn = V.held && t <= V.holdUntil + 1e-6 && t >= V.lastTime;
+        // accent sweep: consecutive accents within ~0.5 s charge up and push the filter further
+        if (accent) { V.charge = (t - V.lastAccentT < 0.5) ? Math.min(1, V.charge * 0.6 + 0.5) : 0.3; V.lastAccentT = t; }
+        else if (t - V.lastAccentT > 0.5) V.charge = 0;
+        const lvl = 0.55 * (1 + amt * 0.8);
+        osc.frequency.cancelScheduledValues(t); vca.gain.cancelScheduledValues(t);
+        ag.gain.cancelScheduledValues(t); ag.gain.setTargetAtTime(0.8 * (1 + amt * 0.375), t, glideIn ? 0.01 : 0.001);
+        if (glideIn) {
+          osc.frequency.setTargetAtTime(f, t, glide);
+          vca.gain.setTargetAtTime(lvl, t, 0.01);
+        } else {
+          osc.frequency.setValueAtTime(f, t);
+          const peak = Math.min(16000, cutoff * Math.pow(2, envMod * 5 + amt * (2.2 + V.charge * 1.6)));
+          const dec = accent ? Math.min(decay, 0.2) : decay;
+          for (const fl of [f1, f2]) {
+            fl.frequency.cancelScheduledValues(t);
+            fl.frequency.setTargetAtTime(peak, t, 0.0015);
+            fl.frequency.setTargetAtTime(cutoff, t + 0.006, Math.max(0.01, dec / 3));
+          }
+          vca.gain.setTargetAtTime(lvl, t, 0.0015);
+          vca.gain.setTargetAtTime(lvl * 0.72, t + 0.008, accent ? 0.12 : 0.45);
+        }
+        let end;
+        if (q.slide) {
+          V.held = true; V.holdUntil = t + len * 1.6 + 0.02; end = V.holdUntil;
+          vca.gain.setTargetAtTime(0, V.holdUntil, 0.006); // tentative: cancelled when the next note arrives in time
+        } else {
+          V.held = false; V.holdUntil = -1; end = t + Math.max(0.03, len * clamp(num(q.gate, 0.55), 0.1, 1));
+          vca.gain.setTargetAtTime(0, end, 0.006);
+        }
+        V.lastTime = t; V.notes++;
+        const h = { voice: V, time: t, end, note: q.note, accent, slide: !!q.slide, glided: glideIn, retrig: !glideIn };
+        V.log.push({ t, note: q.note, accent, slide: !!q.slide, retrig: !glideIn }); if (V.log.length > 256) V.log.shift();
+        return h;
+      },
+      release(t) {
+        t = Math.max(0, num(t, ctx.currentTime)); V.held = false; V.holdUntil = -1;
+        vca.gain.cancelScheduledValues(t); vca.gain.setTargetAtTime(0, t, 0.006); return V;
+      },
+      dispose() {
+        if (V.disposed) return; V.disposed = true;
+        try { osc.stop(); } catch (e) {}
+        [osc, f1, f2, vca, pre, sh, post, ag, out].forEach(n => { try { n.disconnect(); } catch (e) {} });
+      }
+    };
+    V.set(null, 0);
+    return V;
+  }
+
+  /* persistent mono voice per (ctx, dest) so slides work across consecutive playNote calls */
+  const VOICES = typeof WeakMap !== 'undefined' ? new WeakMap() : null;
+  function voiceFor(ctx, dest, params) {
+    const key = dest || ctx.destination;
+    let v = VOICES && VOICES.get(key);
+    if (!v || v.ctx !== ctx || v.disposed) { v = createVoice(ctx, key, params); if (VOICES) VOICES.set(key, v); }
+    else if (params) v.set(params);
+    return v;
+  }
+  function playNote(ctx, dest, time, opts) {
+    const o = opts || {};
+    const v = (o.voice && !o.voice.disposed) ? o.voice : voiceFor(ctx, dest);
+    return v.play(time, o);
+  }
+  function release(ctx, dest, time) { const v = VOICES && VOICES.get(dest || ctx.destination); if (v) v.release(time); return !!v; }
+
+  /* ---------- psytrance kick ---------- */
+  function kick(ctx, dest, time, opts) {
+    const p = Object.assign({}, KICK, opts || {});
+    const t = Math.max(0, num(time, ctx.currentTime)), v = clamp(num(p.velocity, 1), 0, 1.2);
+    const dec = clamp(p.dec, 0.08, 1.5), hold = clamp(p.hold, 0.005, dec * 0.8);
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(p.top, t);                                // click-ish top of the sweep
+    o.frequency.exponentialRampToValueAtTime(Math.max(p.f0, p.f1 + 1), t + 0.006);
+    o.frequency.exponentialRampToValueAtTime(p.f1, t + p.sw);            // body sweep down to the fundamental
+    const a = p.amp * v;
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(a, t + 0.0015);
+    g.gain.setValueAtTime(a, t + hold);
+    g.gain.setTargetAtTime(0, t + hold, (dec - hold) / 4);              // tight tail
+    g.gain.setValueAtTime(a * Math.exp(-4) * 0.9, t + dec - 0.004);
+    g.gain.linearRampToValueAtTime(0, t + dec);                          // hard end, no low rumble into the bass
+    o.connect(g); if (dest) g.connect(dest);
+    o.start(t); o.stop(t + dec + 0.02);
+    let n = null;
+    if (p.click > 0) {
+      n = ctx.createBufferSource(); n.buffer = noiseBuf(ctx);
+      const bp = ctx.createBiquadFilter(), ng = ctx.createGain(); bp.type = 'bandpass'; bp.frequency.value = 4200; bp.Q.value = 0.8;
+      ng.gain.setValueAtTime(p.click * v, t); ng.gain.setTargetAtTime(0, t + 0.0005, p.cd / 3);
+      n.connect(bp); bp.connect(ng); if (dest) ng.connect(dest);
+      n.start(t); n.stop(t + Math.max(0.02, p.cd * 4));
+    }
+    o.onended = () => { try { o.disconnect(); g.disconnect(); } catch (e) {} };
+    return { time: t, end: t + dec, transient: t + KICK_TRANSIENT, osc: o, gain: g, noise: n };
+  }
+
+  /* ---------- rolling offbeat bass note (one 16th) ---------- */
+  function rollNote(ctx, dest, time, opts) {
+    const p = Object.assign({}, ROLL, opts || {});
+    const t = Math.max(0, num(time, ctx.currentTime)), len = clamp(num(p.len, 0.06), 0.015, 2);
+    const v = clamp(num(p.velocity, 1), 0, 1.2), lvl = clamp(p.level, 0, 1) * v;
+    const o = ctx.createOscillator(), lp = ctx.createBiquadFilter(), g = ctx.createGain();
+    o.type = normWave(p.wave); o.frequency.value = mtof(p.note);
+    lp.type = 'lowpass'; lp.Q.value = 0.7 + clamp(p.res, 0, 1) * 4;
+    const peak = Math.min(8000, p.cutoff * Math.pow(2, clamp(p.envMod, 0, 1) * 3));
+    lp.frequency.setValueAtTime(peak, t); lp.frequency.setTargetAtTime(p.cutoff, t + 0.002, Math.max(0.006, p.decay / 3));
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(lvl, t + 0.002);
+    g.gain.setTargetAtTime(lvl * 0.55, t + 0.003, Math.max(0.01, p.decay));
+    g.gain.setTargetAtTime(0, t + len - 0.006, 0.0015);
+    o.connect(lp); lp.connect(g); if (dest) g.connect(dest);
+    o.start(t); o.stop(t + len + 0.01);
+    o.onended = () => { try { o.disconnect(); lp.disconnect(); g.disconnect(); } catch (e) {} };
+    return { time: t, end: t + len, note: p.note };
+  }
+
+  function parseRoll(pattern) {
+    const s = String(PATTERNS[String(pattern || 'KBBB').toUpperCase()] || pattern || 'KBBB').toUpperCase().replace(/[^KB\-.X]/g, '').padEnd(4, '-').slice(0, 4);
+    const kick = [], bass = [];
+    for (let i = 0; i < 4; i++) { if (s[i] === 'K' || s[i] === 'X') kick.push(i); else if (s[i] === 'B') bass.push(i); }
+    return { str: s, kick, bass };
+  }
+
+  /* sidechain duck node: put it between the bass and its destination */
+  function createDuck(ctx, dest) { const g = ctx.createGain(); g.gain.value = 1; if (dest) g.connect(dest); return g; }
+  function duckAt(duck, t, depth, recover) {
+    const gp = duck.gain; gp.cancelScheduledValues(t);
+    gp.setTargetAtTime(1 - clamp(depth, 0, 1), t, 0.002); gp.setTargetAtTime(1, t + 0.012, Math.max(0.005, recover / 3));
+  }
+
+  /* KBBB scheduler: kick and bass on ONE 16th grid, so they are phase-locked.
+     each bass note starts on its 16th (never inside the kick transient) and ends >= 4 ms before the next 16th. */
+  function scheduleRoll(ctx, dest, start, opts) {
+    const o = Object.assign({ bpm: 145, beats: 4, pattern: 'KBBB', kick: true, bass: true, duck: 0.5 }, opts || {});
+    const t0 = Math.max(0, num(start, ctx.currentTime)), st = sixteenth(o.bpm);
+    const beats = Math.max(1, Math.round(num(o.bars, 0) * 4 || num(o.beats, 4)));
+    const P = parseRoll(o.pattern), bp = Object.assign({}, ROLL, o.bassParams || {}, o.note != null ? { note: o.note } : {});
+    let duck = o.duckNode || null;
+    const bassDest = o.bassDest || dest, kickDest = o.kickDest || dest;
+    if (o.bass && o.duck > 0 && !duck) duck = createDuck(ctx, bassDest);
+    const events = [];
+    const notes = Array.isArray(o.notes) ? o.notes : null;  // optional per-beat bass notes
+    for (let b = 0; b < beats; b++) {
+      const bt = t0 + b * 4 * st;
+      if (o.kick) P.kick.forEach(i => { const k = kick(ctx, kickDest, bt + i * st, o.kickParams); events.push({ type: 'kick', time: k.time, end: k.end }); });
+      if (o.bass && duck && o.duck > 0) P.kick.forEach(i => duckAt(duck, bt + i * st, o.duck, st * 0.8));
+      if (o.bass) P.bass.forEach(i => {
+        const t = bt + i * st;
+        const lastKick = P.kick.filter(k => k < i).pop();
+        const ts = lastKick != null ? Math.max(t, bt + lastKick * st + KICK_TRANSIENT) : t;
+        const len = Math.min(st * clamp(num(bp.gate, 0.62), 0.2, 0.95), t + st - 0.004 - ts);
+        const note = notes ? num(notes[b % notes.length], bp.note) : bp.note;
+        const r = rollNote(ctx, duck || bassDest, ts, Object.assign({}, bp, { note, len }));
+        events.push({ type: 'bass', time: r.time, end: r.end, note });
+      });
+    }
+    return { events, duck, start: t0, end: t0 + beats * 4 * st, sixteenth: st, pattern: P.str };
+  }
+
+  /* ---------- master bus: hard ceiling (tanh soft clip, no oversampling so it cannot overshoot) ---------- */
+  function createBus(ctx, dest, opts) {
+    const o = Object.assign({ gain: 0.8, ceiling: 0.93 }, opts || {});
+    const input = ctx.createGain(), sh = ctx.createWaveShaper(), output = ctx.createGain();
+    input.gain.value = o.gain; sh.curve = CLIP || (CLIP = tanhCurve(1.5, 4096)); sh.oversample = 'none'; output.gain.value = clamp(o.ceiling, 0, 0.99);
+    input.connect(sh); sh.connect(output); output.connect(dest || ctx.destination);
+    return { input, output, shaper: sh, ceiling: output.gain.value };
+  }
+
+  /* ---------- presets ---------- */
+  // steps: [semitone offset from root, accent, slide] or null (rest). root is the acid line's midi root.
+  const R = null;
+  const PRESETS = {
+    'acid-squelch': {
+      name: 'acid squelch', bpm: 138, root: 45, scale: 'phrygian',
+      voice: { wave: 'sawtooth', cutoff: 260, res: 0.84, envMod: 0.72, decay: 0.34, accentAmt: 0.75, drive: 0.35, glide: 0.024 },
+      roll: { pattern: 'KBBB', note: 33, cutoff: 300, decay: 0.07 }, mix: { acid: 1, kick: 1, bass: 0.8 },
+      steps: [[0, 1, 0], [0, 0, 0], [12, 0, 1], [0, 0, 0], R, [0, 1, 0], [3, 0, 1], [1, 0, 0],
+              [0, 0, 0], R, [12, 1, 1], [10, 0, 0], [0, 0, 0], [7, 1, 0], R, [1, 0, 1]]
+    },
+    'acid-rubber': {
+      name: 'acid rubber', bpm: 132, root: 45, scale: 'minor',
+      voice: { wave: 'square', cutoff: 380, res: 0.6, envMod: 0.45, decay: 0.5, accentAmt: 0.5, drive: 0.15, glide: 0.03 },
+      roll: { pattern: 'K-BB', note: 33, cutoff: 280, decay: 0.09 }, mix: { acid: 1, kick: 1, bass: 0.7 },
+      steps: [[0, 0, 1], [0, 0, 0], R, [7, 1, 0], [0, 0, 1], [3, 0, 1], [5, 0, 0], R,
+              [0, 1, 0], R, [-2, 0, 1], [0, 0, 0], [12, 1, 0], R, [10, 0, 1], [7, 0, 0]]
+    },
+    'psy-roll': {
+      name: 'psy roll', bpm: 145, root: 45, scale: 'phrygian',
+      voice: { wave: 'sawtooth', cutoff: 300, res: 0.55, envMod: 0.5, decay: 0.18, accentAmt: 0.45, drive: 0.3, glide: 0.02 },
+      roll: { pattern: 'KBBB', note: 33, cutoff: 380, decay: 0.06 }, mix: { acid: 0.7, kick: 1, bass: 1 },
+      steps: [R, [12, 0, 0], R, [12, 1, 0], R, [12, 0, 0], R, [13, 0, 1],
+              R, [12, 0, 0], R, [12, 1, 0], R, [19, 0, 0], R, [12, 0, 0]]
+    },
+    'full-on': {
+      name: 'full-on', bpm: 146, root: 45, scale: 'harmonicminor',
+      voice: { wave: 'sawtooth', cutoff: 420, res: 0.78, envMod: 0.76, decay: 0.22, accentAmt: 0.8, drive: 0.6, glide: 0.018 },
+      roll: { pattern: 'KBBB', note: 33, cutoff: 420, decay: 0.06 }, mix: { acid: 0.95, kick: 1, bass: 0.9 },
+      steps: [[0, 1, 0], [12, 0, 0], [0, 0, 0], [11, 0, 1], [12, 1, 0], [0, 0, 0], [7, 0, 0], [8, 0, 1],
+              [7, 1, 0], [0, 0, 0], [12, 0, 1], [15, 1, 0], [0, 0, 0], [3, 0, 0], [12, 1, 1], [11, 0, 0]]
+    },
+    'dark-psy': {
+      name: 'dark psy', bpm: 150, root: 45, scale: 'phrygian',
+      voice: { wave: 'square', cutoff: 220, res: 0.86, envMod: 0.62, decay: 0.16, accentAmt: 0.75, drive: 0.7, glide: 0.02 },
+      roll: { pattern: 'KBBB', note: 33, cutoff: 260, decay: 0.05, wave: 'square' }, mix: { acid: 0.9, kick: 1, bass: 0.9 },
+      steps: [[0, 1, 0], [1, 0, 1], [0, 0, 0], R, [6, 1, 0], [0, 0, 0], [1, 0, 1], [-1, 0, 0],
+              [0, 1, 1], [12, 0, 0], R, [1, 1, 0], [0, 0, 0], [6, 0, 1], [7, 0, 0], [1, 1, 0]]
+    }
+  };
+  const PRESET_ORDER = ['acid-squelch', 'acid-rubber', 'psy-roll', 'full-on', 'dark-psy'];
+  function presetKey(name) {
+    const k = String(name || '').trim().toLowerCase().replace(/[\s_]+/g, '-');
+    if (PRESETS[k]) return k;
+    const alias = { squelch: 'acid-squelch', rubber: 'acid-rubber', roll: 'psy-roll', psy: 'psy-roll', fullon: 'full-on', dark: 'dark-psy', darkpsy: 'dark-psy' };
+    return alias[k.replace(/-/g, '')] || null;
+  }
+  function presetSteps(name, root, transpose) {
+    const k = presetKey(name); if (!k) return null;
+    const p = PRESETS[k], r = num(root, p.root) + num(transpose, 0);
+    return p.steps.map(s => s ? { note: r + s[0], accent: !!s[1], slide: !!s[2] } : null);
+  }
+  /* full, resolved copy of a preset + genres-style element specs (same shape as OrbsGenres el()) */
+  function preset(name) {
+    const k = presetKey(name); if (!k) return null;
+    const p = JSON.parse(JSON.stringify(PRESETS[k]));
+    p.id = k; p.voice = Object.assign({}, DEFAULTS, p.voice); delete p.voice.note; delete p.voice.len;
+    p.stepsResolved = presetSteps(k);
+    const rp = parseRoll(p.roll.pattern);
+    p.elements = {
+      kick: { variant: 'psy', hit: { kind: 'drum', n: 36, velocity: 1, length: 0.26 }, lap: 1, hits: rp.kick.map(i => i / 4), voice: Object.assign({}, KICK) },
+      bass: { variant: 'roll', hit: { kind: 'note', role: 'root', octave: 1, velocity: 0.9, length: 0.15 }, lap: 1, hits: rp.bass.map(i => i / 4), voice: bassVoiceShape(Object.assign({}, ROLL, p.roll)) },
+      lead: { variant: 'acid', hit: { kind: 'note', role: 'line', octave: 2, velocity: 0.8, length: 0.25 }, lap: 4,
+        hits: p.steps.map((s, i) => s ? i / 4 : null).filter(x => x != null), voice: Object.assign({ type: normWave(p.voice.wave) }, p.voice) }
+    };
+    return p;
+  }
+  function bassVoiceShape(r) { return { type: normWave(r.wave), cutoff: r.cutoff, q: +(0.7 + r.res * 4).toFixed(2), attack: 0.002, release: 0.006, sustain: 0.55, dec: r.decay }; }
+  function list() { return PRESET_ORDER.map(k => ({ id: k, name: PRESETS[k].name, bpm: PRESETS[k].bpm })); }
+
+  /* play a 16-step pattern on one acid voice (slides carry across steps) */
+  function schedulePattern(ctx, dest, start, opts) {
+    const o = Object.assign({ loops: 1 }, opts || {});
+    const pr = o.preset ? preset(o.preset) : null;
+    const bpm = num(o.bpm, pr ? pr.bpm : 145), st = num(o.stepLen, sixteenth(bpm));
+    const steps = Array.isArray(o.steps) ? o.steps : pr ? presetSteps(pr.id, o.root, o.transpose) : null;
+    if (!steps) throw new Error('OrbsExtras.acid.schedulePattern needs steps or a preset');
+    const params = Object.assign({}, pr ? pr.voice : {}, o.params || {});
+    const v = (o.voice && !o.voice.disposed) ? o.voice : voiceFor(ctx, dest);
+    v.set(params, Math.max(0, num(start, ctx.currentTime)));
+    const t0 = Math.max(0, num(start, ctx.currentTime)), events = [];
+    for (let L = 0; L < o.loops; L++) for (let i = 0; i < steps.length; i++) {
+      const s = steps[i]; if (!s) continue;
+      const t = t0 + (L * steps.length + i) * st;
+      events.push(v.play(t, Object.assign({}, params, s, { len: st })));
+    }
+    return { events, voice: v, start: t0, end: t0 + o.loops * steps.length * st, sixteenth: st };
+  }
+
+  /* acid + kick + rolling bass for one preset, all on one grid, into a soft-clip bus */
+  function schedulePreset(ctx, dest, start, name, opts) {
+    const pr = preset(name); if (!pr) throw new Error('OrbsExtras.acid: unknown preset "' + name + '"');
+    const o = Object.assign({ bars: 1, acid: true, kick: true, bass: true, duck: 0.5, bus: true }, opts || {});
+    const bpm = num(o.bpm, pr.bpm), t0 = Math.max(0, num(start, ctx.currentTime));
+    const bus = o.bus ? createBus(ctx, dest) : null, out = bus ? bus.input : (dest || ctx.destination);
+    const gA = ctx.createGain(), gK = ctx.createGain(), gB = ctx.createGain();
+    gA.gain.value = pr.mix.acid * STEM; gK.gain.value = pr.mix.kick * STEM; gB.gain.value = pr.mix.bass * STEM;
+    gA.connect(out); gK.connect(out); gB.connect(out);
+    const voice = createVoice(ctx, gA, pr.voice);
+    const a = o.acid ? schedulePattern(ctx, gA, t0, { preset: pr.id, bpm, loops: o.bars, voice }) : null;
+    const r = (o.kick || o.bass) ? scheduleRoll(ctx, null, t0, { bpm, bars: o.bars, pattern: pr.roll.pattern, kick: o.kick, bass: o.bass, duck: o.duck, kickDest: gK, bassDest: gB, bassParams: pr.roll }) : null;
+    return { preset: pr, bus, voice, acid: a, roll: r, start: t0, end: t0 + o.bars * 16 * sixteenth(bpm) };
+  }
+
+  /* offline render helper: Promise<{buffer, stats}> */
+  function render(name, opts) {
+    const o = Object.assign({ bars: 2, sampleRate: 44100, tail: 0.4 }, opts || {});
+    const AC = (typeof OfflineAudioContext !== 'undefined' && OfflineAudioContext) || (typeof webkitOfflineAudioContext !== 'undefined' && webkitOfflineAudioContext);
+    if (!AC) return Promise.reject(new Error('OfflineAudioContext is not available'));
+    const pr = preset(name); if (!pr) return Promise.reject(new Error('unknown preset ' + name));
+    const bpm = num(o.bpm, pr.bpm), dur = o.bars * 16 * sixteenth(bpm) + o.tail;
+    const ctx = new AC(1, Math.ceil(dur * o.sampleRate), o.sampleRate);
+    schedulePreset(ctx, ctx.destination, 0, name, o);
+    return ctx.startRendering().then(buffer => ({ buffer, stats: stats(buffer) }));
+  }
+  function stats(buffer) {
+    let peak = 0, sum = 0, nan = 0, n = 0;
+    for (let c = 0; c < buffer.numberOfChannels; c++) {
+      const d = buffer.getChannelData(c);
+      for (let i = 0; i < d.length; i++) { const x = d[i]; if (x !== x || !isFinite(x)) { nan++; continue; } const a = Math.abs(x); if (a > peak) peak = a; sum += x * x; n++; }
+    }
+    const rms = n ? Math.sqrt(sum / n) : 0;
+    return { peak, rms, nan, peakDb: peak > 0 ? 20 * Math.log10(peak) : -Infinity };
+  }
+
+  /* ---------- live sequencer (lookahead scheduler; demo + app) ---------- */
+  function createSequencer(ctx, dest, opts) {
+    const o = Object.assign({ preset: 'acid-squelch', acid: true, kick: true, bass: true, duck: 0.5, lookahead: 0.12, interval: 25 }, opts || {});
+    const bus = createBus(ctx, dest);
+    const gA = ctx.createGain(), gK = ctx.createGain(), gB = ctx.createGain();
+    [gA, gK, gB].forEach(g => g.connect(bus.input));
+    const duck = createDuck(ctx, gB);
+    let pr = preset(o.preset), bpm = num(o.bpm, pr.bpm), params = Object.assign({}, pr.voice), steps = pr.stepsResolved;
+    const voice = createVoice(ctx, gA, params);
+    let timer = null, step = 0, next = 0;
+    function mix() { gA.gain.value = pr.mix.acid * STEM; gK.gain.value = pr.mix.kick * STEM; gB.gain.value = pr.mix.bass * STEM; }
+    mix();
+    function tick() {
+      const st = sixteenth(bpm);
+      while (next < ctx.currentTime + o.lookahead) {
+        const i = step % 16, s = steps[i];
+        if (o.acid && s) voice.play(next, Object.assign({}, params, s, { len: st }));
+        if (i % 4 === 0 && (o.kick || o.bass)) scheduleRoll(ctx, null, next, { bpm, beats: 1, pattern: pr.roll.pattern, kick: o.kick, bass: o.bass, duck: o.duck, duckNode: duck, kickDest: gK, bassDest: gB, bassParams: pr.roll });
+        if (typeof o.onStep === 'function') { const at = next, ii = i; setTimeout(() => { if (timer) o.onStep(ii, at); }, Math.max(0, (at - ctx.currentTime) * 1000)); }
+        next += st; step++;
+      }
+    }
+    const S = {
+      voice, bus,
+      start() { if (timer) return S; if (ctx.state === 'suspended' && ctx.resume) ctx.resume(); step = 0; next = ctx.currentTime + 0.05; tick(); timer = setInterval(tick, o.interval); return S; },
+      stop() { if (timer) clearInterval(timer); timer = null; voice.release(ctx.currentTime); return S; },
+      playing() { return !!timer; },
+      setPreset(name) { const p = preset(name); if (!p) return false; pr = p; params = Object.assign({}, p.voice); steps = p.stepsResolved; bpm = p.bpm; voice.set(params); mix(); return true; },
+      setParams(x) { Object.assign(params, x || {}); voice.set(params); return S; },
+      setBpm(b) { bpm = clamp(num(b, bpm), 40, 220); return S; },
+      setSteps(s) { if (Array.isArray(s)) steps = s; return S; },
+      setMute(k, on) { if (k in o) o[k] = !on; return S; },
+      setDuck(d) { o.duck = clamp(num(d, 0.5), 0, 1); return S; },
+      state() { return { preset: pr.id, bpm, step: step % 16, playing: !!timer, params: Object.assign({}, params), acid: o.acid, kick: o.kick, bass: o.bass, duck: o.duck }; },
+      dispose() { S.stop(); voice.dispose(); try { bus.output.disconnect(); } catch (e) {} }
+    };
+    return S;
+  }
+
+  /* genres-shaped voice params (drop-in for OrbsGenres VOICE_PARAMS / the app's kickV & bass variants) */
+  const VOICES_SHAPE = {
+    kick: { psy: { f0: KICK.f0, f1: KICK.f1, sw: KICK.sw, dec: KICK.dec, click: KICK.click, cd: KICK.cd, amp: KICK.amp } },
+    bass: { roll: bassVoiceShape(ROLL), acid: { type: 'sawtooth', cutoff: DEFAULTS.cutoff, q: 12, attack: 0.002, release: 0.006, sustain: 0.7, dec: DEFAULTS.decay } }
+  };
+
+  return {
+    acid: {
+      VERSION, DEFAULTS, KICK, ROLL, PRESETS, PRESET_ORDER, VOICES: VOICES_SHAPE, KICK_TRANSIENT,
+      createVoice, voiceFor, playNote, release,
+      kick, rollNote, scheduleRoll, createDuck, parseRoll,
+      schedulePattern, schedulePreset, createSequencer, createBus,
+      preset, presetSteps, list, render, stats, mtof
+    }
+  };
+}));
+
+</script>
+<script>
+/* ===== orbs extras: fx2 (inlined from fx/extras-fx2.js) ===== */
+/* orbs extras — fx2: the missing common effects as standalone web audio devices
+   compressor · limiter · chorus · flanger · phaser · gate · bitcrusher · stereo width ·
+   tremolo · auto-filter · tape · pitch shifter · vocoder
+   plain umd / cjs, no deps. publishes OrbsExtras.fx2 (merge-safe: creates OrbsExtras if
+   missing, never overwrites keys that are already there).
+
+   device = OrbsExtras.fx2.create(id, ctx, opts)   (or OrbsExtras.fx2.devices[id].create(ctx, opts))
+     -> { id, label, input, output, params, set(id, v), get(id), bypass(on), bypassed,
+          setBpm(bpm), dispose(), disposed, carrier? (vocoder), engine? (bitcrusher) }
+   params: [{ id, label, min, max, def, unit, step?, curve?, options? }]  (<= 6 per device)
+   all native nodes (offline-safe). only the bitcrusher's downsample uses an AudioWorklet, and
+   only after `await OrbsExtras.fx2.prepare(ctx)` (blob url -> data url -> native fallback).
+*/
+(function (root, factory) {
+  const api = factory();
+  function merge(dest) {
+    if (!dest || typeof dest !== 'object') return dest;
+    const keys = Object.keys(api);
+    for (let i = 0; i < keys.length; i++) if (dest[keys[i]] == null) dest[keys[i]] = api[keys[i]];
+    return dest;
+  }
+  if (typeof module === 'object' && module.exports) merge(module.exports);
+  if (root && typeof root === 'object') root.OrbsExtras = merge(root.OrbsExtras || (root.OrbsExtras = {}));
+}(typeof self !== 'undefined' ? self : this, function () {
+  'use strict';
+
+  const TAU = 0.015;            // default smoothing time constant (s)
+  const XF = 0.012;             // bypass crossfade time constant (s) -> ~60 ms to settle
+  const fin = v => typeof v === 'number' && isFinite(v);
+  const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+  const dbToLin = db => Math.pow(10, db / 20);
+
+  // tempo divisions: beats per lfo cycle (quarter note = 1 beat), same as the app's bpm clock
+  const DIVS = [
+    { id: '4/1', beats: 16 }, { id: '2/1', beats: 8 }, { id: '1/1', beats: 4 }, { id: '1/2', beats: 2 },
+    { id: '1/2t', beats: 4 / 3 }, { id: '1/4d', beats: 1.5 }, { id: '1/4', beats: 1 }, { id: '1/4t', beats: 2 / 3 },
+    { id: '1/8d', beats: 0.75 }, { id: '1/8', beats: 0.5 }, { id: '1/8t', beats: 1 / 3 }, { id: '1/16', beats: 0.25 },
+    { id: '1/32', beats: 0.125 }
+  ];
+  const DIV_IDS = DIVS.map(d => d.id);
+  const DIV_DEF = DIV_IDS.indexOf('1/4');
+
+  const P = (id, label, min, max, def, unit, x) => Object.assign({ id, label, min, max, def, unit }, x || {});
+  const SYNC = () => [P('sync', 'sync', 0, 1, 1, 'toggle', { step: 1, options: ['off', 'on'] }),
+    P('div', 'div', 0, DIVS.length - 1, DIV_DEF, 'div', { step: 1, options: DIV_IDS })];
+
+  // ---------- smoothing ----------
+  function ramp(param, v, t, tau) {
+    if (!param || !fin(v)) return;
+    try { param.setTargetAtTime(v, t, tau == null ? TAU : tau); } catch (e) { try { param.value = v; } catch (e2) { /* */ } }
+  }
+  function init(param, v) { if (param && fin(v)) try { param.value = v; } catch (e) { /* */ } }
+
+  // ---------- curves (cached per length) ----------
+  const curveCache = Object.create(null);
+  function curve(key, n, f) {
+    if (curveCache[key]) return curveCache[key];
+    const c = new Float32Array(n);
+    for (let i = 0; i < n; i++) { const y = f(i / (n - 1) * 2 - 1); c[i] = fin(y) ? y : 0; }
+    return (curveCache[key] = c);
+  }
+  // safety: input pre-scaled by 1/4, transparent below 0.9, soft knee to a hard ceiling at 1.0
+  const safeCurve = () => curve('safe', 8193, x => { const z = x * 4, a = Math.abs(z); return a <= 0.9 ? z : Math.sign(z) * (0.9 + 0.1 * Math.tanh((a - 0.9) / 0.1)); });
+  const absCurve = () => curve('abs', 4097, x => Math.abs(x));
+  function safetyStage(ctx) {
+    const pre = ctx.createGain(); pre.gain.value = 0.25;
+    const ws = ctx.createWaveShaper(); ws.curve = safeCurve();
+    pre.connect(ws);
+    return { input: pre, output: ws, nodes: [pre, ws] };
+  }
+
+  // ---------- registry of live devices (for broadcast setBpm) ----------
+  const live = new Set();
+  let globalBpm = 120;
+
+  // ---------- base device ----------
+  function makeDevice(ctx, def, opts) {
+    if (!ctx || typeof ctx.createGain !== 'function') throw new Error('OrbsExtras.fx2: ' + def.id + ' needs an AudioContext');
+    opts = opts || {};
+    const nodes = [], sources = [];
+    const track = n => { nodes.push(n); return n; };
+    const src = n => { sources.push(n); return track(n); };
+    const input = track(ctx.createGain());
+    input.channelCount = 2; input.channelCountMode = 'explicit'; input.channelInterpretation = 'speakers';
+    const output = track(ctx.createGain());
+    const wet = track(ctx.createGain()), dry = track(ctx.createGain());
+    wet.gain.value = 1; dry.gain.value = 0;
+    input.connect(dry); dry.connect(output); wet.connect(output);
+    const st = {};
+    def.params.forEach(p => { st[p.id] = p.def; });
+    if (opts.params) Object.keys(opts.params).forEach(k => { const p = def.params.find(q => q.id === k); if (p && fin(+opts.params[k])) st[k] = clampP(p, +opts.params[k]); });
+    let bpmSrc = opts.bpm, bpmVal = fin(+opts.bpm) ? +opts.bpm : globalBpm;
+    const bpm = () => { const b = typeof bpmSrc === 'function' ? +bpmSrc() : bpmVal; return fin(b) && b > 0 ? clamp(b, 20, 999) : 120; };
+    const io = { ctx, input, track, src, st, bpm, opts,
+      rate: () => st.sync >= 0.5 ? bpm() / 60 / DIVS[clamp(Math.round(st.div), 0, DIVS.length - 1)].beats : st.rate };
+    const body = def.build(ctx, io);
+    let tail = body.output;
+    if (def.safe !== false) { const s = safetyStage(ctx); s.nodes.forEach(track); body.output.connect(s.input); tail = s.output; }
+    tail.connect(wet);
+    const t0 = ctx.currentTime;
+    def.params.forEach(p => body.apply(p.id, st[p.id], t0, true));
+    let bypassed = false, disposed = false;
+    const dev = {
+      id: def.id, label: def.label, category: def.category, input, output,
+      params: def.params.map(p => Object.assign({}, p, p.options ? { options: p.options.slice() } : {})),
+      get bypassed() { return bypassed; }, get disposed() { return disposed; },
+      get(id) { return st[id]; },
+      values() { return Object.assign({}, st); },
+      set(id, v) {
+        if (disposed) return false;
+        if (id && typeof id === 'object') { let ok = true; Object.keys(id).forEach(k => { ok = dev.set(k, id[k]) && ok; }); return ok; }
+        const p = def.params.find(q => q.id === id);
+        if (!p && body.extra && body.extra(id, v, ctx.currentTime)) return true;
+        if (!p) return false;
+        v = +v; if (!fin(v)) return false;          // nan / inf guard: ignore
+        v = clampP(p, v); st[id] = v;
+        body.apply(id, v, ctx.currentTime, false);
+        if ((id === 'sync' || id === 'div' || id === 'rate') && body.retime) body.retime(ctx.currentTime);
+        return true;
+      },
+      bypass(on) {
+        if (disposed) return bypassed;
+        bypassed = on === undefined ? !bypassed : !!on;
+        const t = ctx.currentTime;
+        ramp(wet.gain, bypassed ? 0 : 1, t, XF); ramp(dry.gain, bypassed ? 1 : 0, t, XF);
+        return bypassed;
+      },
+      setBpm(b) { if (typeof b === 'function') bpmSrc = b; else if (fin(+b) && +b > 0) { bpmSrc = null; bpmVal = +b; } if (body.retime && !disposed) body.retime(ctx.currentTime); },
+      dispose() {
+        if (disposed) return; disposed = true; live.delete(dev);
+        sources.forEach(s => { try { s.stop(); } catch (e) { /* not started / already stopped */ } });
+        if (body.dispose) try { body.dispose(); } catch (e) { /* */ }
+        nodes.forEach(n => { try { n.disconnect(); } catch (e) { /* */ } });
+        nodes.length = 0; sources.length = 0;
+      },
+      _nodes: () => nodes.length, _sources: () => sources.slice()
+    };
+    if (body.expose) Object.assign(dev, body.expose);
+    if (opts.bypass) dev.bypass(true);
+    live.add(dev);
+    return dev;
+  }
+  function clampP(p, v) { v = clamp(v, p.min, p.max); if (p.step) v = p.min + Math.round((v - p.min) / p.step) * p.step; return v; }
+
+  // lfo helper: oscillator -> optional smoother -> depth gain
+  function lfo(ctx, io, type) {
+    const osc = io.src(ctx.createOscillator()); osc.type = type || 'sine'; osc.frequency.value = 1;
+    const depth = io.track(ctx.createGain()); depth.gain.value = 0;
+    osc.connect(depth); osc.start();
+    return { osc, depth };
+  }
+  function mixPair(ctx, io) { // internal dry/wet mix (equal-gain, smoothed)
+    const d = io.track(ctx.createGain()), w = io.track(ctx.createGain()), out = io.track(ctx.createGain());
+    io.input.connect(d); d.connect(out); w.connect(out);
+    return { dry: d, wet: w, out, set(m, t, now) { if (now) { init(d.gain, 1 - m); init(w.gain, m); } else { ramp(d.gain, 1 - m, t); ramp(w.gain, m, t); } } };
+  }
+  const sp = (param, v, t, now, tau) => now ? init(param, v) : ramp(param, v, t, tau);
+
+  // ================= devices =================
+  const DEFS = [];
+  const def = d => { DEFS.push(d); return d; };
+
+  def({ id: 'compressor', label: 'compressor', category: 'dynamics',
+    params: [P('threshold', 'thresh', -60, 0, -18, 'db'), P('ratio', 'ratio', 1, 20, 4, ':1'), P('attack', 'attack', 0.1, 100, 10, 'ms', { curve: 'log' }),
+      P('release', 'release', 10, 1000, 150, 'ms', { curve: 'log' }), P('knee', 'knee', 0, 30, 6, 'db'), P('makeup', 'makeup', 0, 24, 0, 'db')],
+    build(ctx, io) {
+      const c = io.track(ctx.createDynamicsCompressor()), g = io.track(ctx.createGain());
+      io.input.connect(c); c.connect(g);
+      return { output: g, expose: { reduction: () => fin(c.reduction) ? c.reduction : 0 },
+        apply(id, v, t, now) {
+          if (id === 'threshold') sp(c.threshold, v, t, now); else if (id === 'ratio') sp(c.ratio, v, t, now);
+          else if (id === 'attack') sp(c.attack, v / 1000, t, now); else if (id === 'release') sp(c.release, v / 1000, t, now);
+          else if (id === 'knee') sp(c.knee, v, t, now); else if (id === 'makeup') sp(g.gain, dbToLin(v), t, now);
+        } };
+    } });
+
+  def({ id: 'limiter', label: 'limiter', category: 'dynamics', safe: false,
+    params: [P('gain', 'gain', 0, 24, 0, 'db'), P('ceiling', 'ceiling', -12, 0, -0.3, 'db'), P('release', 'release', 10, 500, 60, 'ms', { curve: 'log' })],
+    build(ctx, io) {
+      const pre = io.track(ctx.createGain()), c = io.track(ctx.createDynamicsCompressor());
+      const cs = io.track(ctx.createGain()), ws = io.track(ctx.createWaveShaper()), post = io.track(ctx.createGain());
+      init(c.ratio, 20); init(c.knee, 0); init(c.attack, 0.001);
+      ws.curve = curve('lim', 8193, x => { const z = x * 4, a = Math.abs(z); return a <= 0.95 ? z : Math.sign(z) * Math.min(1, 0.95 + 0.05 * Math.tanh((a - 0.95) / 0.05)); });
+      io.input.connect(pre); pre.connect(c); c.connect(cs); cs.connect(ws); ws.connect(post);
+      return { output: post, expose: { reduction: () => fin(c.reduction) ? c.reduction : 0 },
+        apply(id, v, t, now) {
+          if (id === 'gain') sp(pre.gain, dbToLin(v), t, now);
+          else if (id === 'ceiling') { const l = dbToLin(v); sp(c.threshold, v - 1.5, t, now); sp(cs.gain, 0.25 / l, t, now); sp(post.gain, l, t, now); }
+          else if (id === 'release') sp(c.release, v / 1000, t, now);
+        } };
+    } });
+
+  def({ id: 'gate', label: 'gate', category: 'dynamics',
+    params: [P('threshold', 'thresh', -80, 0, -40, 'db'), P('range', 'range', -80, 0, -80, 'db'), P('attack', 'attack', 0.1, 50, 1, 'ms', { curve: 'log' }), P('release', 'release', 5, 1000, 80, 'ms', { curve: 'log' })],
+    build(ctx, io) {
+      // native envelope follower: |x| -> lowpass (release) -> scale 0.5/thr -> step curve -> lowpass (attack) -> vca
+      const rect = io.track(ctx.createWaveShaper()); rect.curve = absCurve();
+      const envLp = io.track(ctx.createBiquadFilter()); envLp.type = 'lowpass'; envLp.Q.value = -3;
+      const sc = io.track(ctx.createGain());
+      const step = io.track(ctx.createWaveShaper()); step.curve = curve('gstep', 2049, x => x <= 0.35 ? 0 : x >= 0.5 ? 1 : (u => u * u * (3 - 2 * u))((x - 0.35) / 0.15));
+      const atLp = io.track(ctx.createBiquadFilter()); atLp.type = 'lowpass'; atLp.Q.value = -3;
+      const open = io.track(ctx.createGain()), vca = io.track(ctx.createGain());
+      io.input.connect(rect); rect.connect(envLp); envLp.connect(sc); sc.connect(step); step.connect(atLp); atLp.connect(open); open.connect(vca.gain);
+      io.input.connect(vca);
+      const lpHz = ms => clamp(1 / (2 * Math.PI * ms / 1000), 1, 20000);
+      return { output: vca,
+        apply(id, v, t, now) {
+          if (id === 'threshold') sp(sc.gain, 0.5 / dbToLin(v) * 1.57, t, now); // 1.57 ≈ mean|sin| -> peak
+          else if (id === 'range') { const fl = id === 'range' ? dbToLin(v) : 0, f = v <= -79.9 ? 0 : fl; sp(vca.gain, f, t, now); sp(open.gain, 1 - f, t, now); }
+          else if (id === 'attack') sp(atLp.frequency, lpHz(v), t, now);
+          else if (id === 'release') sp(envLp.frequency, lpHz(v), t, now);
+        } };
+    } });
+
+  def({ id: 'chorus', label: 'chorus', category: 'modulation',
+    params: [P('rate', 'rate', 0.05, 5, 0.8, 'hz', { curve: 'log' }), P('depth', 'depth', 0, 1, 0.5, ''), P('delay', 'delay', 5, 30, 14, 'ms'),
+      P('spread', 'spread', 0, 1, 1, ''), P('mix', 'mix', 0, 1, 0.5, '')],
+    build(ctx, io) {
+      const m = mixPair(ctx, io), split = io.track(ctx.createChannelSplitter(2)), merge = io.track(ctx.createChannelMerger(2));
+      const dl = io.track(ctx.createDelay(0.1)), dr = io.track(ctx.createDelay(0.1));
+      const L = lfo(ctx, io), R = io.track(ctx.createGain()); L.osc.connect(R);
+      L.depth.connect(dl.delayTime); R.connect(dr.delayTime);
+      io.input.connect(split); split.connect(dl, 0); split.connect(dr, 1); dl.connect(merge, 0, 0); dr.connect(merge, 0, 1); merge.connect(m.wet);
+      const depthS = () => io.st.depth * 0.004;
+      return { output: m.out,
+        apply(id, v, t, now) {
+          const st = io.st;
+          if (id === 'rate') sp(L.osc.frequency, v, t, now);
+          else if (id === 'delay') { sp(dl.delayTime, v / 1000, t, now); sp(dr.delayTime, v / 1000, t, now); }
+          if (id === 'depth' || id === 'spread' || id === 'delay') { const d = Math.min(depthS(), st.delay / 1000 * 0.9); sp(L.depth.gain, d, t, now); sp(R.gain, d * (1 - 2 * st.spread), t, now); }
+          if (id === 'mix') m.set(v, t, now);
+        } };
+    } });
+
+  def({ id: 'flanger', label: 'flanger', category: 'modulation',
+    params: [P('rate', 'rate', 0.02, 5, 0.25, 'hz', { curve: 'log' }), P('depth', 'depth', 0, 1, 0.7, ''), P('delay', 'delay', 3, 12, 4, 'ms'),
+      P('feedback', 'fb', -0.9, 0.9, 0.5, ''), P('mix', 'mix', 0, 1, 0.5, '')],
+    build(ctx, io) {
+      // delay >= 3 ms: web audio clamps delays inside a feedback cycle to one render quantum (~2.9 ms)
+      const m = mixPair(ctx, io), d = io.track(ctx.createDelay(0.05)), fb = io.track(ctx.createGain());
+      const damp = io.track(ctx.createBiquadFilter()); damp.type = 'lowpass'; damp.frequency.value = 9000;
+      const L = lfo(ctx, io);
+      L.depth.connect(d.delayTime); io.input.connect(d); d.connect(damp); damp.connect(fb); fb.connect(d); d.connect(m.wet);
+      return { output: m.out,
+        apply(id, v, t, now) {
+          const st = io.st;
+          if (id === 'rate') sp(L.osc.frequency, v, t, now);
+          else if (id === 'feedback') sp(fb.gain, clamp(v, -0.9, 0.9), t, now);
+          else if (id === 'mix') m.set(v, t, now);
+          if (id === 'delay' || id === 'depth') { const base = st.delay / 1000, dep = Math.min(st.depth * base * 0.6, base - 0.0029); sp(d.delayTime, base, t, now); sp(L.depth.gain, Math.max(0, dep), t, now); }
+        } };
+    } });
+
+  def({ id: 'phaser', label: 'phaser', category: 'modulation',
+    params: [P('rate', 'rate', 0.02, 8, 0.5, 'hz', { curve: 'log' })].concat(SYNC(), [P('depth', 'depth', 0, 1, 0.7, ''), P('freq', 'freq', 100, 4000, 700, 'hz', { curve: 'log' }), P('mix', 'mix', 0, 1, 0.5, '')]),
+    build(ctx, io) {
+      const m = mixPair(ctx, io), L = lfo(ctx, io), aps = [];
+      let prev = io.input;
+      for (let i = 0; i < 6; i++) { const a = io.track(ctx.createBiquadFilter()); a.type = 'allpass'; a.Q.value = 0.6; prev.connect(a); L.depth.connect(a.detune); aps.push(a); prev = a; }
+      prev.connect(m.wet);
+      const retime = (t, now) => sp(L.osc.frequency, clamp(io.rate(), 0.005, 40), t, now, 0.05);
+      return { output: m.out, retime,
+        apply(id, v, t, now) {
+          if (id === 'depth') sp(L.depth.gain, v * 2400, t, now); // ± 2 octaves
+          else if (id === 'freq') aps.forEach((a, i) => sp(a.frequency, v * Math.pow(1.6, i - 2.5), t, now));
+          else if (id === 'mix') m.set(v, t, now);
+          else if (id === 'rate' || id === 'sync' || id === 'div') retime(t, now);
+        } };
+    } });
+
+  def({ id: 'tremolo', label: 'tremolo', category: 'modulation',
+    params: [P('rate', 'rate', 0.1, 20, 4, 'hz', { curve: 'log' })].concat(SYNC(), [P('depth', 'depth', 0, 1, 0.6, ''), P('shape', 'shape', 0, 2, 0, 'shape', { step: 1, options: ['sine', 'triangle', 'square'] })]),
+    build(ctx, io) {
+      const vca = io.track(ctx.createGain()), L = lfo(ctx, io);
+      const sm = io.track(ctx.createBiquadFilter()); sm.type = 'lowpass'; sm.frequency.value = 80; sm.Q.value = -3; // rounds the square: no clicks
+      L.osc.disconnect(); L.osc.connect(sm); sm.connect(L.depth); L.depth.connect(vca.gain);
+      io.input.connect(vca);
+      const retime = (t, now) => sp(L.osc.frequency, clamp(io.rate(), 0.01, 40), t, now, 0.05);
+      return { output: vca, retime, expose: { lfo: L.osc },
+        apply(id, v, t, now) {
+          if (id === 'depth') { sp(vca.gain, 1 - v / 2, t, now); sp(L.depth.gain, v / 2, t, now); }
+          else if (id === 'shape') L.osc.type = ['sine', 'triangle', 'square'][v | 0] || 'sine';
+          else if (id === 'rate' || id === 'sync' || id === 'div') retime(t, now);
+        } };
+    } });
+
+  def({ id: 'autofilter', label: 'auto-filter', category: 'filter',
+    params: [P('rate', 'rate', 0.02, 20, 1, 'hz', { curve: 'log' })].concat(SYNC(), [P('freq', 'freq', 60, 12000, 800, 'hz', { curve: 'log' }), P('depth', 'depth', 0, 1, 0.6, ''), P('res', 'res', 0, 20, 4, 'db')]),
+    build(ctx, io) {
+      const f = io.track(ctx.createBiquadFilter()); f.type = io.opts.type || 'lowpass';
+      const L = lfo(ctx, io); L.depth.connect(f.detune); io.input.connect(f);
+      const retime = (t, now) => sp(L.osc.frequency, clamp(io.rate(), 0.005, 40), t, now, 0.05);
+      return { output: f, retime,
+        extra(id, v) { if (id === 'type' && ['lowpass', 'highpass', 'bandpass', 'notch'].includes(v)) { f.type = v; return true; } return false; },
+        apply(id, v, t, now) {
+          if (id === 'freq') sp(f.frequency, v, t, now); else if (id === 'depth') sp(L.depth.gain, v * 3600, t, now); // ± 3 octaves
+          else if (id === 'res') sp(f.Q, v, t, now); else if (id === 'rate' || id === 'sync' || id === 'div') retime(t, now);
+        } };
+    } });
+
+  def({ id: 'bitcrusher', label: 'bitcrusher', category: 'distortion',
+    params: [P('bits', 'bits', 1, 16, 8, 'bit', { step: 1 }), P('down', 'down', 1, 32, 1, 'x', { step: 1, curve: 'log' }), P('tone', 'tone', 500, 20000, 20000, 'hz', { curve: 'log' }), P('mix', 'mix', 0, 1, 1, '')],
+    build(ctx, io) {
+      const m = mixPair(ctx, io), ws = io.track(ctx.createWaveShaper()), tone = io.track(ctx.createBiquadFilter()); tone.type = 'lowpass'; tone.Q.value = -3;
+      let wk = null;
+      if (readyCtx.has(ctx)) { try { wk = io.track(new AudioWorkletNode(ctx, 'orbs-fx2-crush', { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [2] })); } catch (e) { wk = null; } }
+      if (wk) { io.input.connect(wk); wk.connect(ws); } else io.input.connect(ws);
+      ws.connect(tone); tone.connect(m.wet);
+      const pf = wk && wk.parameters.get('factor');
+      return { output: m.out, expose: { engine: wk ? 'worklet' : 'native' },
+        dispose() { if (wk && wk.port) try { wk.port.postMessage('stop'); } catch (e) { /* */ } },
+        apply(id, v, t, now) {
+          if (id === 'bits') { const b = v | 0, lv = Math.pow(2, b) / 2; ws.curve = curve('bits' + b, 32769, x => clamp(Math.round(x * lv) / lv, -1, 1)); }
+          else if (id === 'down') { if (pf) { if (now) init(pf, v); else pf.setValueAtTime(v, t); } }
+          else if (id === 'tone') sp(tone.frequency, v >= 19999 ? ctx.sampleRate / 2 : v, t, now); // at nyquist the biquad is an exact pass-through
+          else if (id === 'mix') m.set(v, t, now);
+        } };
+    } });
+
+  def({ id: 'tape', label: 'tape / drive', category: 'distortion',
+    params: [P('drive', 'drive', 0, 36, 12, 'db'), P('tone', 'tone', 800, 16000, 7000, 'hz', { curve: 'log' }), P('wow', 'wow', 0, 1, 0.2, ''),
+      P('bias', 'bias', 0, 1, 0.2, ''), P('mix', 'mix', 0, 1, 1, ''), P('output', 'out', -24, 6, 0, 'db')],
+    build(ctx, io) {
+      const m = mixPair(ctx, io), pre = io.track(ctx.createGain()), sh = io.track(ctx.createWaveShaper()), comp = io.track(ctx.createGain());
+      const tone = io.track(ctx.createBiquadFilter()); tone.type = 'lowpass'; tone.Q.value = -3;
+      const dc = io.track(ctx.createBiquadFilter()); dc.type = 'highpass'; dc.frequency.value = 18; dc.Q.value = -3; // bias makes dc: remove it
+      const d = io.track(ctx.createDelay(0.05)); d.delayTime.value = 0.006;
+      const wow = lfo(ctx, io), flut = lfo(ctx, io); wow.osc.frequency.value = 0.6; flut.osc.frequency.value = 7.3;
+      wow.depth.connect(d.delayTime); flut.depth.connect(d.delayTime);
+      sh.oversample = '4x';
+      io.input.connect(pre); pre.connect(sh); sh.connect(dc); dc.connect(tone); tone.connect(d); d.connect(comp); comp.connect(m.wet);
+      const shape = b => { const k = Math.round(b * 20); sh.curve = curve('tape' + k, 4097, x => { const z = x * 4, a = (k / 20) * 0.3; return Math.tanh(z + a * z * z) - Math.tanh(0); }); };
+      return { output: m.out,
+        apply(id, v, t, now) {
+          const st = io.st;
+          if (id === 'drive' || id === 'output') { const g = dbToLin(st.drive); sp(pre.gain, g / 4, t, now); sp(comp.gain, dbToLin(st.output) / Math.max(1, Math.sqrt(g)) * 1.1, t, now); }
+          else if (id === 'tone') sp(tone.frequency, v, t, now);
+          else if (id === 'wow') { sp(wow.depth.gain, v * 0.0012, t, now); sp(flut.depth.gain, v * 0.00012, t, now); }
+          else if (id === 'bias') shape(v); else if (id === 'mix') m.set(v, t, now);
+        } };
+    } });
+
+  def({ id: 'width', label: 'stereo width', category: 'utility',
+    params: [P('width', 'width', 0, 2, 1, '%x100'), P('gain', 'gain', -24, 12, 0, 'db')],
+    build(ctx, io) {
+      const sp2 = io.track(ctx.createChannelSplitter(2)), mg = io.track(ctx.createChannelMerger(2)), g = io.track(ctx.createGain());
+      const mid = io.track(ctx.createGain()), side = io.track(ctx.createGain()), inv = io.track(ctx.createGain()), sw = io.track(ctx.createGain()), sneg = io.track(ctx.createGain());
+      mid.gain.value = 0.5; inv.gain.value = -1; side.gain.value = 0.5; sneg.gain.value = -1;
+      io.input.connect(sp2);
+      sp2.connect(mid, 0); sp2.connect(mid, 1);           // m = (l + r) / 2
+      sp2.connect(side, 0); sp2.connect(inv, 1); inv.connect(side); // s = (l - r) / 2
+      side.connect(sw); sw.connect(sneg);
+      mid.connect(mg, 0, 0); sw.connect(mg, 0, 0); mid.connect(mg, 0, 1); sneg.connect(mg, 0, 1);
+      mg.connect(g);
+      return { output: g, apply(id, v, t, now) { if (id === 'width') sp(sw.gain, v, t, now); else if (id === 'gain') sp(g.gain, dbToLin(v), t, now); } };
+    } });
+
+  def({ id: 'pitch', label: 'pitch shifter', category: 'pitch',
+    params: [P('semis', 'semis', -12, 12, 7, 'st', { step: 1 }), P('fine', 'fine', -100, 100, 0, 'ct'), P('window', 'window', 30, 200, 90, 'ms'), P('mix', 'mix', 0, 1, 1, '')],
+    build(ctx, io) {
+      // doppler pitch shift: two delay lines swept by looping sawtooth buffers, crossfaded by sin² windows
+      const m = mixPair(ctx, io), sr = ctx.sampleRate, PER = 0.1, n = Math.round(sr * PER);
+      const saw = [ctx.createBuffer(1, n, sr), ctx.createBuffer(1, n, sr)], win = [ctx.createBuffer(1, n, sr), ctx.createBuffer(1, n, sr)];
+      for (let v = 0; v < 2; v++) { const s = saw[v].getChannelData(0), w = win[v].getChannelData(0); for (let i = 0; i < n; i++) { const ph = (i / n + v * 0.5) % 1; s[i] = ph; w[i] = Math.pow(Math.sin(Math.PI * ph), 2); } }
+      const voices = [0, 1].map(v => {
+        const mod = io.src(ctx.createBufferSource()); mod.buffer = saw[v]; mod.loop = true;
+        const fade = io.src(ctx.createBufferSource()); fade.buffer = win[v]; fade.loop = true;
+        const mg = io.track(ctx.createGain()), d = io.track(ctx.createDelay(1)), vca = io.track(ctx.createGain()); vca.gain.value = 0;
+        mod.connect(mg); mg.connect(d.delayTime); fade.connect(vca.gain); io.input.connect(d); d.connect(vca); vca.connect(m.wet);
+        return { mod, fade, mg, d };
+      });
+      const t0 = ctx.currentTime; voices.forEach(v => { v.mod.start(t0); v.fade.start(t0); });
+      const upd = (t, now) => {
+        const st = io.st, r = Math.pow(2, (st.semis + st.fine / 100) / 12), w = st.window / 1000, pr = PER / w;
+        voices.forEach(v => { sp(v.mod.playbackRate, pr, t, now, 0.005); sp(v.fade.playbackRate, pr, t, now, 0.005); sp(v.mg.gain, (1 - r) * w, t, now, 0.005); sp(v.d.delayTime, Math.max(0, (r - 1) * w), t, now, 0.005); });
+      };
+      return { output: m.out, apply(id, v, t, now) { if (id === 'mix') m.set(v, t, now); else upd(t, now); } };
+    } });
+
+  def({ id: 'vocoder', label: 'vocoder', category: 'pitch',
+    params: [P('carrier', 'carrier', 0, 2, 0, 'choice', { step: 1, options: ['saw', 'noise', 'planet'] }), P('pitch', 'pitch', 40, 880, 110, 'hz', { curve: 'log' }),
+      P('release', 'release', 5, 300, 40, 'ms', { curve: 'log' }), P('shift', 'formant', 0.5, 2, 1, 'x', { curve: 'log' }), P('mix', 'mix', 0, 1, 1, ''), P('gain', 'gain', -12, 24, 6, 'db')],
+    build(ctx, io) {
+      // input = modulator (voice / planet). carrier = built-in saw, noise, or dev.carrier (connect another planet).
+      const m = mixPair(ctx, io), B = 16, lo = 90, hi = 7000;
+      const carIn = io.track(ctx.createGain());
+      const saw = io.src(ctx.createOscillator()); saw.type = 'sawtooth'; const sawG = io.track(ctx.createGain());
+      const nb = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate), nd = nb.getChannelData(0); let seed = 12345;
+      for (let i = 0; i < nd.length; i++) { seed = (seed * 1664525 + 1013904223) >>> 0; nd[i] = seed / 2147483648 - 1; }
+      const noise = io.src(ctx.createBufferSource()); noise.buffer = nb; noise.loop = true; const noiseG = io.track(ctx.createGain());
+      const extG = io.track(ctx.createGain()), car = io.track(ctx.createGain());
+      saw.connect(sawG); noise.connect(noiseG); carIn.connect(extG); sawG.connect(car); noiseG.connect(car); extG.connect(car);
+      saw.start(); noise.start();
+      const sum = io.track(ctx.createGain()), mk = io.track(ctx.createGain());
+      const rect = absCurve(), bands = [];
+      for (let b = 0; b < B; b++) {
+        const f = lo * Math.pow(hi / lo, b / (B - 1)), q = 5.5;
+        const mb = io.track(ctx.createBiquadFilter()); mb.type = 'bandpass'; mb.frequency.value = f; mb.Q.value = q;
+        const mr = io.track(ctx.createWaveShaper()); mr.curve = rect;
+        const env = io.track(ctx.createBiquadFilter()); env.type = 'lowpass'; env.Q.value = -3;
+        const eg = io.track(ctx.createGain()); eg.gain.value = 2.2;
+        const cb = io.track(ctx.createBiquadFilter()); cb.type = 'bandpass'; cb.frequency.value = f; cb.Q.value = q;
+        const vca = io.track(ctx.createGain()); vca.gain.value = 0;
+        io.input.connect(mb); mb.connect(mr); mr.connect(env); env.connect(eg); eg.connect(vca.gain);
+        car.connect(cb); cb.connect(vca); vca.connect(sum);
+        bands.push({ f, env, cb });
+      }
+      sum.connect(mk); mk.connect(m.wet);
+      return { output: m.out, expose: { carrier: carIn },
+        apply(id, v, t, now) {
+          if (id === 'carrier') { const c = v | 0; sp(sawG.gain, c === 0 ? 1 : 0, t, now); sp(noiseG.gain, c === 1 ? 1.4 : 0, t, now); sp(extG.gain, c === 2 ? 1 : 0, t, now); }
+          else if (id === 'pitch') sp(saw.frequency, v, t, now);
+          else if (id === 'release') bands.forEach(b => sp(b.env.frequency, clamp(1 / (2 * Math.PI * v / 1000), 2, 200), t, now));
+          else if (id === 'shift') bands.forEach(b => sp(b.cb.frequency, clamp(b.f * v, 30, 16000), t, now));
+          else if (id === 'mix') m.set(v, t, now);
+          else if (id === 'gain') sp(mk.gain, dbToLin(v) * 4, t, now);
+        } };
+    } });
+
+  // ---------- worklet (bitcrusher downsample) ----------
+  const CRUSH_SRC = "class C extends AudioWorkletProcessor{static get parameterDescriptors(){return[{name:'factor',defaultValue:1,minValue:1,maxValue:64,automationRate:'k-rate'}]}" +
+    "constructor(){super();this.h=[0,0];this.c=0;this.alive=true;this.port.onmessage=e=>{if(e.data==='stop')this.alive=false}}" +
+    "process(ins,outs,p){const i=ins[0],o=outs[0],f=Math.max(1,Math.round(p.factor[0]||1));if(!i||!i.length){for(const ch of o)ch.fill(0);return this.alive}" +
+    "const n=o[0].length;let c=this.c;for(let k=0;k<n;k++){if(c<=0){for(let ch=0;ch<o.length;ch++){const x=(i[ch]||i[0])[k];this.h[ch]=(x===x&&Math.abs(x)<1e4)?x:0}c=f}c--;for(let ch=0;ch<o.length;ch++)o[ch][k]=this.h[ch]||0}this.c=c;return this.alive}}" +
+    "registerProcessor('orbs-fx2-crush',C);";
+  const readyCtx = new WeakSet(), pending = new WeakMap();
+  function prepare(ctx) {
+    if (!ctx || !ctx.audioWorklet || typeof AudioWorkletNode === 'undefined') return Promise.resolve({ worklet: false, via: 'none' });
+    if (readyCtx.has(ctx)) return Promise.resolve({ worklet: true, via: 'cached' });
+    if (pending.has(ctx)) return pending.get(ctx);
+    const p = (async () => {
+      const tries = [];
+      try { if (typeof Blob !== 'undefined' && typeof URL !== 'undefined' && URL.createObjectURL) { const u = URL.createObjectURL(new Blob([CRUSH_SRC], { type: 'application/javascript' })); tries.push(['blob', u]); } } catch (e) { /* */ }
+      try { tries.push(['data', 'data:application/javascript;base64,' + btoa(CRUSH_SRC)]); } catch (e) { /* */ }
+      for (const [via, u] of tries) {
+        try { await ctx.audioWorklet.addModule(u); readyCtx.add(ctx); return { worklet: true, via }; } catch (e) { /* next */ }
+      }
+      return { worklet: false, via: 'native' };
+    })();
+    pending.set(ctx, p);
+    return p;
+  }
+
+  // ---------- public api ----------
+  const devices = {}, list = [];
+  DEFS.forEach(d => {
+    const create = (ctx, opts) => makeDevice(ctx, d, opts);
+    devices[d.id] = { id: d.id, label: d.label, category: d.category, params: d.params, create };
+    list.push({ id: d.id, label: d.label, category: d.category, create });
+  });
+  function create(id, ctx, opts) { const d = devices[id]; if (!d) throw new Error('OrbsExtras.fx2: unknown device "' + id + '"'); return d.create(ctx, opts); }
+  function setBpm(b) { if (!fin(+b) || +b <= 0) return; globalBpm = +b; live.forEach(d => d.setBpm(globalBpm)); }
+  // knob helpers: map a param value <-> knob position u (0..1), honouring curve:'log' and step
+  function toKnob(p, v) { v = clamp(+v, p.min, p.max); if (p.curve === 'log' && p.min > 0) return Math.log(v / p.min) / Math.log(p.max / p.min); return (v - p.min) / (p.max - p.min || 1); }
+  function fromKnob(p, u) { u = clamp(fin(+u) ? +u : 0, 0, 1); const v = p.curve === 'log' && p.min > 0 ? p.min * Math.pow(p.max / p.min, u) : p.min + u * (p.max - p.min); return clampP(p, v); }
+  function format(p, v) {
+    if (p.options) return p.options[clamp(Math.round(v - p.min), 0, p.options.length - 1)];
+    if (p.unit === 'hz') return v >= 1000 ? (v / 1000).toFixed(v >= 10000 ? 0 : 1) + ' khz' : (v < 10 ? v.toFixed(2) : Math.round(v)) + ' hz';
+    if (p.unit === 'ms') return (v < 10 ? v.toFixed(1) : Math.round(v)) + ' ms';
+    if (p.unit === 'db') return (v > 0 ? '+' : '') + v.toFixed(1) + ' db';
+    if (p.unit === '%x100') return Math.round(v * 100) + '%';
+    if (p.unit === '') return Math.round(v * 100) + '';
+    if (p.unit === ':1') return v.toFixed(1) + ':1';
+    return (p.step ? Math.round(v) : v.toFixed(2)) + (p.unit ? ' ' + p.unit : '');
+  }
+  const fx2 = { version: 1, list, devices, create, prepare, setBpm, DIVS, toKnob, fromKnob, format,
+    rateFor: (bpm, div) => (fin(+bpm) ? +bpm : 120) / 60 / (DIVS[clamp(div | 0, 0, DIVS.length - 1)] || DIVS[DIV_DEF]).beats,
+    liveCount: () => live.size };
+  return { fx2 };
+}));
+
+</script>
+<script>
+/* ===== batch N: acid presets as genres ===== */
+/* batch N glue: the 5 acid presets (OrbsExtras.acid) become genres in OrbsGenres: list / get / apply / noteFor / chordAt know them.
+   each is psytrance's genre with the preset's tempo + key, and its kick (psy), bass (roll) and lead (acid line) elements. */
+(function () {
+  const G = window.OrbsGenres, A = window.OrbsExtras && window.OrbsExtras.acid; if (!G || !A || G._acid) return; G._acid = true;
+  const NAMES = A.PRESET_ORDER.slice(), ACG = {}, frac = x => x - Math.floor(x), cp = o => JSON.parse(JSON.stringify(o));
+  G.VAR_NAMES.kick.indexOf('psy') < 0 && G.VAR_NAMES.kick.push('psy');
+  ['roll', 'acid'].forEach(v => G.VAR_NAMES.bass.indexOf(v) < 0 && G.VAR_NAMES.bass.push(v)); G.VAR_NAMES.lead.indexOf('acid') < 0 && G.VAR_NAMES.lead.push('acid');
+  G.VOICE_PARAMS.kick.psy = cp(A.VOICES.kick.psy); G.VOICE_PARAMS.bass.roll = cp(A.VOICES.bass.roll); G.VOICE_PARAMS.bass.acid = cp(A.VOICES.bass.acid); G.VOICE_PARAMS.lead.acid = cp(A.VOICES.bass.acid);
+  const base = G.get('psytrance');
+  const mk = (variant, spec, old) => { const o = Object.assign({ variant, hit: {}, hits: [0], lap: 1 }, spec); o.cycle = o.lap; o.angles = o.hits.map(h => G.hitToA(frac(h / o.lap))); o.a = o.angles[0] || 0; o.orbit = old.orbit; o.distance = old.distance; return o; };
+  NAMES.forEach(id => {
+    const pr = A.preset(id), g = cp(base), el = pr.elements, scale = pr.scale || 'phrygian';
+    g.id = id; g.name = pr.name; g.bpm = pr.bpm; g.swing = 0; g.acid = id;
+    g.key = { root: pr.root % 12, name: 'A', mode: scale }; g.scale = scale; g.pcs = G.scalePcs(g.key.root, scale);
+    g.prog = [G.parseChord(scale === 'phrygian' ? 'Am' : 'Am', 3)];
+    g.elements.kick = mk('psy', { hit: { kind: 'drum', n: 36, velocity: 1, length: 0.26 }, lap: 1, hits: el.kick.hits, vol: 0.95, verb: 0.03, echo: 0, cut: 1, voice: cp(A.VOICES.kick.psy) }, base.elements.kick);
+    g.elements.bass = mk('roll', { hit: { kind: 'note', role: 'root', octave: 1, velocity: 0.9, length: 0.15 }, lap: 1, hits: el.bass.hits, vol: 0.82, verb: 0.02, echo: 0, cut: 0.85, voice: cp(el.bass.voice) }, base.elements.bass);
+    g.elements.lead = mk('acid', { hit: { kind: 'note', n: pr.root + 12, velocity: 0.8, length: 0.25 }, lap: 4, hits: el.lead.hits, vol: 0.6, verb: 0.1, echo: 0.12, cut: 1, voice: Object.assign({ type: el.lead.voice.type }, cp(A.VOICES.bass.acid)) }, base.elements.lead);
+    ACG[id] = g;
+  });
+  const is = g => typeof g === 'string' && ACG[g];
+  const list0 = G.list, get0 = G.get, apply0 = G.apply, note0 = G.noteFor, chord0 = G.chordAt, ids0 = G.ids;
+  G.list = function () { return list0().concat(NAMES.map(id => { const g = ACG[id]; return { id, name: g.name, bpm: g.bpm, swing: 0, key: 'A ' + g.scale, root: g.key.root, scale: g.scale, acid: true }; })); };
+  G.ids = function () { return ids0().concat(NAMES); };
+  G.get = function (g) { return is(g) ? cp(ACG[g]) : get0(g); };
+  G.apply = function (g, st, o) { return apply0(is(g) ? ACG[g] : g, st, o); };
+  G.noteFor = function (el, step, g) { return note0(el, step, is(g) ? ACG[g] : g); };
+  G.chordAt = function (bar, g) { return chord0(bar, is(g) ? ACG[g] : g); };
+  G.ACID = ACG;
+})();
+
+</script>
+<script>
 (() => {
 'use strict';
 /* ---------------- setup ---------------- */
@@ -8490,7 +9631,7 @@ let still = false, bpm = 108, snapOn = true, recCount = 0, cloneCount = 0, sheet
 const LS = 'orbs-solar-v1';
 let ready = false, pending = [], savedGroups = null, oldOrbs = null;
 const PKEYS = ['rad', 'a', 'vol', 'pn', 'echo', 'verb', 'cut', 'muted', 'seed'];
-const KEEP = ['trimS', 'trimE', 'rev', 'loop', 'bars', 'recBpm', 'phase', 'recorded', 'label', 'side', 'base', 'gid', 'pat', 'voice', 'prob', 'moons', 'drift', 'inHole', 'size', 'trail', 'chops'];
+const KEEP = ['trimS', 'trimE', 'rev', 'loop', 'bars', 'recBpm', 'phase', 'recorded', 'label', 'side', 'base', 'gid', 'pat', 'voice', 'prob', 'moons', 'drift', 'inHole', 'size', 'trail', 'chops', 'acid', 'fxx'];
 const dbOut = st => Object.assign({}, st, { gainDb: isFinite(st.gainDb) ? st.gainDb : '-inf' });
 function save() { if (!ready || window.__orbsShareLoading) return; try {
   const els = {}; IDS.forEach(id => { const e = E[id], o = els[id] = { v: e.variant }; PKEYS.concat(KEEP).forEach(k => { if (e[k] !== undefined) o[k] = e[k]; }); o.a = +(+e.a).toFixed(5); o.rad = +(+e.rad).toFixed(4); });
@@ -8501,11 +9642,11 @@ function applySaved(e, o) {
   if (o.v) e.variant = String(o.v);
   ['trimS', 'trimE', 'rev', 'loop', 'bars', 'recBpm', 'phase', 'recorded'].forEach(k => { if (o[k] !== undefined) e[k] = o[k]; });
   if (typeof o.gid === 'string') e.gid = o.gid;
-  if (o.voice && typeof o.voice === 'object') e.voice = o.voice;
+  if (o.voice && typeof o.voice === 'object') e.voice = o.voice; if (o.acid && typeof o.acid === 'object') e.acid = o.acid; if (o.fxx && typeof o.fxx === 'object') e.fxx = o.fxx;
   if (isFinite(o.prob)) e.prob = clamp(+o.prob, 0, 1); if (isFinite(o.moons)) e.moons = clamp(o.moons | 0, 0, 3); if (isFinite(o.drift)) e.drift = clamp(+o.drift, 0, 1); e.inHole = !!o.inHole && !!o.muted;
   if (isFinite(o.size)) e.size = clamp(+o.size, 0, 1); if (o.trail && Array.isArray(o.trail.points) && (o.trail.kind === 'cut' || o.trail.kind === 'vol')) e.trail = { kind: o.trail.kind, points: o.trail.points.filter(p => p && isFinite(p.phase) && isFinite(p.value)).slice(0, 32).map(p => ({ phase: frac(+p.phase), value: clamp(+p.value, 0, 1), bend: clamp(+p.bend || 0, -1, 1) })) };
   if (Array.isArray(o.chops)) e.chops = o.chops.filter(c => c && isFinite(c.start) && isFinite(c.end)).slice(0, 32).map(c => ({ start: +c.start, end: +c.end, peak: +c.peak || 0 }));
-  e.pat = Array.isArray(o.pat) ? o.pat.filter(h => h && isFinite(h.o) && isFinite(h.v)).map(h => { const q = { o: frac(+h.o), v: clamp(+h.v, 0, 1) }; if (isFinite(h.c) && +h.c < 1) q.c = clamp(+h.c, 0, 1); if (Number.isInteger(h.s) && h.s >= 0) q.s = h.s; if (isFinite(h.n) && h.n != null) q.n = clamp(Math.round(+h.n), 0, 127); if (isFinite(h.len) && +h.len > 0) q.len = Math.min(16, +h.len); return q; }).slice(0, 128) : [];
+  e.pat = Array.isArray(o.pat) ? o.pat.filter(h => h && isFinite(h.o) && isFinite(h.v)).map(h => { const q = { o: frac(+h.o), v: clamp(+h.v, 0, 1) }; if (isFinite(h.c) && +h.c < 1) q.c = clamp(+h.c, 0, 1); if (Number.isInteger(h.s) && h.s >= 0) q.s = h.s; if (isFinite(h.n) && h.n != null) q.n = clamp(Math.round(+h.n), 0, 127); if (isFinite(h.len) && +h.len > 0) q.len = Math.min(16, +h.len); if (h.acc) q.acc = 1; if (h.sl) q.sl = 1; return q; }).slice(0, 128) : [];
   if (e.side === 'rec' && o.label) e.label = String(o.label).slice(0, 14);
 }
 function load() { try { const s = JSON.parse(localStorage.getItem(LS) || 'null'); if (!s) return;
@@ -10190,6 +11331,7 @@ function exportMidi(id) {
   recMsg('exported ' + (id ? (E[id].label || id) : ids.length + ' planets') + ' · ' + beats / 4 + (beats > 4 ? ' bars' : ' bar') + ' .mid'); return data;
 }
 /* ---- export: wav (offline render: each planet's own voice → vol / filter / pan → a small room) ---- */
+let fxxOff = (ctx, e, dest) => dest, fxxPan = () => {}; /* live build: per-group fx2 inserts (m/u.js) */
 function renderInto(ctx, dest, opt, beats) {
   const real = ac; ac = ctx; rendering = true;
   try {
@@ -10199,7 +11341,7 @@ function renderInto(ctx, dest, opt, beats) {
     for (const id of IDS) { const e = E[id]; if (!exportable(e) || (opt && opt.solo && opt.solo !== id)) continue; const o = grpOf(e), og = o && o.st.muted ? 0 : o ? OrbsFX.dbToGain(o.st.gainDb) : 1;
       const inp = ctx.createGain(), fl = ctx.createBiquadFilter(), vg = ctx.createGain(), pn = ctx.createStereoPanner(), sg = ctx.createGain();
       fl.type = 'lowpass'; fl.Q.value = 0.7; fl.frequency.value = cutHz(e.cut); vg.gain.value = Math.pow(e.vol, 1.3) * e.lvl * og * 0.8; pn.pan.value = clamp(e.pn, -1, 1) * 0.9; sg.gain.value = e.verb;
-      inp.connect(fl); fl.connect(vg); vg.connect(pn); pn.connect(dest); pn.connect(sg); sg.connect(room);
+      inp.connect(fl); fl.connect(vg); vg.connect(pn); pn.connect(fxxOff(ctx, e, dest)); fxxPan(ctx, e, pn); pn.connect(sg); sg.connect(room);
       for (const h of hitsIn(e, 0, beats)) { const t = Math.max(0, h.t) + 0.002, dur = h.ev.dur; try { const fn = voiceFn(e, h.ev); if (fn) fn(t, h.ev, inp, dur); else if (e.chops && h.ev.slice) playSlice(e, t, h.ev, inp); else playVoice(e.id, t, h.ev, inp, dur); } catch (x) {} } }
   } finally { ac = real; rendering = false; }
 }
@@ -10706,7 +11848,7 @@ function lvKnobPaint(el) { const v = lvGet(el.dataset); if (!v) return; el.query
 function lvFaderPaint(el) { const v = lvGet(el.dataset); if (!v) return; const b = el.querySelector('.tr b'); if (b) b.style.bottom = 'calc(' + (v.t * 100).toFixed(1) + '% - 2px)'; const st = el.closest('.st'), db = st && st.querySelector('.db'); if (db) db.textContent = v.txt.replace(' db', ''); }
 const LV_DEF = { vol: null, pn: 0.5, size: 0.5, pan: 0.5, gain: 48 / 54, lo: 0.5, mid: 0.5, hi: 0.5, amount: 0.5 };
 document.addEventListener('pointerdown', ev => { // knob: vertical drag · fader: absolute position
-  const k = ev.target.closest('#lv .k[data-sl],#lv .k[data-osl],#lv .k[data-o2sl],#lv .k[data-rsl],#lv .k[data-rsend],#lv .k[data-tsl],#lv .k[data-gsl],#lv .k[data-master]'), f = !k && ev.target.closest('#lv .fd');
+  const k = ev.target.closest('#lv .k[data-sl],#lv .k[data-osl],#lv .k[data-o2sl],#lv .k[data-rsl],#lv .k[data-rsend],#lv .k[data-tsl],#lv .k[data-gsl],#lv .k[data-master],#lv .k[data-fxx]'), f = !k && ev.target.closest('#lv .fd');
   if (!k && !f) return; ev.preventDefault(); initAudio(); if (ac.state !== 'running') ac.resume();
   const el = k || f; lvWake(el); const v0 = lvGet(el.dataset); if (!v0) return; lvDrag = { el, fader: !!f, y0: ev.clientY, t0: v0.t }; try { el.setPointerCapture(ev.pointerId); } catch (x) {}
   if (f) lvDragMove(ev);
@@ -10962,7 +12104,7 @@ function lvDevToggle(dev, id) { // switch a device off (stash its values, go neu
   }
   lvSave(); save(); sheetDirty = true;
 }
-const lvDevOn = (dev, e, o) => dev === 'sound' ? !e.muted : dev === 'utility' ? !o.st.muted : !LVOFF[lvOffKey(dev, e, o)] && lvActive(dev, e, o);
+let lvDevOn = (dev, e, o) => dev === 'sound' ? !e.muted : dev === 'utility' ? !o.st.muted : !LVOFF[lvOffKey(dev, e, o)] && lvActive(dev, e, o);
 function lvEqSvg(t2) { let d = ''; for (let j = 0; j <= 44; j++) { const x = +(j * 80 / 44).toFixed(2), f = j / 44, db = t2.lo * Math.exp(-Math.pow(f / 0.22, 2)) + t2.mid * Math.exp(-Math.pow((f - 0.5) / 0.16, 2)) + t2.hi * Math.exp(-Math.pow((1 - f) / 0.22, 2)); d += (j ? 'L' : 'M') + x + ' ' + (7 - db / 15 * 6).toFixed(2); }  return '<svg width="80" height="14"><path d="M0 7H80" stroke="#fff" stroke-opacity=".14"/><path d="' + d + '" fill="none" stroke="#fff" stroke-opacity=".75"/></svg>'; }
 function lvDetail() {
   const e = E[selId], hd = LV('detHd'), ch = LV('lChain'), cl = LV('lClip');
@@ -11879,6 +13021,210 @@ function bubPushKey(key, arg) { /* test hook: open a rim item of the newest bubb
   if (!it) return false; bubPush(key, it.dataset.barg, it); return true;
 }
 
+/* ================= batch N: vsynths (planets play the browser synths) + acid voices (303 line, psy kick, rolling bass) ================= */
+const ACID = window.OrbsExtras && OrbsExtras.acid, VSX = window.OrbsExtras && OrbsExtras.vsynths;
+var vsx = null; const ACIDLOG = [];
+/* ---- variants: kick psy · bass roll / acid · lead acid (the genre menu's acid presets use them; any planet can pick them) ---- */
+if (ACID) { const add = (b, v) => { if (VAR_NAMES[b] && !VAR_NAMES[b].includes(v)) VAR_NAMES[b].push(v); }; add('kick', 'psy'); add('bass', 'roll'); add('bass', 'acid'); add('lead', 'acid');
+  const n0 = ev => Array.isArray(ev.n) ? ev.n[0] : (ev.n == null ? 45 : ev.n), st16 = () => 60 / bpm / 4;
+  if (VARIANTS.kick) VARIANTS.kick.psy = (t, ev, dest) => ACID.kick(dest.context, dest, t, { velocity: ev.v == null ? 1 : ev.v });
+  if (VARIANTS.bass) { VARIANTS.bass.roll = (t, ev, dest, dur) => ACID.rollNote(dest.context, dest, t, { note: n0(ev), len: Math.min(dur || st16(), st16() * 0.95), velocity: ev.v == null ? 1 : ev.v });
+    VARIANTS.bass.acid = (t, ev, dest, dur) => ACID.playNote(dest.context, dest, t, { note: n0(ev), len: st16() }); }
+  if (VARIANTS.lead) VARIANTS.lead.acid = (t, ev, dest) => ACID.playNote(dest.context, dest, t, { note: n0(ev), len: st16() });
+}
+function acidKind(id) { const e = typeof id === 'string' ? E[id] : id; if (!ACID || !e || e.side === 'rec') return null; const b = baseOf(e.id), B = E[b]; if (!B || B.variant === 'file') return null;
+  const v = B.variant; return b === 'kick' && v === 'psy' ? 'kick' : (b === 'bass' || b === 'lead') && v === 'acid' ? 'acid' : b === 'bass' && v === 'roll' ? 'roll' : null; }
+const ACID_DEF = { acid: () => Object.assign({}, ACID.DEFAULTS), roll: () => Object.assign({}, ACID.ROLL), kick: () => ({ dec: ACID.KICK.dec, click: ACID.KICK.click, f1: ACID.KICK.f1 }) };
+function acidParams(e, k) { if (!e.acid || e.acid._k !== k) e.acid = Object.assign(ACID_DEF[k](), { _k: k }); return e.acid; }
+function acidBus(e, ctx) { if (!e._abus || e._abus.ctx !== ctx || e._abus.dest !== e.in) { const b = ACID.createBus(ctx, e.in, { gain: 0.6 }); e._abus = { ctx, dest: e.in, input: b.input }; if (e._av) { try { e._av.dispose(); } catch (x) {} e._av = null; } } return e._abus.input; }
+function acidPlay(e, k, t, ev, dur) {
+  const ctx = e.in && e.in.context; if (!ctx) return; const bus = acidBus(e, ctx), P = acidParams(e, k), n = Array.isArray(ev.n) ? ev.n[0] : ev.n, st = 60 / bpm / 4, v = ev.v == null ? 1 : ev.v;
+  if (k === 'kick') ACID.kick(ctx, bus, t, Object.assign({}, P, { velocity: v }));
+  else if (k === 'roll') ACID.rollNote(ctx, bus, t, Object.assign({}, P, { note: n == null ? 33 : n, len: Math.min(dur || st, st * 0.95), velocity: v }));
+  else { if (!e._av || e._av.disposed || e._av.ctx !== ctx) e._av = ACID.createVoice(ctx, bus, P);
+    if (t < e._av.lastTime) t = e._av.lastTime + 0.001; /* one mono voice: calls stay in time order */
+    e._av.play(t, Object.assign({}, P, { note: n == null ? 45 : n, len: st, accent: !!ev.acc, slide: !!ev.slide, level: clamp(0.45 + 0.4 * v, 0, 1) })); }
+  ACIDLOG.push({ id: e.id, k, t, n, acc: !!ev.acc, slide: !!ev.slide }); if (ACIDLOG.length > 2000) ACIDLOG.splice(0, 500);
+}
+const nDec0 = decorate;
+decorate = function (e, ev, j) { nDec0(e, ev, j); if (j < 100) { const hh = hitsOf(e)[j]; if (hh) { if (hh.acc) ev.acc = 1; if (hh.sl) ev.slide = 1; } } return ev; };
+const nPlay0 = playPlanet;
+playPlanet = function (e, t, ev, dur) {
+  if (vsx && !rendering && vsx.owns(e.id)) return; /* vsynths solo: only the synth sounds for this planet */
+  const k = acidKind(e); if (k && !(e.chops && ev.slice != null)) return acidPlay(e, k, t, ev, dur);
+  if (e._av && !k) { try { e._av.dispose(); } catch (x) {} e._av = null; }
+  return nPlay0(e, t, ev, dur);
+};
+/* acid knobs: SLIDERS entries, so the bubble's knobs drag / reset / wheel like every other knob */
+const ACID_SL = [['acut', 'cutoff', 'cutoff', 60, 2400, true, v => Math.round(v) + ''], ['ares', 'res', 'res', 0, 1, false, v => Math.round(v * 100) + ''], ['aenv', 'env mod', 'envMod', 0, 1, false, v => Math.round(v * 100) + ''],
+  ['adec', 'decay', 'decay', 0.03, 1.2, true, v => Math.round(v * 1000) + ' ms'], ['aacc', 'accent', 'accentAmt', 0, 1, false, v => Math.round(v * 100) + ''], ['aglide', 'glide', 'glide', 0.004, 0.2, true, v => Math.round(v * 1000) + ' ms'],
+  ['kdec', 'decay', 'dec', 0.08, 0.8, true, v => Math.round(v * 1000) + ' ms'], ['kclick', 'click', 'click', 0, 1, false, v => Math.round(v * 100) + ''], ['kf1', 'pitch', 'f1', 35, 80, false, v => Math.round(v) + ' hz']];
+if (ACID) ACID_SL.forEach(([k, name, key, lo, hi, lg, show]) => { const kind = id => acidKind(id) || 'acid';
+  const to = u => lg ? lo * Math.pow(hi / lo, u) : lo + (hi - lo) * u, from = v => clamp(lg ? Math.log(v / lo) / Math.log(hi / lo) : (v - lo) / (hi - lo), 0, 1);
+  SLIDERS.push({ k, name, get: e => from(+acidParams(e, kind(e)) [key] || lo), set: (e, t) => { const P = acidParams(e, kind(e)); P[key] = +to(t).toFixed(4); if (e._av && !e._av.disposed) e._av.set(P); }, show: e => show(+acidParams(e, kind(e))[key] || lo) }); });
+
+/* ---- genres: picking an acid preset also lays out its kick / bass / acid line (tempo, key and the preset's 16 steps with slide + accent) ---- */
+const nGenre0 = applyGenre;
+applyGenre = function (id, mode) { nGenre0(id, mode); if (ACID && OrbsGenres.ACID && OrbsGenres.ACID[id]) acidLayout(id); };
+function acidLayout(id) {
+  const pr = ACID.preset(id); if (!pr) return; const el = pr.elements, pos = posNow();
+  const plan = [['kick', 1, el.kick.hits.map(h => ({ h })), {}], ['bass', 1, el.bass.hits.map(h => ({ h })), Object.assign({}, ACID.ROLL, pr.roll)],
+    ['lead', 4, pr.stepsResolved.map((s, i) => s && { h: i / 4, n: s.note, acc: s.accent, sl: s.slide }).filter(Boolean), Object.assign({}, pr.voice)]];
+  for (const [pid, L, hs] of plan) { const e = E[pid]; if (!e || e.inHole) continue; if (ORB[e.orbit].lap !== L && membersOf(ORB[e.orbit]).length > 1) for (const p of partnersOf(pid)) links.delete(lkey(pid, p)); }
+  regroup();
+  for (const [pid, L, hs, P] of plan) { const e = E[pid]; if (!e || e.inHole || !hs.length) continue;
+    setGroupLap(e.orbit, L); const o = ORB[e.orbit], h0 = hs[0].h;
+    e.a = frac(OrbsGenres.hitToA(frac(h0 / L)) + o.st.offset); e.muted = false;
+    e.pat = hs.length > 1 || hs[0].n != null ? hs.map(x => { const q = { o: +frac((x.h - h0) / L).toFixed(6), v: x.acc ? 1 : 0.8 }; if (x.n != null) q.n = x.n; if (x.acc) q.acc = 1; if (x.sl) q.sl = 1; return q; }) : [];
+    const k = acidKind(e); if (k) { e.acid = Object.assign(ACID_DEF[k](), k === 'kick' ? {} : P, { _k: k }); delete e.acid.pattern; delete e.acid.note; }
+    if (e._av) { try { e._av.dispose(); } catch (x) {} e._av = null; } }
+  layout(); save(); sheetDirty = true; LVD = true;
+}
+if (OrbsGenres.ACID) Object.keys(OrbsGenres.ACID).forEach(id => { if (!G_NAMES.includes(id)) G_NAMES.push(id); });
+
+/* ---- vsynths: one sheet holds one synth; routed planets send their notes into it ---- */
+const nMid0 = midiNote;
+midiNote = function (e, ev, t, dur) { nMid0(e, ev, t, dur); if (vsx && !rendering && ev && ev.n != null) vsx.note(e.id, ev.n, clamp(ev.v * e.vol, 0.01, 1), t, dur); };
+const nOff0 = allOff; allOff = function () { nOff0(); if (vsx) vsx.panic(); };
+const nNew0 = newPlanet; newPlanet = function (id, p) { const e = nNew0(id, p); if (vsx) vsx.refresh(); return e; };
+const nRem0 = removeEl; removeEl = function (id) { const r = nRem0(id); if (vsx) vsx.refresh(); return r; };
+const vsSheetH = () => vsx && vsx.state().open && !vsx.el.hidden && !vsx.el.dataset.tucked ? Math.round(vsx.el.getBoundingClientRect().height) : 0;
+const nBox0 = lvBoxes;
+lvBoxes = function () { nBox0(); const h = vsSheetH(), b = LV('bxB'); if (!b) return; if (h) { const top = Math.min(parseFloat(b.style.top) || innerHeight, innerHeight - h); b.style.top = top + 'px'; } };
+let vsWasOpen = false;
+function vsChanged(s) { lvBxK = ''; lvBoxes(); document.body.classList.toggle('vsOpen', !!s.open); LV('lv').style.setProperty('--vsh', vsSheetH() + 'px');
+  const opened = !!s.open && !vsWasOpen; vsWasOpen = !!s.open;
+  if (s.open && BUB.open) { if (bubPhone()) { if (opened) bubClose(true); else vsTuck(true); } else { BUB.st.forEach((q, lv) => { q.D = bubSize(lv, q.node); const c = lv ? bubPlace(lv, q.D, { x: q.fx, y: q.fy }, BUB.st[lv - 1]) : bubPlace(0, q.D, bubPlanetXY(E[BUB.id]), null); q.cx = c.x; q.cy = c.y; }); bubRender(); } }
+  else if (BUB.open) setTimeout(bubRender, 0); }
+/* the bubbles keep clear of the synth sheet: their screen ends where it starts */
+const nClamp0 = bubClampC; bubClampC = function (cx, cy, D) { const c = nClamp0(cx, cy, D), h = vsSheetH(); if (h) c.y = Math.max(D / 2 + 40, Math.min(c.y, innerHeight - h - D / 2 - 8)); return c; };
+function nSynth(id, act, v) { /* the bubble's synth actions (also a test hook) */
+  if (!vsx) return null; initAudio(); const s = vsx.state();
+  if (act === 'pick') return vsx.pick(v);
+  if (act === 'route') { const on = VSX.routes(s.route, id); vsx.route(on ? 'off' : id); }
+  else if (act === 'all') vsx.route(s.route === 'melodic' ? 'off' : 'melodic');
+  else if (act === 'oct') vsx.oct(s.oct + v);
+  else if (act === 'mode') vsx.mode(s.mode === 'solo' ? 'layer' : 'solo');
+  else if (act === 'open') { if (!VSX.routes(s.route, id)) vsx.route(id); return vsx.open(); }
+  else if (act === 'close') vsx.hide();
+  return vsx.state();
+}
+if (typeof BUB_NODES !== 'undefined') {
+  const snd0 = BUB_NODES.sound;
+  BUB_NODES.sound = function (e) { const n = snd0(e), id = e.id, k = acidKind(e), items = [bO('swap', 'swap'), bO('synth', 'synth')];
+    if (k) items.push(Object.assign(bO(k === 'kick' ? 'psy kick' : k === 'roll' ? 'roll' : 'acid', 'acid'), { on: true }));
+    items.push(bK('size', { sl: 'size', id }, true), bO('take', 'take'));
+    return { t: n.t, sub: n.sub, items };
+  };
+  BUB_NODES.take = function (e) { const id = e.id; return { t: 'record / edit', items: [bB('wave ›', 'data-act="bar" data-id="' + id + '"'), bB(recState ? 'stop rec' : 're-record', 'data-act="rec" data-id="' + id + '"', !!recState), bB(MOD.hum && MOD.hum.id === id ? 'humming…' : 'hum', 'data-lmod="hum"', !!(MOD.hum && MOD.hum.id === id), !modHas('humStart')), bB('load file', 'data-bub="file"')] }; };
+  BUB_NODES.synth = function (e) { const id = e.id;
+    if (!vsx) return { t: 'synth', items: [bB('off', '', false, true)], center: '<div class="bnote">vsynths not loaded</div>' };
+    const s = vsx.state(), nm = (VSX.list.find(x => x[0] === s.slug) || [s.slug, s.slug])[1], on = VSX.routes(s.route, id);
+    return { t: 'synth · ' + nm, sub: (s.open ? (s.ready ? 'ready' : 'loading…') : 'closed') + ' · ' + (Array.isArray(s.route) ? s.route.join(',') : s.route),
+      items: [bO('pick', 'synpick'), bB(on ? 'routed' : 'route here', 'data-bsyn="route"', on), bB('oct −', 'data-bsyn="oct" data-v="-1"'), bB('oct +', 'data-bsyn="oct" data-v="1"'), bB(s.mode, 'data-bsyn="mode"', s.mode === 'solo'), bB(s.open ? 'close synth' : 'open synth', 'data-bsyn="' + (s.open ? 'close' : 'open') + '"', s.open)],
+      center: '<div class="bbig" style="font-size:15px">oct ' + (s.oct > 0 ? '+' : '') + s.oct + '</div>' + (COARSE ? '<div class="bnote">on iphone: tap inside the synth once to wake its sound</div>' : '') };
+  };
+  BUB_NODES.synpick = function (e, arg) { const [a, pg] = bubArgPage(arg), s = vsx ? vsx.state() : {};
+    return { t: 'pick a synth', sub: VSX ? VSX.list.length + ' synths' : '', items: bubPage((VSX ? VSX.list : []).map(([slug, name]) => bB(name, 'data-bsyn="pick" data-v="' + slug + '"', s.slug === slug)), 'synpick', a, pg) };
+  };
+  BUB_NODES.acid = function (e) { const id = e.id, k = acidKind(e) || 'acid';
+    if (k === 'kick') return { t: 'psy kick', items: [bK('decay', { sl: 'kdec', id }), bK('click', { sl: 'kclick', id }), bK('pitch', { sl: 'kf1', id })] };
+    if (k === 'roll') return { t: 'rolling bass', items: [bK('cutoff', { sl: 'acut', id }), bK('res', { sl: 'ares', id }), bK('env mod', { sl: 'aenv', id }), bK('decay', { sl: 'adec', id })] };
+    return { t: 'acid', sub: '303 line · slide + accent from the pattern', items: [bK('cutoff', { sl: 'acut', id }), bK('res', { sl: 'ares', id }), bK('env mod', { sl: 'aenv', id }), bK('decay', { sl: 'adec', id }), bK('accent', { sl: 'aacc', id }), bK('glide', { sl: 'aglide', id })] };
+  };
+}
+function nInit() {
+  if (VSX && !vsx) { try { vsx = VSX.create({ ctx: () => ac, planets: () => IDS.filter(id => E[id]).map(id => ({ id, label: E[id].label || id })), onChange: vsChanged }); } catch (x) { vsx = null; } }
+  if (bubRoot) bubRoot.addEventListener('click', ev => { const m = ev.target.closest('[data-bsyn]'); if (!m || !BUB.open || ev.target.closest('.bub.anc')) return; ev.stopPropagation();
+    const a = m.dataset.bsyn, r = nSynth(BUB.id, a, a === 'oct' ? +m.dataset.v : m.dataset.v); Promise.resolve(r).then(() => bubRender()); bubRender(); }, true);
+}
+/* phone: the bubble and the synth sheet take turns (the synth keeps playing while it is tucked away) */
+const nBubOpen0 = bubOpen, nBubClose0 = bubClose;
+function vsTuck(on) { if (!vsx) return; const el = vsx.el; if (on && !el.hidden && bubPhone()) { el.style.visibility = 'hidden'; el.dataset.tucked = '1'; } else if (!on && el.dataset.tucked) { el.style.visibility = ''; delete el.dataset.tucked; } lvBxK = ''; lvBoxes(); }
+bubOpen = function (id) { nBubOpen0(id); if (BUB.open) vsTuck(true); };
+bubClose = function (all) { const r = nBubClose0(all); if (!BUB.open) vsTuck(false); return r; };
+
+/* ================= batch N+: vmorphs' fx2 (fx/extras-fx2.js) as per-group inserts after the saturator ================= */
+const FXX = (window.OrbsExtras || {}).fx2 || null;
+const FXX_CATS = [['dynamics', 'dynamics', ['compressor', 'limiter', 'gate']], ['modulation', 'modulation', ['chorus', 'flanger', 'phaser', 'tremolo', 'autofilter']], ['character', 'character', ['bitcrusher', 'tape']], ['stereo', 'space / stereo', ['width']], ['pitch', 'pitch', ['pitch', 'vocoder']]];
+const FXD = {}; /* orbit id -> { devs: { devId: dev }, order: 'a,b', car: { src, node } } (live audio) */
+let FXXLOG = []; /* test hook: errors while wiring */
+const fxxDef = id => FXX && FXX.devices[id];
+const fxxOrd = () => FXX ? FXX.list.map(d => d.id) : [];
+/* state rides on every planet of the group (e.fxx = { devId: { on, v: {param: value}, src? } }), so regrouping keeps it */
+function fxxState(o) { const m = membersOf(o); for (const e of m) if (e.fxx && Object.keys(e.fxx).length) return e.fxx; return null; }
+function fxxPut(e, devId, fn) { const o = ORB[e.orbit]; if (!o) return null; const base = JSON.parse(JSON.stringify(fxxState(o) || {})); base[devId] = base[devId] || { on: false, v: {} }; fn(base[devId]); for (const m of membersOf(o)) m.fxx = JSON.parse(JSON.stringify(base)); return base[devId]; }
+let fxxPrepped = null;
+function fxxPrep() { if (!FXX || !ac || fxxPrepped === ac) return; fxxPrepped = ac; try { Promise.resolve(FXX.prepare(ac)).catch(() => {}); } catch (x) {} }
+function fxxSync() { /* make the audio match the saved state; rewire only when a device appears */
+  if (!FXX || !fx || !fx2) return; fxxPrep();
+  for (const k of Object.keys(FXD)) if (!ORB.some(o => o.id === k)) { const R = FXD[k]; Object.values(R.devs).forEach(d => { try { d.dispose(); } catch (x) {} }); delete FXD[k]; }
+  for (const o of ORB) { const st = fxxState(o); let R = FXD[o.id]; if (!st && !R) continue; if (!R) R = FXD[o.id] = { devs: {}, order: '', car: null, sat: null };
+    let n2 = null, ch = null; try { n2 = fx2.nodes(o.id); ch = fx.chain(o.id); } catch (x) {} if (!n2 || !n2.sat || !ch || !ch.utilGain) continue;
+    for (const id of fxxOrd()) { const s = st && st[id]; if (!s || R.devs[id]) continue; if (!s.on) continue;
+      try { R.devs[id] = FXX.create(id, ac, { bpm: () => bpm, params: s.v || {}, bypass: !s.on }); } catch (x) { FXXLOG.push(String(x && x.message || x)); } }
+    const order = fxxOrd().filter(id => R.devs[id]).join(',');
+    if (order !== R.order || R.sat !== n2.sat.output) { const so = n2.sat.output; try { so.disconnect(); } catch (x) {} if (R.sat && R.sat !== so) { try { R.sat.disconnect(); } catch (x) {} }
+      for (const id of fxxOrd()) if (R.devs[id]) { try { R.devs[id].output.disconnect(); } catch (x) {} }
+      let p = so; for (const id of fxxOrd()) { const d = R.devs[id]; if (!d) continue; p.connect(d.input); p = d.output; } p.connect(ch.utilGain); R.order = order; R.sat = so; }
+    for (const id of Object.keys(R.devs)) { const s = st && st[id], d = R.devs[id]; if (!s) { d.bypass(true); continue; } if (d.bypassed !== undefined ? d.bypassed !== !s.on : true) d.bypass(!s.on); if (s.v) d.set(s.v); }
+    const vd = R.devs.vocoder, vs = st && st.vocoder, want = vd && vs && vs.on && vs.v && vs.v.carrier === 2 && vs.src && E[vs.src] && E[vs.src].pan ? vs.src : null;
+    if (R.car && (!want || R.car.src !== want || R.car.node !== E[R.car.src].pan)) { try { R.car.node.disconnect(R.car.dev.carrier); } catch (x) {} R.car = null; }
+    if (want && !R.car) { try { E[want].pan.connect(vd.carrier); R.car = { src: want, node: E[want].pan, dev: vd }; } catch (x) { FXXLOG.push(String(x && x.message || x)); } } }
+}
+function fxxOn(e, devId) { const st = e && ORB[e.orbit] && fxxState(ORB[e.orbit]); return !!(st && st[devId] && st[devId].on); }
+function fxxToggle(e, devId, v) { if (!FXX || !e) return false; initAudio(); const s = fxxPut(e, devId, q => { q.on = v == null ? !q.on : !!v; }); fxxSync(); save(); sheetDirty = true; LVD = true; return s.on; }
+function fxxSet(e, devId, pid, val) { if (!FXX || !e) return null; initAudio(); const p = fxxDef(devId).params.find(q => q.id === pid); if (!p) return null; let v = +val; if (!isFinite(v)) return null; v = clamp(v, p.min, p.max); if (p.step) v = Math.round(v / p.step) * p.step;
+  const s = fxxPut(e, devId, q => { q.on = true; q.v[pid] = v; }); fxxSync(); const R = FXD[ORB[e.orbit].id], d = R && R.devs[devId]; if (d) s.v[pid] = d.get(pid); return s.v[pid]; }
+function fxxVal(e, devId, p) { const st = ORB[e.orbit] && fxxState(ORB[e.orbit]), s = st && st[devId]; const R = FXD[ORB[e.orbit] && ORB[e.orbit].id], d = R && R.devs[devId]; return d ? d.get(p.id) : s && s.v && s.v[p.id] != null ? s.v[p.id] : p.def; }
+/* knobs: data-fxx = device, data-fp = param, data-id = planet */
+const lvGet_fx = lvGet; lvGet = function (d) { if (d && d.fxx) { const e = E[d.id], p = FXX && e && fxxDef(d.fxx) && fxxDef(d.fxx).params.find(q => q.id === d.fp); if (!p) return null; const v = fxxVal(e, d.fxx, p); return { t: FXX.toKnob(p, v), txt: FXX.format(p, v) }; } return lvGet_fx(d); };
+const slApply_fx = slApply; slApply = function (d, u) { if (d && d.fxx) { const e = E[d.id], p = FXX && e && fxxDef(d.fxx) && fxxDef(d.fxx).params.find(q => q.id === d.fp); if (!p) return; const v = fxxSet(e, d.fxx, p.id, FXX.fromKnob(p, clamp(u, 0, 1))); return { t: FXX.toKnob(p, v), txt: FXX.format(p, v) }; } return slApply_fx(d, u); };
+document.addEventListener('dblclick', ev => { const k = ev.target.closest('#lv .k[data-fxx]'); if (!k) return; const e = E[k.dataset.id], p = fxxDef(k.dataset.fxx) && fxxDef(k.dataset.fxx).params.find(q => q.id === k.dataset.fp); if (!e || !p) return; fxxSet(e, k.dataset.fxx, p.id, p.def); lvKnobPaint(k); save(); });
+/* the fx bubble: existing devices, then category bubbles, then each device */
+if (FXX) BUB_FX.push(...FXX_CATS.map(([k, n]) => ['cat-' + k, n]));
+const lvDevOn_fx = lvDevOn; lvDevOn = function (k, e, o) { if (typeof k === 'string' && k.startsWith('cat-')) { const c = FXX_CATS.find(z => 'cat-' + z[0] === k); return !!(c && c[2].some(id => fxxOn(e, id))); } return lvDevOn_fx(k, e, o); };
+const bubFxNode0 = BUB_NODES.fx;
+BUB_NODES.fx = function (e, arg) { const r = bubFxNode0(e, arg); r.items.forEach(it => { if (it.key === 'dev' && String(it.arg).startsWith('cat-')) it.key = 'fxcat'; }); return r; };
+BUB_NODES.fxcat = function (e, arg) { const c = FXX_CATS.find(z => 'cat-' + z[0] === arg) || FXX_CATS[0];
+  return { t: c[1], sub: groupName(ORB[e.orbit]), items: c[2].map(id => Object.assign(bO(fxxDef(id).label, 'fxd', id), { on: fxxOn(e, id) })) }; };
+const FXX_SHORT = { threshold: 'thresh', release: 'rel', attack: 'att', feedback: 'fb', ceiling: 'ceil', makeup: 'makeup', window: 'window' };
+BUB_NODES.fxd = function (e, devId) { const d = fxxDef(devId); if (!d) return { t: devId, items: [] }; const on = fxxOn(e, devId), id = e.id;
+  const items = d.params.slice(0, 6).map(p => p.options ? bB(p.id === 'sync' ? 'sync' : p.id === 'div' ? '♩ ' + p.options[Math.round(fxxVal(e, devId, p))] : p.options[Math.round(fxxVal(e, devId, p))], 'data-bfx="opt" data-p="' + p.id + '"', p.id === 'sync' ? !!Math.round(fxxVal(e, devId, p)) : false)
+    : bK(FXX_SHORT[p.id] || p.label, { fxx: devId, fp: p.id, id }, p.min < 0 && p.max > 0));
+  let center = '<div class="bpads"><span class="bpd' + (on ? ' on' : '') + '" data-bfx="tog">' + (on ? 'on' : 'off') + '</span></div>';
+  if (devId === 'vocoder' && on) { const st = fxxState(ORB[e.orbit]), s = st && st.vocoder, car = Math.round(fxxVal(e, 'vocoder', d.params[0]));
+    if (car === 2) center += '<select data-bfxcar="1"><option value="">carrier planet ▾</option>' + IDS.filter(x => E[x].orbit !== e.orbit).map(x => '<option value="' + x + '"' + (s && s.src === x ? ' selected' : '') + '>' + bubEsc(E[x].label || x) + '</option>').join('') + '</select>'; }
+  return { t: d.label, sub: (on ? 'on' : 'off') + ' · ' + groupName(ORB[e.orbit]), items, center }; };
+function nFx(id, act, devId, a, b) { /* test hook + the bubble's actions */ const e = E[id]; if (!e || !FXX) return null;
+  if (act === 'tog') return fxxToggle(e, devId, a);
+  if (act === 'set') return fxxSet(e, devId, a, b);
+  if (act === 'opt') { const p = fxxDef(devId).params.find(q => q.id === a); if (!p || !p.options) return null; const v = b != null ? b : (Math.round(fxxVal(e, devId, p)) + 1) % p.options.length; return fxxSet(e, devId, a, v); }
+  if (act === 'car') { const src = devId; const s = fxxPut(e, 'vocoder', q => { q.src = src || null; q.on = true; if (src) q.v.carrier = 2; }); fxxSync(); save(); return s.src; }
+  if (act === 'state') { const R = FXD[ORB[e.orbit].id]; return { st: fxxState(ORB[e.orbit]), devs: R ? Object.keys(R.devs) : [], order: R ? R.order : '', car: R && R.car ? R.car.src : null, bypassed: R ? Object.fromEntries(Object.entries(R.devs).map(([k, d]) => [k, d.bypassed])) : {} }; }
+  return null; }
+/* keep the inserts with the groups: regroup, new / dropped orbits, tempo */
+const regroup_fx = regroup; regroup = function (...a) { const r = regroup_fx(...a); try { fxxSync(); } catch (x) { FXXLOG.push(String(x && x.message || x)); } return r; };
+const setBpm_fx = setBpm; setBpm = function (v) { setBpm_fx(v); if (FXX) FXX.setBpm(bpm); };
+const initFx_fx = initFx; initFx = function () { const was = !!fx; initFx_fx(); if (!was && fx) { if (FXX) FXX.setBpm(bpm); fxxSync(); } };
+/* offline renders (wav, stems, song): the group's inserts in the offline context too */
+fxxOff = function (ctx, e, dest) { if (!FXX) return dest; const o = ORB[e.orbit], st = o && fxxState(o); if (!st || !fxxOrd().some(id => st[id] && st[id].on)) return dest;
+  const M = ctx._fxx || (ctx._fxx = { orb: {}, pn: {} }); let C = M.orb[o.id];
+  if (!C) { const inp = ctx.createGain(); let p = inp; const devs = {}; for (const id of fxxOrd()) { const s = st[id]; if (!s || !s.on) continue; try { const d = FXX.create(id, ctx, { bpm, params: s.v || {}, bypass: false }); devs[id] = d; p.connect(d.input); p = d.output; } catch (x) { FXXLOG.push(String(x && x.message || x)); } }
+    p.connect(dest); C = M.orb[o.id] = { inp, devs, src: st.vocoder && st.vocoder.on && st.vocoder.src }; }
+  return C.inp; };
+fxxPan = function (ctx, e, pn) { if (ctx._fxx) ctx._fxx.pn[e.id] = pn; else ctx._fxx = { orb: {}, pn: { [e.id]: pn } }; };
+const renderInto_fx = renderInto; renderInto = async function (ctx, dest, opt, beats) {
+  if (FXX && ORB.some(o => { const st = fxxState(o); return st && st.bitcrusher && st.bitcrusher.on; })) { try { await FXX.prepare(ctx); } catch (x) {} }
+  const r = renderInto_fx(ctx, dest, opt, beats); const M = ctx._fxx;
+  if (M) for (const C of Object.values(M.orb)) if (C.src && C.devs.vocoder && M.pn[C.src]) { try { M.pn[C.src].connect(C.devs.vocoder.carrier); } catch (x) {} }
+  return r; };
+function fxInit() { if (!FXX) return;
+  if (bubRoot) { bubRoot.addEventListener('click', ev => { const m = ev.target.closest('[data-bfx]'); if (!m || !BUB.open || ev.target.closest('.bub.anc')) return; ev.stopPropagation(); const top = BUB.st[BUB.st.length - 1]; if (!top || top.key !== 'fxd') return;
+      const devId = top.arg; if (m.dataset.bfx === 'tog') nFx(BUB.id, 'tog', devId); else if (m.dataset.bfx === 'opt') nFx(BUB.id, 'opt', devId, m.dataset.p); bubRender(); }, true);
+    bubRoot.addEventListener('change', ev => { const s = ev.target.closest('[data-bfxcar]'); if (!s || !BUB.open) return; nFx(BUB.id, 'car', s.value); bubRender(); }); }
+  if (fx) fxxSync(); }
+
 
 /* ---------------- sample picker ---------------- */
 const pk = document.getElementById('picker'), pkTabs = document.getElementById('pkTabs'), pkList = document.getElementById('pkList'), pkFile = document.getElementById('pkFile'), pkNote = document.getElementById('pkNote');
@@ -12230,7 +13576,7 @@ window.SS = { E, get ORB() { return ORB; }, IDS, links, get TETH() { return TETH
   get VIEW() { return VIEW; }, zoomAt, setView, zoomFit, zoom11, get COMET() { return COMET; }, setComet, comets, shareLink, shareState, chanceOk, MOON_OFF, POLY, renderMore, get spaceDown() { return spaceDown; },
   sysSnap, applyDiscrete, storeScene, gotoScene, get SCENES() { return SCENES; }, get MORPH() { return MORPH; }, set SCENE_BARS(v) { SCENE_BARS = v; }, mutate, undoMutate, MUT_UNDO, setJam, get JAM() { return JAM; }, jamHit, jamNudge, driftOff, swallow, get HOLE() { return HOLE; }, sunTap, get CHORD() { return CHORD; }, chordIdx, chordName, hitEvent,
   get XS() { return XS; }, setXS, hitsIn, midiFor, exportMidi, exportWav, renderInto, get bin() { return bin; }, binauralOn, get ECL() { return ECL; }, GRAV, startGravity, sizeSemis, sizeWheel, get MOODCSS() { return MOODCSS; }, setTrailKind, trailOf, trailMix, chopPlanet, playSlice, startPractice, endPractice, pracTap, get prac() { return prac; }, get lastPractice() { return lastPractice; }, gravGesture, X, save, setWinTab, get WTAB() { return WTAB; }, setSec, secOpen, set SEC_ALL(v) { SEC_ALL = !!v; sheetDirty = true; }, set UI_ALL(v) { UI_ALL = !!v; sheetDirty = true; if (winId) renderWin(); }, get SHEET() { return SHEET; }, sheetCollapse, applySheet, moreOpen, get SECS() { return SECS; }, get SKIN() { return SKIN; }, setSkin, SKIN_IDS, SKINS, drawScene, SKC, SKSTAT, get fieldBuilds() { return fieldBuilds; }, get CLEAN() { return CLEAN; }, setClean, get CLEAN_LABELS() { return CLEAN_LABELS; }, get XFADE() { return XFADE; }, get GRAV_DONE() { return GRAV_DONE; }, releaseGravity, linked, get lastShare() { return lastShare; }, get PAD9() { return PAD9; }, pad9Init, pad9Toggle, pad9Open, pad9Commit, playPlanetSound, P9V, posAt, timeAtPos, get recCount() { return recCount; } };
-liveInit(); spInit(); modInit(); w3Init(); bubInit(); Object.defineProperties(window.SS, Object.getOwnPropertyDescriptors({ LIVE: true, get space() { return SP; }, get mods() { return MOD; }, get bub() { return BUB; }, lkey, bubOpen, bubClose, bubPush: bubPushKey, bubBack, bubSwap, bubUseRec, bubRender, get V3D() { return V3D; }, set3D, get K() { return K; }, get RMAX() { return RMAX; }, get CX() { return CX; }, get CY() { return CY; }, hitDot, wireSphere, decorate, hitEvent, modHum, modHumApply, modTilt, modAuto, modSongPlay, modSongExport, modSongTemplate, modDuoHost, modDuoTick, get LVP() { return LVP; }, lvCollapse, lvAddPlanet, lvDevToggle, lvDevOn: (dev, id) => { const e = E[id]; return !!e && lvDevOn(dev, e, ORB[e.orbit]); }, lvGet, lvSet, get LVOFF() { return LVOFF; }, lvPadSlot, get lvTemp() { return lvTemp; }, lvOverdub, get lvOd() { return lvOd; }, get master() { return master; }, get LVMASTER() { return LVMASTER; }, get LABELS_ON() { return LABELS_ON; }, get lvMenu() { return lvMenu; }, lvOpenMenu, get recBarsN() { return recBarsN; }, hitDotAt: (x, y) => !!(hitDot(x, y, 4) || hitLabel(x, y) || linkAt(x, y) || Math.hypot(x - CX, y - CY) < SUNR + 12), lvBoxes, lvCloseAll, recMsg: s => recMsg(s), lvSnd: () => lvSndDrag }));
+liveInit(); spInit(); modInit(); w3Init(); bubInit(); nInit(); fxInit(); Object.defineProperties(window.SS, Object.getOwnPropertyDescriptors({ LIVE: true, get space() { return SP; }, get mods() { return MOD; }, get bub() { return BUB; }, get vsx() { return vsx; }, get ACIDLOG() { return ACIDLOG; }, acidKind, acidVoiceOf: id => E[id] && E[id]._av, get G_NAMES() { return G_NAMES; }, nSynth, nFx, fxxSync, get FXD() { return FXD; }, get FXXLOG() { return FXXLOG; }, get FXX() { return FXX; }, get fx2n() { return fx2; }, renderFx: (beats) => X.renderWav({ duration: beats * 60 / bpm + 0.5, render: (c, d) => renderInto(c, d, { solo: null }, beats) }), VAR_NAMES, lkey, bubOpen, bubClose, bubPush: bubPushKey, bubBack, bubSwap, bubUseRec, bubRender, get V3D() { return V3D; }, set3D, get K() { return K; }, get RMAX() { return RMAX; }, get CX() { return CX; }, get CY() { return CY; }, hitDot, wireSphere, decorate, hitEvent, modHum, modHumApply, modTilt, modAuto, modSongPlay, modSongExport, modSongTemplate, modDuoHost, modDuoTick, get LVP() { return LVP; }, lvCollapse, lvAddPlanet, lvDevToggle, lvDevOn: (dev, id) => { const e = E[id]; return !!e && lvDevOn(dev, e, ORB[e.orbit]); }, lvGet, lvSet, get LVOFF() { return LVOFF; }, lvPadSlot, get lvTemp() { return lvTemp; }, lvOverdub, get lvOd() { return lvOd; }, get master() { return master; }, get LVMASTER() { return LVMASTER; }, get LABELS_ON() { return LABELS_ON; }, get lvMenu() { return lvMenu; }, lvOpenMenu, get recBarsN() { return recBarsN; }, hitDotAt: (x, y) => !!(hitDot(x, y, 4) || hitLabel(x, y) || linkAt(x, y) || Math.hypot(x - CX, y - CY) < SUNR + 12), lvBoxes, lvCloseAll, recMsg: s => recMsg(s), lvSnd: () => lvSndDrag }));
 })();
 </script>
 </body>

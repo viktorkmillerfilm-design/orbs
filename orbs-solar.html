@@ -6475,7 +6475,7 @@ let still = false, bpm = 108, snapOn = true, recCount = 0, cloneCount = 0, sheet
 const LS = 'orbs-solar-v1';
 let ready = false, pending = [], savedGroups = null, oldOrbs = null;
 const PKEYS = ['rad', 'a', 'vol', 'pn', 'echo', 'verb', 'cut', 'muted', 'seed'];
-const KEEP = ['trimS', 'trimE', 'rev', 'loop', 'bars', 'recBpm', 'phase', 'recorded', 'label', 'side', 'base', 'gid', 'pat', 'voice', 'prob', 'moons', 'drift', 'inHole', 'size', 'trail', 'chops'];
+const KEEP = ['trimS', 'trimE', 'rev', 'loop', 'bars', 'recBpm', 'phase', 'recorded', 'label', 'side', 'base', 'gid', 'pat', 'voice', 'prob', 'moons', 'drift', 'inHole', 'size', 'trail', 'chops', 'acid', 'fxx'];
 const dbOut = st => Object.assign({}, st, { gainDb: isFinite(st.gainDb) ? st.gainDb : '-inf' });
 function save() { if (!ready || window.__orbsShareLoading) return; try {
   const els = {}; IDS.forEach(id => { const e = E[id], o = els[id] = { v: e.variant }; PKEYS.concat(KEEP).forEach(k => { if (e[k] !== undefined) o[k] = e[k]; }); o.a = +(+e.a).toFixed(5); o.rad = +(+e.rad).toFixed(4); });
@@ -6486,11 +6486,11 @@ function applySaved(e, o) {
   if (o.v) e.variant = String(o.v);
   ['trimS', 'trimE', 'rev', 'loop', 'bars', 'recBpm', 'phase', 'recorded'].forEach(k => { if (o[k] !== undefined) e[k] = o[k]; });
   if (typeof o.gid === 'string') e.gid = o.gid;
-  if (o.voice && typeof o.voice === 'object') e.voice = o.voice;
+  if (o.voice && typeof o.voice === 'object') e.voice = o.voice; if (o.acid && typeof o.acid === 'object') e.acid = o.acid; if (o.fxx && typeof o.fxx === 'object') e.fxx = o.fxx;
   if (isFinite(o.prob)) e.prob = clamp(+o.prob, 0, 1); if (isFinite(o.moons)) e.moons = clamp(o.moons | 0, 0, 3); if (isFinite(o.drift)) e.drift = clamp(+o.drift, 0, 1); e.inHole = !!o.inHole && !!o.muted;
   if (isFinite(o.size)) e.size = clamp(+o.size, 0, 1); if (o.trail && Array.isArray(o.trail.points) && (o.trail.kind === 'cut' || o.trail.kind === 'vol')) e.trail = { kind: o.trail.kind, points: o.trail.points.filter(p => p && isFinite(p.phase) && isFinite(p.value)).slice(0, 32).map(p => ({ phase: frac(+p.phase), value: clamp(+p.value, 0, 1), bend: clamp(+p.bend || 0, -1, 1) })) };
   if (Array.isArray(o.chops)) e.chops = o.chops.filter(c => c && isFinite(c.start) && isFinite(c.end)).slice(0, 32).map(c => ({ start: +c.start, end: +c.end, peak: +c.peak || 0 }));
-  e.pat = Array.isArray(o.pat) ? o.pat.filter(h => h && isFinite(h.o) && isFinite(h.v)).map(h => { const q = { o: frac(+h.o), v: clamp(+h.v, 0, 1) }; if (isFinite(h.c) && +h.c < 1) q.c = clamp(+h.c, 0, 1); if (Number.isInteger(h.s) && h.s >= 0) q.s = h.s; if (isFinite(h.n) && h.n != null) q.n = clamp(Math.round(+h.n), 0, 127); if (isFinite(h.len) && +h.len > 0) q.len = Math.min(16, +h.len); return q; }).slice(0, 128) : [];
+  e.pat = Array.isArray(o.pat) ? o.pat.filter(h => h && isFinite(h.o) && isFinite(h.v)).map(h => { const q = { o: frac(+h.o), v: clamp(+h.v, 0, 1) }; if (isFinite(h.c) && +h.c < 1) q.c = clamp(+h.c, 0, 1); if (Number.isInteger(h.s) && h.s >= 0) q.s = h.s; if (isFinite(h.n) && h.n != null) q.n = clamp(Math.round(+h.n), 0, 127); if (isFinite(h.len) && +h.len > 0) q.len = Math.min(16, +h.len); if (h.acc) q.acc = 1; if (h.sl) q.sl = 1; return q; }).slice(0, 128) : [];
   if (e.side === 'rec' && o.label) e.label = String(o.label).slice(0, 14);
 }
 function load() { try { const s = JSON.parse(localStorage.getItem(LS) || 'null'); if (!s) return;
@@ -8175,6 +8175,7 @@ function exportMidi(id) {
   recMsg('exported ' + (id ? (E[id].label || id) : ids.length + ' planets') + ' · ' + beats / 4 + (beats > 4 ? ' bars' : ' bar') + ' .mid'); return data;
 }
 /* ---- export: wav (offline render: each planet's own voice → vol / filter / pan → a small room) ---- */
+let fxxOff = (ctx, e, dest) => dest, fxxPan = () => {}; /* live build: per-group fx2 inserts (m/u.js) */
 function renderInto(ctx, dest, opt, beats) {
   const real = ac; ac = ctx; rendering = true;
   try {
@@ -8184,7 +8185,7 @@ function renderInto(ctx, dest, opt, beats) {
     for (const id of IDS) { const e = E[id]; if (!exportable(e) || (opt && opt.solo && opt.solo !== id)) continue; const o = grpOf(e), og = o && o.st.muted ? 0 : o ? OrbsFX.dbToGain(o.st.gainDb) : 1;
       const inp = ctx.createGain(), fl = ctx.createBiquadFilter(), vg = ctx.createGain(), pn = ctx.createStereoPanner(), sg = ctx.createGain();
       fl.type = 'lowpass'; fl.Q.value = 0.7; fl.frequency.value = cutHz(e.cut); vg.gain.value = Math.pow(e.vol, 1.3) * e.lvl * og * 0.8; pn.pan.value = clamp(e.pn, -1, 1) * 0.9; sg.gain.value = e.verb;
-      inp.connect(fl); fl.connect(vg); vg.connect(pn); pn.connect(dest); pn.connect(sg); sg.connect(room);
+      inp.connect(fl); fl.connect(vg); vg.connect(pn); pn.connect(fxxOff(ctx, e, dest)); fxxPan(ctx, e, pn); pn.connect(sg); sg.connect(room);
       for (const h of hitsIn(e, 0, beats)) { const t = Math.max(0, h.t) + 0.002, dur = h.ev.dur; try { const fn = voiceFn(e, h.ev); if (fn) fn(t, h.ev, inp, dur); else if (e.chops && h.ev.slice) playSlice(e, t, h.ev, inp); else playVoice(e.id, t, h.ev, inp, dur); } catch (x) {} } }
   } finally { ac = real; rendering = false; }
 }
